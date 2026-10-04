@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stripboard Studio</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">▥</span><span><strong>STRIPBOARD</strong><small>STUDIO</small></span></div>
+      <div class="side-label">WORKSPACE</div>
+      <div class="project-choice"><span class="project-icon">🎬</span><div><span id="sideProject">Caricamento…</span><small>Progetto attivo</small></div></div>
+      <div class="side-label navigation-label">NAVIGAZIONE</div>
+      <button class="nav active" id="boardNav" type="button"><span>▤</span> Stripboard <em id="boardCount">—</em></button>
+      <button class="nav" id="reportNav" type="button"><span>▧</span> Report <em id="reportCount">—</em></button>
+      <div class="side-bottom">
+        <div class="source-note"><span class="dot"></span> File elaborati in locale</div>
+        <p>Layout e contenuti provengono dai file Movie Magic Scheduling.</p>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumb">WORKSPACE <span>/</span> <b id="crumb">STRIPBOARD</b></div>
+        <div class="top-actions"><span class="version-badge">v1.3.0</span><span class="local-badge">● &nbsp; Locale</span><label class="upload"><input id="fileInput" type="file" accept=".msd">＋ &nbsp; Importa .msd</label></div>
+      </header>
+      <div class="page">
+        <div class="eyebrow">MOVIE MAGIC SCHEDULING · VISUALIZZATORE</div>
+        <div class="title-row"><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><button id="printButton" class="print-button" type="button">↗ &nbsp; Stampa vista</button></div>
+        <div id="status" class="status" hidden></div>
+        <section class="controls">
+          <div class="control"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div>
+          <div class="control"><label for="boardSelect">PIANO DI LAVORAZIONE</label><select id="boardSelect"></select></div>
+          <div class="control"><label for="layoutSelect" id="layoutLabel">LAYOUT STRIPBOARD</label><select id="layoutSelect"></select></div>
+        </section>
+        <section class="print-options" id="printOptions" aria-label="Opzioni di stampa stripboard">
+          <label><input id="printPageBreaks" type="checkbox"> Nuova pagina dopo ogni giorno</label>
+          <label><input id="printHeader" type="checkbox"> Header di stampa</label>
+        </section>
+        <section class="visibility-options" aria-label="Visibilità delle righe">
+          <label><input id="hideBanners" type="checkbox"> Nascondi banner</label>
+          <label><input id="hideDayBreaks" type="checkbox"> Nascondi fine giornata</label>
+        </section>
+        <section class="stats" id="stats"></section>
+        <section class="content-panel">
+          <div class="panel-header"><div><div class="section-kicker" id="sectionKicker">PIANO DI LAVORAZIONE</div><h2 id="viewTitle">Stripboard</h2><p id="viewSubtitle"></p></div><div class="panel-tools"><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="Cerca scena, set, testo…"></label><label class="color-switch" id="colorSwitch"><input id="showColors" type="checkbox" checked><span class="switch-track"></span><span>Colori strip</span></label><button id="toggleUnscheduled" class="subtle-button" type="button">Coda non programmata</button></div></div>
+          <div id="boardView" class="view"></div>
+          <div id="reportView" class="view" hidden></div>
+        </section>
+        <footer>Stripboard Studio v1.3.0 <span>·</span> Crediti: <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41 su GitHub</a></footer>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="assets/app.js"></script>
+</body>
+</html>

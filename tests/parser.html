@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="it"><meta charset="utf-8"><title>Verifica parser MSD</title>
+<body><h1>Verifica parser MSD</h1><pre id="result">In corso…</pre>
+<script type="module">
+import {parseMsd} from '../assets/msd-parser.js';
+const fixtures=[
+  {file:'Wonderful Life Demo.msd',title:"IT'S A WONDERFUL LIFE",activeBoard:'Actor Scenario',
+    counts:{scenes:146,elements:445,categories:28,calendars:3,stripboards:3,sceneElementAssociations:840,linkedElements:0,redFlags:6,scheduleDays:87,unscheduledDays:0},
+    layouts:[7,15],dates:['2008-06-17','2008-07-30'],scenes:132,banners:12}
+];
+const lines=[];let failures=0;
+function check(label,actual,expected){const okay=JSON.stringify(actual)===JSON.stringify(expected);lines.push(`${okay?'✓':'✗'} ${label}: ${JSON.stringify(actual)}`);if(!okay){failures++;lines.push(`  atteso: ${JSON.stringify(expected)}`)}}
+for(const fixture of fixtures){
+  try{
+    const response=await fetch('../samples/'+encodeURIComponent(fixture.file));
+    if(!response.ok)throw Error(`HTTP ${response.status}`);
+    const bytes=await response.arrayBuffer(),project=await parseMsd(bytes,fixture.file);
+    const board=project.boards.find(x=>x.name===project.activeBoard);
+    lines.push(`\n${fixture.file}`);
+    check('titolo',project.title,fixture.title);
+    check('conteggi',project.counts,fixture.counts);
+    check('layout', [project.stripLayouts.length,project.reportLayouts.length],fixture.layouts);
+    check('piano attivo',project.activeBoard,fixture.activeBoard);
+    check('date',[board.dateAudit.firstDate,board.dateAudit.lastDate],fixture.dates);
+    check('scene nel piano',board.scheduledGroups.flatMap(g=>g.strips).filter(x=>x.kind==='scene').length,fixture.scenes);
+    check('banner nel piano',board.scheduledGroups.flatMap(g=>g.strips).filter(x=>x.kind==='banner').length,fixture.banners);
+    const invalid=bytes.slice(0);new Uint8Array(invalid)[0]=0;
+    let rejected=false;try{await parseMsd(invalid,fixture.file)}catch{rejected=true}
+    check('contenitore non valido respinto',rejected,true);
+  }catch(error){failures++;lines.push(`✗ ${fixture.file}: ${error.message}`)}
+}
+document.querySelector('#result').textContent=lines.join('\n')+`\n\n${failures?'ERRORI: '+failures:'TUTTI I CONTROLLI SUPERATI'}`;
+document.body.dataset.passed=String(failures===0);
+</script></body></html>
