@@ -252,8 +252,16 @@ function stripboardHeader(shapes,metrics){
   addLines(el,shapes,geo,metrics.scale,'strip-field');return el;
 }
 function groupMatches(group,q){if(!q)return true;return group.strips.some(x=>searchText(state.sceneMap.get(x.bdsId),x).includes(q));}
+function fitBoardPreview(){
+  const view=$('boardView');
+  if(view.hidden||view.classList.contains('is-vertical')||!view.classList.contains('print-fit'))return;
+  const styles=getComputedStyle(view);
+  const available=view.clientWidth-parseFloat(styles.paddingLeft)-parseFloat(styles.paddingRight);
+  const width=parseFloat(view.style.getPropertyValue('--print-board-width'));
+  if(available>0&&width>0)view.style.setProperty('--live-board-zoom',String(available/width));
+}
 function renderBoard(board,layout){
-  const view=$('boardView');view.replaceChildren();const q=state.query.trim().toLocaleLowerCase();
+  const view=$('boardView');view.replaceChildren();view.style.setProperty('--live-board-zoom','1');const q=state.query.trim().toLocaleLowerCase();
   const vertical=layout.orientation==='VERTICAL';
   view.classList.toggle('is-vertical',vertical);
   const metrics=stripMetrics(layout);
@@ -289,6 +297,7 @@ function renderBoard(board,layout){
   view.style.setProperty('--print-board-width',`${Math.max(1,...printWidths)}px`);
   view.style.setProperty('--print-strip-height',`${Math.max(1,...printStrips.map(strip=>strip.offsetHeight))}px`);
   if(!shown){const el=document.createElement('div');el.className='empty';el.textContent='Nessun risultato per questa ricerca.';view.append(el)}
+  fitBoardPreview();
 }
 function syncPrintOptions(){
   $('printPageBreaks').checked=state.printPageBreaks;$('printHeader').checked=state.printHeader;
@@ -368,6 +377,7 @@ $('printButton').addEventListener('click',()=>{
   if(state.mode==='report'&&!state.allReport){state.allReport=true;renderReport(selectedBoard(),selectedLayout())}
   requestAnimationFrame(()=>window.print());
 });
+new ResizeObserver(fitBoardPreview).observe($('boardView'));
 $('fileInput').addEventListener('change',async e=>{
   const file=e.target.files[0];if(!file)return;showStatus('');$('projectTitle').textContent='Importazione…';
   try{if(file.size>20*1024*1024)throw Error('Il file deve essere inferiore a 20 MB');const data=await parseMsd(await file.arrayBuffer(),file.name);state.imported=data;

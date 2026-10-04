@@ -517,7 +517,8 @@ button {
 .strips {
     display: flex;
     flex-direction: column;
-    gap: 0
+    gap: 0;
+    zoom: var(--live-board-zoom, 1)
 }
 
 .strip-outer {
@@ -536,8 +537,8 @@ button {
     color: #233441
 }
 
-.strips .strip-outer:not(:last-child) .strip-layout {
-    border-bottom: 0
+.strips .strip-outer:not(:last-child) {
+    margin-bottom: -1px
 }
 
 .strip-layout:hover {
@@ -924,6 +925,8 @@ footer span {
     #boardView.print-fit {
         zoom: min(calc(99vw / var(--print-board-width)), calc(90vh / var(--print-strip-height)))
     }
+
+    #boardView .strips { zoom: 1 }
 
     #boardView.is-vertical { display: block; overflow: visible }
 

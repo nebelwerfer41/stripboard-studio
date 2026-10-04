@@ -27,6 +27,7 @@ Il browser deve supportare `DecompressionStream('deflate-raw')`, `DOMParser` e i
 - Banner e fine giornata disegnati come strip a larghezza uguale alle scene.
 - Interruttore **Colori strip**: applica la griglia colori `INT/EXT` × `Giorno/Notte` del file, oltre ai colori dedicati di banner e fine giornata; può tornare alla vista neutra.
 - Giorni senza testata aggiunta e senza spazio finale; nei layout verticali, giorni affiancati con scorrimento orizzontale.
+- Anteprima orizzontale della stripboard adattata automaticamente alla larghezza del pannello, anche quando la finestra viene ridimensionata.
 - Anteprima dei layout report contenuti nel file, con campi collegati ai dati e stampa dal browser. Banner e fine giornata, quando previsti dal modello, compaiono come righe di testo nel flusso del report.
 - Stampa della stripboard con formato carta, orientamento, margini e scala gestiti dalla finestra di stampa del browser; nell'app restano le opzioni per header e nuova pagina dopo ogni giornata.
 - Importazione locale di altri file `.msd` compatibili con il formato dei campioni.
