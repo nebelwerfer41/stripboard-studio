@@ -536,6 +536,10 @@ button {
     color: #233441
 }
 
+.strips .strip-outer + .strip-outer .strip-layout {
+    border-top: 0
+}
+
 .strip-layout:hover {
     background: #f3f8f7;
     border-color: #9bc9bf
@@ -551,6 +555,14 @@ button {
     display: flex;
     align-items: center;
     min-width: 0
+}
+
+.strip-field.multiline {
+    display: block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    align-content: center
 }
 
 .strip-field.center {
@@ -681,7 +693,8 @@ button {
 }
 
 .report-shape.multiline {
-    white-space: normal
+    white-space: normal;
+    overflow-wrap: anywhere
 }
 
 .record-caption {

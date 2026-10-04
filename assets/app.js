@@ -120,7 +120,7 @@ function fieldValue(shape,ctx){
   }
   if(shape.tag==='BDSElementsIDListField'){
     const names=contextRequirements(ctx,[a.CategoryName]);
-    return names.map(n=>state.elementIds.get(`${a.CategoryName}\u0000${n}`)||n).join(' · ');
+    return names.map(n=>state.elementIds.get(`${a.CategoryName}\u0000${n}`)||n).join(', ');
   }
   if(shape.tag==='BDSRedFlagField')return '';
   if(shape.tag==='BDSByDayField'){
@@ -176,7 +176,7 @@ function createShapes(shapes,ctx,scale,baseClass,geo){
     const a=s.a;const value=fieldValue(s,ctx);div.textContent=value;
     if(!value)div.classList.add('muted');
     if(a.TextJustification==='CENTER')div.classList.add('center');if(a.TextJustification==='RIGHT')div.classList.add('right');
-    if(a.WrapText==='1'||s.tag==='BDSCategoryElementsField')div.classList.add('multiline');
+    if(a.WrapText==='1'||s.tag==='BDSCategoryElementsField'||s.tag==='BDSElementsIDListField')div.classList.add('multiline');
     div.style.left=((r[0]-geo.minX)*scale)+'px';div.style.top=((r[1]-geo.minY)*scale)+'px';
     div.style.width=Math.max(5,r[2]*scale)+'px';div.style.height=Math.max(8,r[3]*scale)+'px';
     div.style.fontSize=Math.max(7,Math.min(13,(Number(s.font.Size)||9)*.85))+'px';
