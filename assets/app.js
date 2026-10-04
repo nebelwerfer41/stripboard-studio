@@ -3,7 +3,6 @@ const $ = id => document.getElementById(id);
 const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
 const state = {project:null, mode:'board', board:null, layout:null, query:'', unscheduled:false, showColors:true, hideBanners:false, hideDayBreaks:false, allReport:false, imported:null, printPageBreaks:false, printHeader:true};
 const SCREEN_PX_PER_INCH=76;
-const PRINT_PX_PER_INCH=96;
 const collator = new Intl.Collator('it',{numeric:true,sensitivity:'base'});
 const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Senza data';
 const shortDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'}) : '—';
@@ -61,7 +60,7 @@ function render(){
   $('viewTitle').textContent=state.mode==='board'?board.name:layout.name;
   $('viewSubtitle').textContent=state.mode==='board'?`Calendario: ${board.calendarName} · Layout: ${layout.name}`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
   renderStats(board);
-  if(state.mode==='board'){renderBoard(board,layout);applyPrintLayout(layout)}else{const style=$('printLayoutStyle');if(style)style.textContent='';renderReport(board,layout)}
+  if(state.mode==='board')renderBoard(board,layout);else renderReport(board,layout);
 }
 function renderStats(board){
   const dated=board.scheduledGroups.filter(g=>g.kind==='ScheduleDay');
@@ -283,35 +282,17 @@ function renderBoard(board,layout){
     day.append(wrap);
     view.append(day);shown++;
   }
+  const printStrips=[...view.querySelectorAll('.strip-layout')];
+  const printWidths=vertical?[...view.querySelectorAll('.vertical-grid')].map(grid=>grid.scrollWidth):
+    printStrips.map(strip=>strip.offsetWidth);
+  view.classList.toggle('print-fit',printStrips.length>0);
+  view.style.setProperty('--print-board-width',`${Math.max(1,...printWidths)}px`);
+  view.style.setProperty('--print-strip-height',`${Math.max(1,...printStrips.map(strip=>strip.offsetHeight))}px`);
   if(!shown){const el=document.createElement('div');el.className='empty';el.textContent='Nessun risultato per questa ricerca.';view.append(el)}
 }
 function syncPrintOptions(){
   $('printPageBreaks').checked=state.printPageBreaks;$('printHeader').checked=state.printHeader;
   document.body.classList.toggle('print-with-header',state.printHeader);
-}
-function printSurface(layout){
-  const paper=layout.paper||{},format=layout.pageFormat||{};
-  const width=Number(paper.Width),height=Number(paper.Height);
-  const rect=(paper.PrintableRect||'').split(',').map(Number);
-  if(!(width>0&&height>0&&rect.length===4&&rect.every(Number.isFinite)&&rect[2]>0&&rect[3]>0))return null;
-  const landscape=/LANDSCAPE/.test(format.Orientation||'');
-  if(!landscape)return {width,height,contentWidth:rect[2],contentHeight:rect[3],margins:[rect[1],width-rect[0]-rect[2],height-rect[1]-rect[3],rect[0]]};
-  const reverse=format.Orientation==='REVERSE_LANDSCAPE';
-  return {width:height,height:width,contentWidth:rect[3],contentHeight:rect[2],margins:reverse?
-    [rect[0],rect[1],width-rect[0]-rect[2],height-rect[1]-rect[3]]:
-    [width-rect[0]-rect[2],height-rect[1]-rect[3],rect[0],rect[1]]};
-}
-function applyPrintLayout(layout){
-  const surface=printSurface(layout),metrics=stripMetrics(layout);
-  const dayWidths=[...$('boardView').querySelectorAll('.vertical-grid')]
-    .map(grid=>grid.querySelectorAll('.strip-outer').length*metrics.width);
-  const boardWidth=metrics.vertical?Math.max(metrics.width,...dayWidths):metrics.width;
-  const available=surface?surface.contentWidth*PRINT_PX_PER_INCH:boardWidth*PRINT_PX_PER_INCH/metrics.scale;
-  const heightFit=metrics.vertical&&surface?surface.contentHeight*PRINT_PX_PER_INCH/metrics.height:Infinity;
-  const zoom=Math.min(PRINT_PX_PER_INCH/metrics.scale,available/boardWidth,heightFit);
-  const style=$('printLayoutStyle')||document.head.appendChild(Object.assign(document.createElement('style'),{id:'printLayoutStyle'}));
-  const page=surface?`@page { size: ${surface.width}in ${surface.height}in; margin: ${surface.margins.map(v=>Math.max(0,v)+'in').join(' ')}; }`:'';
-  style.textContent=`${page} @media print { #boardView { width: ${boardWidth}px; zoom: ${Math.max(.01,zoom)}; } }`;
 }
 function reportRecords(board,layout){
   if(layout.sourceType==='BY_CATEGORY'){

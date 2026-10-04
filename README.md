@@ -1,4 +1,4 @@
-# Stripboard Studio v1.3.0
+# Stripboard Studio v1.3.1
 
 App statica per visualizzare stripboard e modelli di report contenuti nei file Movie Magic Scheduling 6 (`.msd`). Il parser e il renderer sono JavaScript nel browser: nessun backend, database o account richiesto. I file importati restano nel browser e non vengono caricati su un server.
 
@@ -28,7 +28,7 @@ Il browser deve supportare `DecompressionStream('deflate-raw')`, `DOMParser` e i
 - Interruttore **Colori strip**: applica la griglia colori `INT/EXT` × `Giorno/Notte` del file, oltre ai colori dedicati di banner e fine giornata; può tornare alla vista neutra.
 - Giorni senza testata aggiunta e senza spazio finale; nei layout verticali, giorni affiancati con scorrimento orizzontale.
 - Anteprima dei layout report contenuti nel file, con campi collegati ai dati e stampa dal browser. Banner e fine giornata, quando previsti dal modello, compaiono come righe di testo nel flusso del report.
-- Stampa della stripboard adattata al formato carta e all'area stampabile del layout, con opzioni indipendenti per header e nuova pagina dopo ogni giornata.
+- Stampa della stripboard con formato carta, orientamento, margini e scala gestiti dalla finestra di stampa del browser; nell'app restano le opzioni per header e nuova pagina dopo ogni giornata.
 - Importazione locale di altri file `.msd` compatibili con il formato dei campioni.
 
 Le date dei giorni sono derivate dai calendari come nel parser incluso e vengono indicate come stimate. L'anteprima dei report riproduce contenuti e geometria dei campi principali; funzioni di impaginazione e formule proprietarie di Movie Magic non sono replicate completamente.
@@ -41,7 +41,7 @@ Per gli stili di banner e day break, `Alignment` usa i valori `20` (sinistra), `
 
 Nei file di esempio non esiste un attributo di margine/spaziatura del day break o di interruzione pagina della stripboard. Il day break occupa quindi una strip della stessa altezza prevista dal layout, senza margine esterno; il piccolo padding del testo è interno. L'opzione «Nuova pagina dopo ogni giorno» è interna all'app e parte disattivata. `HideStripBoardHeader` del piano determina lo stato iniziale dell'opzione header. Per i report, `ReportSettings.PageBreak` è una proprietà distinta e non viene applicata alla stripboard.
 
-La stampa usa l'orientamento e l'area stampabile del layout; lo zoom viene calcolato dalle dimensioni effettive del canvas e dalla pagina. `PrintScale` e `ScaleStyle` rimangono nel modello originale: nei template osservati `ScaleStyle=Refit`, mentre alcuni valori `PrintScale` non sono coerenti con la lunghezza della strip, perciò il fattore finale viene ricalcolato per evitare il taglio laterale.
+Il browser gestisce la carta e l'area stampabile senza un vincolo `@page` imposto dall'app. La stripboard viene ingrandita o ridotta automaticamente per occupare la larghezza stampabile quando l'altezza delle strip lo consente; la scala resta regolabile nella finestra di stampa. Il file `.msd` conserva i suoi valori originali. `PrintScale` e `ScaleStyle` rimangono nel modello originale: nei template osservati `ScaleStyle=Refit`, mentre alcuni valori `PrintScale` non sono coerenti con la lunghezza della strip.
 
 La barretta laterale è stata rimossa dalla stripboard. La larghezza del canvas di stampa dipende solo dalle strip; l'header opzionale e il bordo sinistro delle strip partono dallo stesso margine stampabile. Nei report, `IncludeBanners`, `IncludeDayBreaks` e `DayBreakFooterText` del template determinano le righe speciali di partenza; i controlli di visibilità possono nasconderle senza modificare il modello MSD.
 

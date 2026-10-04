@@ -536,8 +536,8 @@ button {
     color: #233441
 }
 
-.strips .strip-outer + .strip-outer .strip-layout {
-    border-top: 0
+.strips .strip-outer:not(:last-child) .strip-layout {
+    border-bottom: 0
 }
 
 .strip-layout:hover {
@@ -916,7 +916,14 @@ footer span {
         overflow-wrap: anywhere
     }
 
-    #boardView { width: max-content; max-width: none }
+    #boardView {
+        width: max-content;
+        max-width: none
+    }
+
+    #boardView.print-fit {
+        zoom: min(calc(99vw / var(--print-board-width)), calc(90vh / var(--print-strip-height)))
+    }
 
     #boardView.is-vertical { display: block; overflow: visible }
 
@@ -927,6 +934,7 @@ footer span {
         box-shadow: none !important
     }
 
+    html,
     body {
         background: #fff
     }
