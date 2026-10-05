@@ -3,6 +3,9 @@
 <body><h1>Verifica parser MSD</h1><pre id="result">In corso…</pre>
 <script type="module">
 import {parseMsd} from '../assets/msd-parser.js';
+import {sortCategoryElements,elementLabel} from '../assets/element-format.js';
+import {selectedCalendar,getCalendarDate,shootingDaysOnDate,scenesForShootingDay,boardWithCalendar,
+  redFlagsOnDate,redFlagsForShootingDay,redFlagsForScene,redFlagsForStrip} from '../assets/production-data.js';
 const fixtures=[
   {file:'Wonderful Life Demo.msd',title:"IT'S A WONDERFUL LIFE",activeBoard:'Actor Scenario',
     counts:{scenes:146,elements:445,categories:28,calendars:3,stripboards:3,sceneElementAssociations:840,linkedElements:0,redFlags:6,scheduleDays:87,unscheduledDays:0},
@@ -20,10 +23,43 @@ for(const fixture of fixtures){
     check('titolo',project.title,fixture.title);
     check('conteggi',project.counts,fixture.counts);
     check('layout', [project.stripLayouts.length,project.reportLayouts.length],fixture.layouts);
+    check('layout stripboard con campi Red Flag',project.stripLayouts.filter(layout=>layout.fields.some(field=>field.tag==='BDSRedFlagField')).length,6);
+    check('due campi Red Flag in Horizontal B',project.stripLayouts.find(layout=>layout.name==='Horizontal B').fields.filter(field=>field.tag==='BDSRedFlagField').length,2);
     check('piano attivo',project.activeBoard,fixture.activeBoard);
     check('date',[board.dateAudit.firstDate,board.dateAudit.lastDate],fixture.dates);
+    const alternate=boardWithCalendar(project,'Actor Scenario','6 Day Week');
+    check('proiezione calendario alternativo',[alternate.scheduledGroups.find(g=>g.shootingDayNumber===5)?.date,alternate.dateAudit.lastDate],['2008-06-21','2008-07-23']);
+    check('calendario MSD originale preservato',board.calendarName,'5 Day Week');
+    check('strip e scene preservate nella proiezione',alternate.scheduledGroups[0].strips===board.scheduledGroups[0].strips,true);
     check('scene nel piano',board.scheduledGroups.flatMap(g=>g.strips).filter(x=>x.kind==='scene').length,fixture.scenes);
     check('banner nel piano',board.scheduledGroups.flatMap(g=>g.strips).filter(x=>x.kind==='banner').length,fixture.banners);
+    check('calendari indipendenti',project.calendars.map(c=>c.name),['Actor Unavailable','5 Day Week','6 Day Week']);
+    check('calendario predefinito',project.defaultCalendar,'5 Day Week');
+    check('calendario del piano',selectedCalendar(project).name,'5 Day Week');
+    check('giorno lavorativo',getCalendarDate(project,'5 Day Week','2008-06-18').working,true);
+    check('giorno non lavorativo',getCalendarDate(project,'5 Day Week','2008-06-21').working,false);
+    check('festività fuori intervallo di produzione',getCalendarDate(project,'5 Day Week','2004-05-31').reason,'Holiday');
+    check('data distinta dal giorno di riprese',shootingDaysOnDate(project,'5 Day Week','2008-06-21').length,0);
+    check('numero giorno riprese',shootingDaysOnDate(project,'5 Day Week','2008-06-18').find(d=>d.boardName==='Actor Scenario')?.shootingDayNumber,2);
+    check('scene del giorno riprese',scenesForShootingDay(project,'Actor Scenario',2).length,1);
+    check('red flags multiple stessa data',redFlagsOnDate(project,'2008-06-27').map(f=>f.target.element),['Mr. Potter','Mr. Gower']);
+    check('red flags non mostrate senza elemento nel giorno',redFlagsForShootingDay(project,'Actor Scenario',9).length,0);
+    check('red flag mostrata con elemento schedulato',redFlagsForShootingDay(project,'Actor Scenario',27).map(f=>f.name),['Fitting - DOOD']);
+    check('red flag generale nella giornata',redFlagsForShootingDay(project,'Actor Scenario',2).map(f=>f.name),['Misc.']);
+    const secondDayScene=board.scheduledGroups.find(g=>g.shootingDayNumber===2).strips.find(s=>s.kind==='scene');
+    check('red flag generale su ogni strip del giorno',redFlagsForStrip(project,secondDayScene.bdsId,'2008-06-18').map(f=>f.name),['Misc.']);
+    check('red flag di progetto',redFlagsOnDate(project,'2008-06-18')[0].target.kind,'project');
+    check('red flag di elemento',redFlagsOnDate(project,'2008-07-23')[0].target.category,'Cast Members');
+    const scene=project.scenes.find(item=>item.scene==='12');
+    check('red flag associata alla scena via elemento',redFlagsForScene(project,scene.bdsId,'2008-07-23').map(f=>f.name),['Fitting - DOOD']);
+    check('id sorgente assente e identità locale',project.redFlags.map(f=>[f.sourceId,f.identitySource]).every(([id,source])=>id===null&&source==='entry-order'),true);
+    check('XML raw per futuro round-trip',Boolean(project.sourceXmlSections.CalendarMgr&&project.sourceXmlSections.RedFlagMgr&&project.redFlags.every(f=>f.source?.tag==='RedFlagEntry')),true);
+    check('DOODStatus raw',redFlagsOnDate(project,'2008-06-27').map(f=>f.doodStatus),['16384','16384']);
+    for(const [category,expected] of [['Cast Members',['1.George','6.Mr. Gower']],['Props',['18.Liquor Bottle','63.Poison Capsules','65.Prescription Box','48.Telephone']]]){
+      const elements=project.elements.filter(element=>element.category===category&&scene.requirements[category].includes(element.name));
+      const settings=project.categorySettings.find(item=>item.name===category).attributes;
+      check('scena 12: '+category,sortCategoryElements(elements,settings).map(elementLabel),expected);
+    }
     const invalid=bytes.slice(0);new Uint8Array(invalid)[0]=0;
     let rejected=false;try{await parseMsd(invalid,fixture.file)}catch{rejected=true}
     check('contenitore non valido respinto',rejected,true);

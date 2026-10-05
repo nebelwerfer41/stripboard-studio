@@ -1,7 +1,17 @@
 import {parseMsd} from './msd-parser.js';
+import {serializeMsd} from './msd-writer.js';
+import {moveStrip,createStripboard} from './scheduling.js';
+import {resetDocumentState,documentIsDirty,markDocumentEdited,beginDocumentSave,finishDocumentSave} from './document-state.js';
+import {elementSumText,categoryElementsText,elementLabel,sortCategoryElements} from './element-format.js';
+import {expandReportBoxes} from './report-layout.js';
+import {redFlagsForStrip,redFlagsOnDate,calendarDate,boardWithCalendar,outsideCalendarActivity} from './production-data.js';
 const $ = id => document.getElementById(id);
 const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
-const state = {project:null, mode:'board', board:null, layout:null, query:'', unscheduled:false, showColors:true, hideBanners:false, hideDayBreaks:false, allReport:false, imported:null, printPageBreaks:false, printHeader:true};
+const state = {project:null, mode:'board', board:null, calendar:null, calendarMonth:null, calendarDate:null,
+  flagMonth:null,flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null,
+  layout:null, query:'', unscheduled:false, showColors:true, hideBanners:false, hideDayBreaks:false,
+  allReport:false, importedSource:null, printPageBreaks:false, printHeader:true,reportOptions:new Map(),
+  revision:0,savedRevision:0,serializationState:'idle',moveFrom:null};
 const SCREEN_PX_PER_INCH=76;
 const collator = new Intl.Collator('it',{numeric:true,sensitivity:'base'});
 const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Senza data';
@@ -11,40 +21,74 @@ const rect = s => (s.a.BoundingRect||'').split(',').map(Number);
 const safe = v => String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const sceneIndex = () => new Map(state.project.scenes.map(s=>[s.bdsId,s]));
 const selectedBoard = () => state.project.boards.find(b=>b.name===state.board) || state.project.boards[0];
+const displayedBoard = () => boardWithCalendar(state.project,state.board,state.calendar)||selectedBoard();
+const selectedProductionCalendar = () => state.project.calendars.find(c=>c.name===state.calendar)||state.project.calendars[0];
 const selectedLayout = () => (state.mode==='board'?state.project.stripLayouts:state.project.reportLayouts).find(l=>l.name===state.layout);
 const groups = b => [...(b?.scheduledGroups||[]),...(state.unscheduled?b?.unscheduledGroups||[]:[])];
 const sceneList = b => groups(b).flatMap(g=>g.strips.filter(x=>x.kind==='scene').map(x=>state.sceneMap.get(x.bdsId)).filter(Boolean));
 const searchText = (s,x) => [s?.scene,s?.set,s?.location,s?.synopsis,s?.scriptDay,x?.text].join(' ').toLocaleLowerCase();
 
 function showStatus(message){$('status').textContent=message;$('status').hidden=!message;}
+function isDirty(){return documentIsDirty(state)}
+function updateDocumentStatus(){
+  const saving=state.serializationState==='saving';
+  $('dirtyIndicator').textContent=saving?'Salvataggio…':isDirty()?'Modifiche non salvate':'Salvato';
+  $('dirtyIndicator').classList.toggle('dirty',isDirty());
+  $('saveButton').disabled=saving||!state.project;
+}
+function edited(){markDocumentEdited(state);updateDocumentStatus();render()}
+function refreshBoardOptions(){
+  $('boardSelect').innerHTML=state.project.boards.map(b=>`<option value="${safe(b.name)}">${safe(b.name)}</option>`).join('');
+  $('boardSelect').value=state.board;$('boardCount').textContent=state.project.boards.length;
+  $('projectSubtitle').textContent=`${state.project.fileName} · ${state.project.counts.scenes} scene · ${state.project.boards.length} piani disponibili`;
+}
 async function loadSample(id){
   showStatus('');$('projectTitle').textContent='Caricamento…';
   try {const source=SAMPLES[id];if(!source)throw Error('Progetto non trovato');const response=await fetch(encodeURI(source));
     if(!response.ok)throw Error(response.status===404?'Campione non disponibile: importa un file .msd dal tuo computer.':'Impossibile leggere il file MSD di esempio');
-    setProject(await parseMsd(await response.arrayBuffer(),source.split('/').at(-1)))}
+    setProject(await parseMsd(await response.arrayBuffer(),source.split('/').at(-1)));state.projectChoice=id}
   catch(e){showStatus(e.message);$('projectTitle').textContent=state.project?.title||'Importa un progetto .msd'}
 }
 function setProject(data){
+  resetDocumentState(state);
   state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;
+  state.calendar=selectedBoard()?.calendarName||data.defaultCalendar||data.calendars[0]?.name;
+  state.calendarMonth=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso?.slice(0,7)||new Date().toISOString().slice(0,7);
+  state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
+  state.flagMonth=data.redFlags.map(f=>f.date).filter(Boolean).sort()[0]?.slice(0,7)||state.calendarMonth;
+  Object.assign(state,{flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null});
+  state.elementMap=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e]));
+  state.categorySettings=new Map((data.categorySettings||[]).map(c=>[c.name,c.attributes]));state.reportOptions.clear();
   state.unscheduled=false;state.allReport=false;state.query='';$('search').value='';
   state.hideBanners=false;state.hideDayBreaks=false;$('hideBanners').checked=false;$('hideDayBreaks').checked=false;
   state.printPageBreaks=false;state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
   $('sideProject').textContent=data.title;$('projectTitle').textContent=data.title;
-  $('projectSubtitle').textContent=`${data.fileName} · ${data.counts.scenes} scene · ${data.boards.length} piani disponibili`;
-  $('boardCount').textContent=data.boards.length;$('reportCount').textContent=data.reportLayouts.length;
-  $('boardSelect').innerHTML=data.boards.map(b=>`<option value="${safe(b.name)}">${safe(b.name)}</option>`).join('');$('boardSelect').value=state.board;
+  refreshBoardOptions();$('reportCount').textContent=data.reportLayouts.length;
+  $('calendarCount').textContent=data.calendars.length;$('redFlagCount').textContent=data.redFlags.length;
+  $('calendarSelect').innerHTML=data.calendars.map(c=>`<option value="${safe(c.name)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
   $('toggleUnscheduled').classList.remove('selected');$('toggleUnscheduled').textContent='Visualizza Boneyard';
-  showStatus('');setMode(state.mode);
+  showStatus('');updateDocumentStatus();setMode(state.mode);
 }
 function setMode(mode){
-  state.mode=mode;$('boardNav').classList.toggle('active',mode==='board');$('reportNav').classList.toggle('active',mode==='report');
-  $('crumb').textContent=mode==='board'?'STRIPBOARD':'REPORT';$('layoutLabel').textContent=mode==='board'?'LAYOUT STRIPBOARD':'MODELLO REPORT';
-  $('sectionKicker').textContent=mode==='board'?'PIANO DI LAVORAZIONE':'ANTEPRIMA REPORT';
+  state.mode=mode;
+  for(const [id,key] of [['boardNav','board'],['reportNav','report'],['calendarNav','calendar'],['redFlagNav','redflags']])$(id).classList.toggle('active',mode===key);
+  $('crumb').textContent={board:'STRIPBOARD',report:'REPORT',calendar:'PRODUCTION CALENDARS',redflags:'RED FLAG ENTRY'}[mode];
+  $('layoutLabel').textContent=mode==='board'?'LAYOUT STRIPBOARD':'MODELLO REPORT';
+  $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'PRODUCTION CALENDARS',redflags:'RED FLAG ENTRY'}[mode];
   $('search').placeholder=mode==='board'?'Cerca scena, set, testo…':'Cerca nei dati del report…';
   $('toggleUnscheduled').style.display=mode==='board'?'':'none';
   $('colorSwitch').style.display=mode==='board'?'':'none';
   $('printOptions').hidden=mode!=='board';
+  $('reportOptions').hidden=mode!=='report';
+  $('visibilityOptions').hidden=mode!=='board'&&mode!=='report';
+  $('boardControl').hidden=mode==='redflags';
+  $('layoutControl').hidden=mode==='calendar'||mode==='redflags';
+  $('calendarControl').hidden=mode!=='board'&&mode!=='calendar';
+  $('panelTools').hidden=mode==='calendar'||mode==='redflags';
+  $('stats').hidden=mode==='calendar'||mode==='redflags';
+  $('controls').classList.toggle('minimal',mode==='redflags');
   const layouts=mode==='board'?state.project?.stripLayouts:state.project?.reportLayouts;
+  if(mode==='calendar'||mode==='redflags'){render();return}
   if(!layouts)return;
   if(!layouts.some(l=>l.name===state.layout)){
     const preferred=mode==='board'?layouts.find(l=>l.orientation==='HORIZONTAL' && l.name.startsWith('*Schedule'))||layouts.find(l=>l.orientation==='HORIZONTAL'):layouts.find(l=>l.name==='Flash Suite Export')||layouts.find(l=>l.sourceType==='STRIP_BOARD'&&l.recordType==='STRIP')||layouts[0];
@@ -55,10 +99,18 @@ function setMode(mode){
 }
 function render(){
   if(!state.project)return;
-  const board=selectedBoard(),layout=selectedLayout();if(!board||!layout)return;
-  $('boardView').hidden=state.mode!=='board';$('reportView').hidden=state.mode!=='report';
+  for(const [id,mode] of [['boardView','board'],['reportView','report'],['calendarView','calendar'],['redFlagView','redflags']])$(id).hidden=state.mode!==mode;
+  if(state.mode==='calendar'){
+    $('viewTitle').textContent='Calendari di produzione';$('viewSubtitle').textContent='Pattern settimanali, eccezioni e giorni di ripresa del piano selezionato.';
+    renderCalendarViewer();return;
+  }
+  if(state.mode==='redflags'){
+    $('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e tipi presenti nel file MSD · consultazione';
+    renderRedFlagViewer();return;
+  }
+  const board=state.mode==='board'?displayedBoard():selectedBoard(),layout=selectedLayout();if(!board||!layout)return;
   $('viewTitle').textContent=state.mode==='board'?board.name:layout.name;
-  $('viewSubtitle').textContent=state.mode==='board'?`Calendario: ${board.calendarName} · Layout: ${layout.name}`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
+  $('viewSubtitle').textContent=state.mode==='board'?`Calendario: ${board.calendarName}${board.sourceCalendarName?` · nel file: ${board.sourceCalendarName}`:''} · Layout: ${layout.name} · Usa «Sposta» sulle strip per cambiare ordine`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
   renderStats(board);
   if(state.mode==='board')renderBoard(board,layout);else renderReport(board,layout);
 }
@@ -95,6 +147,14 @@ function contextRequirements(ctx,categories){
   }
   return requirementNames(ctx.scene,categories);
 }
+function contextCategories(ctx){
+  const categories=ctx.dayRecord&&ctx.group?.strips?.length?[...new Set(ctx.group.strips.filter(x=>x.kind==='scene').flatMap(x=>Object.keys(state.sceneMap.get(x.bdsId)?.requirements||{})))]:Object.keys(ctx.scene?.requirements||{});
+  return categories.sort((a,b)=>(Number(state.categorySettings.get(a)?.SortOrder)||0)-(Number(state.categorySettings.get(b)?.SortOrder)||0));
+}
+function contextElements(ctx,category){
+  const elements=contextRequirements(ctx,[category]).map(name=>state.elementMap.get(`${category}\u0000${name}`)||{category,name,boardId:''});
+  return sortCategoryElements(elements,state.categorySettings.get(category));
+}
 function elementDays(element,board){
   if(!element||!board)return [];
   return board.scheduledGroups.filter(g=>g.kind==='ScheduleDay'&&g.strips.some(x=>{
@@ -105,23 +165,28 @@ function fieldValue(shape,ctx){
   const a=shape.a,s=ctx.scene,e=ctx.element,g=ctx.group,p=state.project.production;
   if(shape.tag==='StaticText')return formatTemplate(a.Text||'',ctx);
   if(shape.tag==='ProductionInfoField')return p[a.PropertyName]||'';
-  if(shape.tag==='FunctionField')return a.Function==='PAGE_NUMBER'?'1':a.Function==='CURRENT_DATE'?new Date().toLocaleDateString('it-IT'):'';
+  if(shape.tag==='FunctionField')return a.Function==='PAGE_NUMBER'?'1':['CURRENT_DATE','RENDER_DATE'].includes(a.Function)?new Date().toLocaleDateString('it-IT'):'';
   if(shape.tag==='BDSCategoryElementsField'||shape.tag==='BDSCategoryElementsTableField'){
-    const cats=shape.categories?.length?shape.categories:a.CategoryName?[a.CategoryName]:[];
-    return contextRequirements(ctx,cats).join(' · ');
+    const cats=a.CategorySource==='ALL_REMAINING'?contextCategories(ctx).filter(category=>!ctx.explicitCategories?.has(category)):
+      shape.categories?.length?shape.categories:a.CategoryName?[a.CategoryName]:a.FieldName?[a.FieldName]:[];
+    const table=shape.tag==='BDSCategoryElementsTableField';
+    const sections=cats.map(category=>{
+      const items=contextElements(ctx,category).filter(e=>!table||
+        ((!a.LowBoardIDFilter||e.boardId&&collator.compare(e.boardId,a.LowBoardIDFilter)>=0)&&(!a.HighBoardIDFilter||e.boardId&&collator.compare(e.boardId,a.HighBoardIDFilter)<=0)))
+        .map(e=>table?{text:e.boardId||e.name}:{text:elementLabel(e),id:e.boardId,name:e.name});
+      return {heading:table?null:category,items};
+    }).filter(section=>section.items.length);
+    return {sections,columns:Number(a.NumColumns)||1,style:a.Style};
   }
   if(shape.tag==='BDSCategoryElementsOccurrenceCountField'){
     const cats=shape.categories?.length?shape.categories:a.CategoryName?[a.CategoryName]:[];
-    const count=contextRequirements(ctx,cats).length;
-    if(!count&&a.Suppress==='1')return '';
-    const label=a.Text || (a.Type==='2'?a.CategoryName||'':'');
-    return a.Type==='1'?String(count):`${label}${label&&!/\s$/.test(label)?' ':''}${count}`;
+    return elementSumText({type:a.Type,text:a.Text,category:a.CategoryName,suppress:a.Suppress},contextRequirements(ctx,cats));
   }
   if(shape.tag==='BDSElementsIDListField'){
     const names=contextRequirements(ctx,[a.CategoryName]);
     return names.map(n=>state.elementIds.get(`${a.CategoryName}\u0000${n}`)||n).join(', ');
   }
-  if(shape.tag==='BDSRedFlagField')return '';
+  if(shape.tag==='BDSRedFlagField')return ctx.flags?.length?'⚑':'';
   if(shape.tag==='BDSByDayField'){
     const f=(a.FieldName||'').toUpperCase();
     const values=g?.strips.filter(x=>x.kind==='scene').map(x=>state.sceneMap.get(x.bdsId)).filter(Boolean)||[];
@@ -141,12 +206,18 @@ function fieldValue(shape,ctx){
   }
   if(shape.tag==='CustomListField'){
     const property=a.Property||'';
-    if(e){if(/board id.*element name/i.test(property))return [e.boardId,e.name].filter(Boolean).join(' · ');if(/element name/i.test(property))return e.name;return e.properties?.[property]||''}
-    return contextRequirements(ctx,[a.Category]).join(' · ');
+    const valueFor=element=>{
+      if(/board id.*element name/i.test(property))return {text:elementLabel(element),id:element.boardId,name:element.name};
+      if(/element name/i.test(property))return {text:element.name};
+      if(/^board id$/i.test(property))return {text:element.boardId||''};
+      return {text:element.properties?.[property]||''};
+    };
+    const items=(e?[e]:contextElements(ctx,a.Category)).map(valueFor).filter(item=>item.text);
+    return {sections:[{items,heading:a.PrntCat==='1'?a.Category:null}],columns:Number(a.ColCnt)||1};
   }
   if(shape.tag==='BDSField'){
     const f=(a.FieldName||'').toUpperCase().replaceAll(' ','_');
-    const map={SCENES:'scene',SCENE:'scene',SHEET_NUMBER:'sheetNumber',SYNOPSIS:'synopsis',SEQUENCE:'sequence',IE:'ie',DN:'dn',SET:'set',LOCATION:'location',SCRIPT_DAY:'scriptDay',SCRIPT_PAGE_NUMBERS:'scriptPageNumbers',UNIT:'unit',ESTIMATE_TIME_A:'estimateTimeA',ESTIMATE_TIME_B:'estimateTimeB',COMMENTS:'comments'};
+    const map={SCENES:'scene',SCENE:'scene',SHEET_NUMBER:'sheetNumber',SYNOPSIS:'synopsis',SEQUENCE:'sequence',IE:'ie',DN:'dn',SET:'set',LOCATION:'location',SCRIPT_DAY:'scriptDay',SCRIPT_PAGES:'scriptPageNumbers',SCRIPT_PAGE_NUMBERS:'scriptPageNumbers',UNIT:'unit',ESTIMATE_TIME_A:'estimateTimeA',ESTIMATE_TIME_B:'estimateTimeB',COMMENTS:'comments'};
     if(f==='NUM_SCRIPT_PAGES'||f==='PAGES')return pages(s?.pagesEighths);
     if(f==='DATE')return shortDate(g?.date);
     return s?.[map[f]]||'';
@@ -171,18 +242,56 @@ function createShapes(shapes,ctx,scale,baseClass,geo){
   const frag=document.createDocumentFragment();
   for(const {s,r} of geo.boxes){
     if(s.tag==='HorizontalLine'||s.tag==='VerticalLine')continue;
+    if(s.tag==='BDSRedFlagField'&&!ctx.flags?.length)continue;
     const div=document.createElement('div');div.className=baseClass;
-    const a=s.a;const value=fieldValue(s,ctx);div.textContent=value;
-    if(!value)div.classList.add('muted');
+    const a=s.a;const value=fieldValue(s,ctx);
+    if(value&&typeof value==='object'&&Array.isArray(value.sections)){
+      const titles=[];
+      for(const section of value.sections){
+        if(!section.items.length)continue;
+        const group=document.createElement('div');group.className='element-group';
+        if(section.heading){const heading=document.createElement('div');heading.className='element-heading';heading.textContent=section.heading;group.append(heading);titles.push(section.heading)}
+        const list=document.createElement('div');
+        if(value.style==='COMMA_DELIMETED_LIST'){
+          list.className='element-inline';list.textContent=categoryElementsText(section.items.map(item=>item.text),value.style);
+        }else{
+          list.className='element-list';list.style.gridTemplateColumns=`repeat(${Math.max(1,Math.min(12,Math.floor(value.columns)))}, minmax(0, 1fr))`;
+          for(const item of section.items){
+            const entry=document.createElement('div');entry.className='element-entry';
+            if(item.id){
+              entry.classList.add('with-id');
+              const id=document.createElement('span');id.className='element-id';id.textContent=item.id+'.';
+              const name=document.createElement('span');name.className='element-name';name.textContent=item.name;entry.append(id,name);
+            }else{entry.textContent=item.text;if(section.heading)entry.classList.add('indented')}
+            list.append(entry);
+          }
+        }
+        titles.push(...section.items.map(item=>item.text));group.append(list);div.append(group);
+      }
+      div.title=titles.join('\n');if(!titles.length)div.classList.add('muted');
+    }else{div.textContent=value;if(!value)div.classList.add('muted');div.title=value||a.FieldName||s.tag}
+    if(s.tag==='BDSRedFlagField'){
+      div.classList.add('red-flag-field');
+      div.title=ctx.flags?.map(flagTitle).join('\n')||'';
+      div.setAttribute('aria-label',div.title||'Nessuna Red Flag');
+    }
     if(a.TextJustification==='CENTER')div.classList.add('center');if(a.TextJustification==='RIGHT')div.classList.add('right');
-    if(a.WrapText==='1'||s.tag==='BDSCategoryElementsField'||s.tag==='BDSElementsIDListField')div.classList.add('multiline');
+    if(a.WrapText==='1'||s.tag==='BDSCategoryElementsField'&&a.Style==='GRID'||s.tag==='BDSCategoryElementsTableField'||s.tag==='BDSElementsIDListField'||s.tag==='CustomListField'&&a.PrntCat==='1')div.classList.add('multiline');
+    if(a.WrapText==='1')div.classList.add('allow-wrap');
     div.style.left=((r[0]-geo.minX)*scale)+'px';div.style.top=((r[1]-geo.minY)*scale)+'px';
     div.style.width=Math.max(5,r[2]*scale)+'px';div.style.height=Math.max(8,r[3]*scale)+'px';
-    div.style.fontSize=Math.max(7,Math.min(13,(Number(s.font.Size)||9)*.85))+'px';
+    const report=baseClass==='report-shape';
+    div.style.fontSize=(report?(Number(s.font.Size)||10)*scale/72:Math.max(7,Math.min(13,(Number(s.font.Size)||9)*.85)))+'px';
     if(Number(s.font.Style)&1)div.style.fontWeight='700';
+    if(Number(s.font.Style)&2)div.style.fontStyle='italic';
+    if(report&&s.font.Name)div.style.fontFamily=`"${s.font.Name.replaceAll('"','')}", Arial, sans-serif`;
     if(a.TextOrientation?.startsWith('VERTICAL')){div.style.writingMode='vertical-rl';if(a.TextOrientation==='VERTICAL_BOTTOM_TO_TOP')div.style.transform='rotate(180deg)'}
-    if(a.Borders&&a.Borders!=='0')div.style.border='1px solid #aab8bf';
-    div.title=value||a.FieldName||s.tag;frag.appendChild(div);
+    if(a.Borders&&a.Borders!=='0')div.style.border=report?'1px solid #000':'1px solid #aab8bf';
+    if(report){
+      const content=document.createElement('div');content.className='shape-content';content.append(...div.childNodes);div.append(content);
+      div.dataset.growable=a.IsGrowable==='1'?'1':'0';
+    }
+    frag.appendChild(div);
   }
   return frag;
 }
@@ -213,13 +322,25 @@ function sceneColors(scene){
   const row=matchColorIndex(colors.rows,scene.dn),col=matchColorIndex(colors.columns,scene.ie);
   return colors.cells?.[`${row}:${col}`];
 }
-function makeStrip(scene,layout,metrics){
+function flagTitle(flag){
+  const target=flag.target.kind==='element'?` · ${flag.target.category}: ${flag.target.element}`:'';
+  return `${flag.name||'Red Flag'}${target}${flag.note?' · '+flag.note:''}`;
+}
+function flagIcon(flags){
+  const icon=document.createElement('span');icon.className='red-flag-icon scene-flag-icon';
+  icon.textContent='⚑';icon.title=flags.map(flagTitle).join('\n');
+  icon.setAttribute('role','img');icon.setAttribute('aria-label',`Red Flag scena: ${icon.title}`);
+  return icon;
+}
+function makeStrip(scene,layout,metrics,group){
   const {scale,geo,width,height}=metrics;
   const outer=document.createElement('div');outer.className='strip-outer';
   const strip=document.createElement('div');strip.className='strip-layout';
   strip.style.width=width+'px';strip.style.height=height+'px';
   if(state.showColors){const source=sceneColors(scene);if(source?.bg){strip.style.backgroundColor=source.bg;strip.style.color=source.fg||'#1d2731';strip.classList.add('has-source-color')}}
-  strip.appendChild(createShapes(layout.fields,{scene},scale,'strip-field',geo));addLines(strip,layout.fields,geo,scale,'strip-field');
+  const flags=group?.date?redFlagsForStrip(state.project,scene.bdsId,group.date):[];
+  strip.appendChild(createShapes(layout.fields,{scene,group,flags},scale,'strip-field',geo));addLines(strip,layout.fields,geo,scale,'strip-field');
+  if(flags.length&&!layout.fields.some(field=>field.tag==='BDSRedFlagField'))strip.append(flagIcon(flags));
   strip.title=`Scena ${scene.scene||'—'} · ${scene.set||''} · ${scene.synopsis||''}`;
   outer.append(strip);return outer;
 }
@@ -252,6 +373,36 @@ function stripboardHeader(shapes,metrics){
   addLines(el,shapes,geo,metrics.scale,'strip-field');return el;
 }
 function groupMatches(group,q){if(!q)return true;return group.strips.some(x=>searchText(state.sceneMap.get(x.bdsId),x).includes(q));}
+function groupLabel(group){
+  if(group.kind==='ScheduleDay')return `Giorno ${group.shootingDayNumber} · ${shortDate(group.date)}`;
+  if(group.kind==='RemainingScheduledStrips')return 'Scene programmate senza giorno';
+  if(group.kind==='UnscheduledDay')return 'Giorno non programmato';
+  return 'Scene non programmate';
+}
+function movePositionFrom(element){return {container:element.dataset.container,groupIndex:Number(element.dataset.groupIndex),stripIndex:Number(element.dataset.stripIndex)}}
+function openMoveDialog(position){
+  const board=selectedBoard(),group=board[position.container][position.groupIndex],strip=group?.strips[position.stripIndex];
+  if(!strip)return;
+  state.moveFrom=position;
+  const scene=state.sceneMap.get(strip.bdsId);
+  $('moveSource').textContent=strip.kind==='scene'?`Scena ${scene?.scene||strip.bdsId}`:`Banner: ${strip.text||''}`;
+  const destinations=[...board.scheduledGroups.map((group,index)=>({group,container:'scheduledGroups',index})),
+    ...board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',index}))];
+  $('moveGroup').innerHTML=destinations.map(({group,container,index})=>
+    `<option value="${container}:${index}">${safe(groupLabel(group))}</option>`).join('');
+  $('moveGroup').value=`${position.container}:${position.groupIndex}`;
+  refreshMovePositions();$('movePosition').value=String(position.stripIndex);
+  $('moveDialog').showModal();
+}
+function refreshMovePositions(){
+  const [container,index]=($('moveGroup').value||'').split(':');
+  const group=selectedBoard()?.[container]?.[Number(index)];if(!group)return;
+  $('movePosition').innerHTML=Array.from({length:group.strips.length+1},(_,position)=>{
+    const next=group.strips[position],scene=next&&state.sceneMap.get(next.bdsId);
+    const label=next?(next.kind==='scene'?`Prima della scena ${scene?.scene||next.bdsId}`:`Prima del banner ${next.text||''}`):'Alla fine, prima del day break';
+    return `<option value="${position}">${safe(label)}</option>`;
+  }).join('');
+}
 function fitBoardPreview(){
   const view=$('boardView');
   if(view.hidden||view.classList.contains('is-vertical')||!view.classList.contains('print-fit'))return;
@@ -270,17 +421,26 @@ function renderBoard(board,layout){
   if(layout.header.length)printHeading.append(stripboardHeader(layout.header,metrics));
   view.append(printHeading);
   let shown=0;
-  const visibleGroups=groups(board).filter(group=>groupMatches(group,q));
-  for(const [index,group] of visibleGroups.entries()){
+  const positioned=[...board.scheduledGroups.map((group,index)=>({group,container:'scheduledGroups',groupIndex:index})),
+    ...(state.unscheduled?board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',groupIndex:index})):[])];
+  const visibleGroups=positioned.filter(({group})=>groupMatches(group,q));
+  for(const [index,{group,container,groupIndex}] of visibleGroups.entries()){
     const day=document.createElement('section');day.className='day';
     if(state.printPageBreaks&&group.kind==='ScheduleDay'&&index<visibleGroups.length-1)day.classList.add('print-page-break');
     day.setAttribute('aria-label',group.kind==='ScheduleDay'?`Giorno ${group.ordinal}, ${fmtDate(group.date)}`:group.kind);
     const wrap=document.createElement('div');wrap.className=vertical?'vertical-grid':'strips';
-    for(const item of group.strips){
+    for(const [stripIndex,item] of group.strips.entries()){
       const scene=state.sceneMap.get(item.bdsId);
       if(q&&!searchText(scene,item).includes(q))continue;
-      if(item.kind==='scene'&&scene)wrap.append(makeStrip(scene,layout,metrics));
-      else if(item.kind==='banner'&&!state.hideBanners)wrap.append(makeSpecialStrip('banner',formatTemplate(item.text??'',{group,board}),layout,metrics,item.style));
+      let outer=null;
+      if(item.kind==='scene'&&scene)outer=makeStrip(scene,layout,metrics,group);
+      else if(item.kind==='banner'&&!state.hideBanners)outer=makeSpecialStrip('banner',formatTemplate(item.text??'',{group,board}),layout,metrics,item.style);
+      if(outer){
+        Object.assign(outer.dataset,{container,groupIndex,stripIndex});
+        const button=document.createElement('button');button.className='strip-move-button';button.type='button';
+        button.textContent='Sposta';button.setAttribute('aria-label',`Sposta ${item.kind==='scene'?'scena '+(scene?.scene||item.bdsId):'banner'}`);
+        outer.append(button);wrap.append(outer);
+      }
     }
     if(group.kind==='ScheduleDay'&&layout.dayBreakText&&!state.hideDayBreaks){
       const dayPages=group.strips.reduce((sum,x)=>sum+(state.sceneMap.get(x.bdsId)?.pagesEighths||0),0);
@@ -337,13 +497,46 @@ function reportRecords(board,layout){
     ...endOfDay(group)
   ]);
 }
-function reportBlock(shapes,ctx,height,scale,className){
-  const geo=geometry(shapes,7.7,Number(height)||0);
+function reportBlock(shapes,ctx,height,scale,className,originY=0){
+  const geo=geometry(shapes,7.7,originY+(Number(height)||0));geo.minY=originY;
   const el=document.createElement('div');el.className='report-block '+className;
-  el.style.width=Math.max(580,(geo.maxX-geo.minX)*scale)+'px';el.style.height=Math.max(className==='header-block'?48:32,(geo.maxY-geo.minY)*scale)+'px';
+  el.style.width=Math.max(580,(geo.maxX-geo.minX)*scale)+'px';el.style.height=Math.max(0,(geo.maxY-geo.minY)*scale)+'px';
   el.appendChild(createShapes(shapes,ctx,scale,'report-shape',geo));addLines(el,shapes,geo,scale,'report-shape');return el;
 }
+function fitReportBlocks(paper){
+  for(const block of paper.querySelectorAll('.report-block')){
+    const elements=[...block.children];
+    const boxes=elements.map(el=>{
+      const box={x:parseFloat(el.style.left),y:parseFloat(el.style.top),width:parseFloat(el.style.width),height:parseFloat(el.style.height)};
+      if(el.dataset.growable==='1'&&el.textContent){
+        const content=el.querySelector('.shape-content'),styles=getComputedStyle(el);
+        box.contentHeight=content.getBoundingClientRect().height+parseFloat(styles.paddingTop)+parseFloat(styles.paddingBottom)+parseFloat(styles.borderTopWidth)+parseFloat(styles.borderBottomWidth);
+      }
+      return box;
+    });
+    const expanded=expandReportBoxes(boxes);
+    expanded.forEach((box,index)=>{elements[index].style.top=box.y+'px';elements[index].style.height=box.height+'px'});
+    const extra=Math.max(0,...expanded.map((box,index)=>box.shift+box.height-boxes[index].height));
+    block.style.height=(parseFloat(block.style.height)+extra)+'px';
+  }
+  // Some templates already draw a full-width line at the end of each record.
+  // Reuse that line when enabling the general record separator option.
+  const records=[...paper.querySelectorAll('.record-block')];
+  records.forEach((record,index)=>{
+    const previous=records[index-1];if(!previous)return;
+    const bottom=parseFloat(previous.style.height),width=parseFloat(previous.style.width);
+    const existing=[...previous.querySelectorAll('.line')].some(line=>{
+      const y=parseFloat(line.style.top),h=parseFloat(line.style.height),w=parseFloat(line.style.width);
+      return h<=2&&w>=width*.9&&bottom-y-h>=-1&&bottom-y-h<=8;
+    });
+    record.classList.toggle('preceded-by-layout-line',existing);
+  });
+}
+function reportSetting(layout,name){
+  return state.reportOptions.get(layout.name)?.[name]??layout.settings[name]==='1';
+}
 function renderReport(board,layout){
+  $('reportSeparateRecords').checked=reportSetting(layout,'SeparateRecordsWithALine');
   const view=$('reportView');view.replaceChildren();state.elementIds=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));
   const all=reportRecords(board,layout);const q=state.query.trim().toLocaleLowerCase();
   const records=q?all.filter(x=>searchText(x.scene,{text:[x.element?.name,x.element?.category,x.inlineText].filter(Boolean).join(' ')}).includes(q)):all;
@@ -351,21 +544,250 @@ function renderReport(board,layout){
   const paper=document.createElement('div');paper.className='paper';const scale=78;
   if(layout.header.length)paper.append(reportBlock(layout.header,{group:null,scene:null},layout.headerHeight,scale,'header-block'));
   const show=state.allReport?records:records.slice(0,12);
+  const explicitCategories=new Set(layout.record.filter(shape=>shape.a.CategorySource!=='ALL_REMAINING').flatMap(shape=>shape.categories?.length?shape.categories:shape.a.Category?[shape.a.Category]:shape.a.CategoryName?[shape.a.CategoryName]:[]));
+  let hasRecord=false;
   for(const ctx of show){
     if(ctx.inlineText){const el=document.createElement('div');el.className=`report-inline report-inline-${ctx.inlineKind}`;el.textContent=ctx.inlineText;paper.append(el);continue}
-    paper.append(reportBlock(layout.record,ctx,layout.recordHeight,scale,'record-block'));
+    const record=reportBlock(layout.record,{...ctx,explicitCategories},layout.recordHeight,scale,'record-block',Number(layout.headerHeight)||0);
+    record.classList.toggle('record-separator',hasRecord&&reportSetting(layout,'SeparateRecordsWithALine'));paper.append(record);hasRecord=true;
+    record.classList.toggle('keep-on-page',layout.settings.KeepOnOnePage==='1');
+    record.classList.toggle('record-new-page',layout.settings.PageBreak==='1');
   }
-  if(layout.footer.length)paper.append(reportBlock(layout.footer,{},layout.footerHeight,scale,'footer-block'));
+  if(layout.footer.length)paper.append(reportBlock(layout.footer,{},layout.footerHeight,scale,'footer-block',(Number(layout.headerHeight)||0)+(Number(layout.recordHeight)||0)));
   view.append(paper);
+  fitReportBlocks(paper);
   if(records.length>12&&!state.allReport){const more=document.createElement('button');more.className='report-more';more.textContent=`Mostra tutti i ${records.length} record`;more.onclick=()=>{state.allReport=true;renderReport(board,layout)};view.append(more)}
   const note=document.createElement('div');note.className='report-notice';note.textContent='Anteprima dei campi del modello .msd. Alcune formule e regole di impaginazione di Movie Magic non sono disponibili.';view.append(note);
 }
 
-$('projectSelect').addEventListener('change',e=>{if(e.target.value==='imported'&&state.imported)setProject(state.imported);else loadSample(e.target.value)});
-$('boardSelect').addEventListener('change',e=>{state.board=e.target.value;state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();render()});
+const WEEK_DAYS=[['Mon','Lun'],['Tue','Mar'],['Wed','Mer'],['Thu','Gio'],['Fri','Ven'],['Sat','Sab'],['Sun','Dom']];
+const DATE_FIELDS=[['ProductionPrepStartDate','Inizio preparazione'],['ProductionStartDate','Inizio produzione'],
+  ['ProductionEndDate','Fine produzione'],['ProductionWrapDate','Fine attività']];
+const SPECIAL_NAMES={Off:'Giorno libero',Holiday:'Festività',CompanyTravel:'Viaggio produzione',ExceptionWorkday:'Lavorativo eccezionale'};
+function monthShift(month,delta){
+  const [year,number]=month.split('-').map(Number);
+  return new Date(Date.UTC(year,number-1+delta,1)).toISOString().slice(0,7);
+}
+function monthLabel(month){return new Date(`${month}-01T12:00:00Z`).toLocaleDateString('it-IT',{month:'long',year:'numeric',timeZone:'UTC'})}
+function monthGrid(month,selected,details){
+  const [year,number]=month.split('-').map(Number);
+  const first=(new Date(Date.UTC(year,number-1,1)).getUTCDay()+6)%7;
+  const count=new Date(Date.UTC(year,number,0)).getUTCDate();
+  const total=Math.ceil((first+count)/7)*7;
+  let html=WEEK_DAYS.map(([,name])=>`<div class="month-weekday">${name}</div>`).join('');
+  for(let slot=0;slot<total;slot++){
+    const n=slot-first+1;
+    if(n<1||n>count){html+='<div class="month-blank"></div>';continue}
+    const iso=`${month}-${String(n).padStart(2,'0')}`,detail=details(iso);
+    html+=`<button type="button" class="month-cell ${detail.className||''} ${selected===iso?'selected':''}" data-date="${iso}" title="${safe(detail.title||'')}"><span class="month-number">${n}</span><span class="month-meta">${safe(detail.meta||'')}</span></button>`;
+  }
+  return `<div class="month-grid">${html}</div>`;
+}
+function specialLabel(day){
+  if(!day?.specialDay)return day?.working===false?'Riposo settimanale':day?.working===true?'Giorno lavorativo':'Regola non risolta';
+  const active=Object.entries(SPECIAL_NAMES).filter(([key])=>day.specialDay.attributes[key]==='1').map(([,name])=>name);
+  return active.join(' · ')||'Eccezione registrata';
+}
+function renderCalendarViewer(){
+  const view=$('calendarView'),calendar=selectedProductionCalendar(),board=displayedBoard();
+  if(!calendar){view.innerHTML='<p class="viewer-empty">Nessun calendario nel file MSD.</p>';return}
+  const month=state.calendarMonth||calendar.scheduleDates.ProductionStartDate?.iso?.slice(0,7)||new Date().toISOString().slice(0,7);
+  const selected=state.calendarDate||`${month}-01`,day=calendarDate(calendar,selected);
+  const shootingGroups=board?.scheduledGroups.filter(group=>group.kind==='ScheduleDay'&&group.date===selected)||[];
+  const sceneIds=shootingGroups.flatMap(group=>group.strips.filter(strip=>strip.kind==='scene').map(strip=>strip.bdsId));
+  const scenes=sceneIds.map(id=>state.sceneMap.get(id)).filter(Boolean);
+  const selectedFlags=redFlagsOnDate(state.project,selected);
+  const list=state.project.calendars.map(item=>`<button type="button" class="calendar-choice ${item.name===calendar.name?'selected':''}" data-calendar-name="${safe(item.name)}">
+    <span class="choice-title">${safe(item.name)} ${item.name===state.project.defaultCalendar?'<small>PREDEFINITO</small>':''}</span>
+    <span>${shortDate(item.scheduleDates.ProductionPrepStartDate?.iso)} → ${shortDate(item.scheduleDates.ProductionWrapDate?.iso)}</span>
+  </button>`).join('');
+  const off=WEEK_DAYS.map(([key,name])=>`<span class="weekday-chip ${calendar.daysOff[key]==='1'?'off':''}">${name}</span>`).join('');
+  const grid=monthGrid(month,selected,iso=>{
+    const value=calendarDate(calendar,iso);
+    const groups=board?.scheduledGroups.filter(group=>group.kind==='ScheduleDay'&&group.date===iso)||[];
+    const flags=redFlagsOnDate(state.project,iso);
+    const outside=outsideCalendarActivity(calendar,iso);
+    return {className:`${value?.working===false?'nonworking':value?.working===null?'unresolved':'working'} ${value?.specialDay?'special':''} ${groups.length?'shooting':''} ${outside?'outside-activity':''}`,
+      meta:groups.length?`G ${groups.map(group=>group.shootingDayNumber).join(', ')}`:value?.specialDay?'★':flags.length?'⚑':'',
+      title:`${fmtDate(iso)} · ${specialLabel(value)}${outside?' · Fuori dal periodo di attività':''}${groups.length?` · Giorno di ripresa ${groups.map(g=>g.shootingDayNumber).join(', ')}`:''}`};
+  });
+  const dates=DATE_FIELDS.map(([key,label])=>{
+    const iso=calendar.scheduleDates[key]?.iso;
+    return `<div class="date-fact"><span>${label}</span>${iso?`<button type="button" data-go-date="${iso}" title="Vai a ${safe(shortDate(iso))}">${shortDate(iso)} ↗</button>`:'<strong>—</strong>'}</div>`;
+  }).join('');
+  view.innerHTML=`<div class="viewer-intro"><p>I calendari appartengono al progetto MSD. Cambiare calendario ricalcola solo le date mostrate per il piano <strong>${safe(board?.name||'—')}</strong>; scene e ordine restano gli stessi.</p></div>
+    <div class="calendar-layout"><aside class="viewer-side"><h3>Calendari disponibili</h3><div class="calendar-choices">${list}</div>
+      <div class="viewer-card"><h3>${safe(calendar.name)}</h3><div class="date-facts">${dates}</div><h4>Giorni non lavorativi</h4><div class="weekday-chips">${off}</div></div></aside>
+      <div class="viewer-main"><div class="viewer-card"><div class="month-toolbar"><button type="button" data-month-step="-1" aria-label="Mese precedente">‹</button><h3>${safe(monthLabel(month))}</h3><button type="button" data-month-step="1" aria-label="Mese successivo">›</button><input id="calendarMonthInput" type="month" value="${month}" aria-label="Vai al mese"></div>${grid}
+        <div class="calendar-legend"><span><i class="legend-dot work"></i> Lavorativo</span><span><i class="legend-dot off"></i> Non lavorativo</span><span><i class="legend-dot outside"></i> Fuori attività</span><span><i class="legend-dot special"></i> Eccezione</span><span><i class="legend-dot shoot"></i> Riprese del piano</span></div></div>
+        <div class="viewer-card date-detail"><h3>${safe(fmtDate(selected))}</h3><p><strong>${safe(specialLabel(day))}</strong>${day?.working===null?' · Stato da verificare':''}</p>
+          <div class="detail-pills"><span>${shootingGroups.length?`Giorno di ripresa ${shootingGroups.map(g=>g.shootingDayNumber).join(', ')}`:'Nessuna ripresa nel piano'}</span><span>${scenes.length} ${scenes.length===1?'scena':'scene'}</span><span>${selectedFlags.length} Red Flag nella data</span></div>
+          ${scenes.length?`<p class="scene-summary">${safe(scenes.slice(0,8).map(scene=>scene.scene||scene.bdsId).join(' · '))}${scenes.length>8?' · …':''}</p>`:''}</div></div></div>`;
+}
+
+function flagMatches(flag,{includeDate=true}={}){
+  if(state.flagCategory==='__general__'&&flag.target.kind!=='project')return false;
+  if(state.flagCategory&&state.flagCategory!=='__general__'&&flag.target.category!==state.flagCategory)return false;
+  if(state.flagElement&&flag.target.element!==state.flagElement)return false;
+  if(state.flagName&&flag.name!==state.flagName)return false;
+  if(includeDate&&state.flagStart&&(!flag.date||flag.date<state.flagStart))return false;
+  if(includeDate&&state.flagEnd&&(!flag.date||flag.date>state.flagEnd))return false;
+  return true;
+}
+function renderRedFlagViewer(){
+  const view=$('redFlagView'),project=state.project,month=state.flagMonth||new Date().toISOString().slice(0,7);
+  const categories=[...new Set([...project.elements.map(item=>item.category),...project.redFlags.map(flag=>flag.target.category)].filter(Boolean))].sort(collator.compare);
+  const elements=state.flagCategory&&state.flagCategory!=='__general__'?project.elements.filter(item=>item.category===state.flagCategory).map(item=>item.name).sort(collator.compare):[];
+  const names=[...new Set([...project.redFlagNames.map(item=>item.name),...project.redFlags.map(flag=>flag.name)])].filter(Boolean);
+  const filtered=project.redFlags.filter(flag=>flagMatches(flag)).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.sourceOrder-b.sourceOrder);
+  if(!filtered.some(flag=>flag.id===state.flagSelectedId))state.flagSelectedId=filtered[0]?.id||null;
+  const selected=filtered.find(flag=>flag.id===state.flagSelectedId);
+  const categoryOptions=categories.map(name=>`<option value="${safe(name)}" ${state.flagCategory===name?'selected':''}>${safe(name)}</option>`).join('');
+  const elementOptions=elements.map(name=>`<option value="${safe(name)}" ${state.flagElement===name?'selected':''}>${safe(name)}</option>`).join('');
+  const typeOptions=names.map(name=>`<option value="${safe(name)}" ${state.flagName===name?'selected':''}>${safe(name)}</option>`).join('');
+  const calendarOptions=project.calendars.map(item=>`<option value="${safe(item.name)}" ${state.flagCalendar===item.name?'selected':''}>${safe(item.name)}</option>`).join('');
+  const context=project.calendars.find(item=>item.name===state.flagCalendar);
+  const grid=monthGrid(month,state.flagStart&&state.flagStart===state.flagEnd?state.flagStart:null,iso=>{
+    const flags=project.redFlags.filter(flag=>flag.date===iso&&flagMatches(flag,{includeDate:false}));
+    const day=context?calendarDate(context,iso):null;
+    const outside=context&&outsideCalendarActivity(context,iso);
+    return {className:`${day?.working===false?'nonworking':''} ${flags.length?'has-flags':''} ${outside?'outside-activity':''}`,
+      meta:flags.length?`⚑ ${flags.length}`:'',title:`${fmtDate(iso)} · ${flags.length} Red Flag${day?` · ${specialLabel(day)}`:''}${outside?' · Fuori dal periodo di attività':''}`};
+  });
+  const rows=filtered.map(flag=>`<tr class="${flag.id===selected?.id?'selected':''}" data-flag-id="${safe(flag.id)}" tabindex="0" aria-selected="${flag.id===selected?.id}">
+    <td>${shortDate(flag.date)}</td><td>${safe(flag.target.category||'—')}</td><td>${safe(flag.target.element||'—')}</td><td>${safe(flag.name||'—')}</td><td>${safe(flag.note||'')}</td></tr>`).join('');
+  view.innerHTML=`<div class="viewer-intro"><p>Red Flag Entry elenca le segnalazioni salvate nel file. I tipi disponibili provengono dal Red Flag Manager MSD. Questa vista è in sola lettura.</p></div>
+    <div class="flag-filter-layout"><div class="viewer-card"><h3>1 · Elemento</h3><label class="viewer-label" for="rfCategory">Categoria</label><select id="rfCategory"><option value="">Tutte le categorie</option><option value="__general__" ${state.flagCategory==='__general__'?'selected':''}>Generali · senza elemento</option>${categoryOptions}</select>
+      <label class="viewer-label" for="rfElement">Elemento</label><select id="rfElement" ${elements.length?'':'disabled'}><option value="">Tutti gli elementi</option>${elementOptions}</select></div>
+      <div class="viewer-card"><h3>2 · Data o intervallo</h3><div class="month-toolbar"><button type="button" data-flag-month-step="-1" aria-label="Mese precedente">‹</button><strong>${safe(monthLabel(month))}</strong><button type="button" data-flag-month-step="1" aria-label="Mese successivo">›</button><input id="rfMonthInput" type="month" value="${month}" aria-label="Vai al mese"></div>${grid}
+        <div class="date-range"><label>Dal <input id="rfFrom" type="date" value="${safe(state.flagStart)}"></label><label>Al <input id="rfTo" type="date" value="${safe(state.flagEnd)}"></label><button id="rfClearDates" type="button">Azzera</button></div>
+        <label class="viewer-label" for="rfCalendar">Contesto calendario</label><select id="rfCalendar"><option value="">Solo Red Flags</option>${calendarOptions}</select></div>
+      <div class="viewer-card"><h3>3 · Tipo di Red Flag</h3><select id="rfType" size="7" aria-label="Tipo di Red Flag"><option value="" ${!state.flagName?'selected':''}>Tutti i tipi</option>${typeOptions}</select><p class="viewer-hint">Tipi definiti nel file MSD; nessuna modifica viene salvata.</p></div></div>
+    <div class="viewer-card flag-results"><div class="results-heading"><h3>Red Flags nel file</h3><span>${filtered.length} di ${project.redFlags.length} voci</span></div>
+      <div class="flag-table-wrap"><table class="flag-table"><thead><tr><th>Data</th><th>Categoria</th><th>Elemento</th><th>Tipo</th><th>Nota</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="no-results">Nessuna Red Flag per questi filtri.</td></tr>'}</tbody></table></div></div>
+    ${selected?`<div class="viewer-card flag-detail"><div><span class="detail-kicker">RED FLAG SELEZIONATA</span><h3>${safe(selected.name||'Red Flag')}</h3><p>${shortDate(selected.date)} · ${safe(selected.target.kind==='project'?'Intera giornata':`${selected.target.category}: ${selected.target.element}`)}</p></div><div><strong>Nota</strong><p>${safe(selected.note||'Nessuna nota')}</p><small>DOODStatus: ${safe(selected.doodStatus??'—')}</small></div></div>`:''}`;
+}
+
+$('projectSelect').addEventListener('change',async e=>{
+  const choice=e.target.value;
+  if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Aprire un altro progetto?')){e.target.value=state.projectChoice;return}
+  try{
+    if(choice==='imported'&&state.importedSource){
+      const {bytes,name}=state.importedSource;setProject(await parseMsd(bytes.slice(0),name));state.projectChoice='imported';
+    }else await loadSample(choice);
+  }catch(error){showStatus(error.message);e.target.value=state.projectChoice}
+});
+$('boardSelect').addEventListener('change',e=>{
+  const changed=state.project.activeBoard!==e.target.value;
+  state.board=e.target.value;state.project.activeBoard=state.board;
+  state.calendar=selectedBoard()?.calendarName||state.project.defaultCalendar;
+  $('calendarSelect').value=state.calendar;
+  state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
+  state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);
+  state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
+  if(changed)edited();else render();
+});
+$('newBoardButton').addEventListener('click',()=>{
+  $('newBoardName').value=`${state.board} copia`;$('newBoardDialog').showModal();$('newBoardName').focus();$('newBoardName').select();
+});
+$('newBoardForm').addEventListener('submit',event=>{
+  event.preventDefault();
+  if(event.submitter?.value!=='create'){$('newBoardDialog').close();return}
+  try{
+    const board=createStripboard(state.project,{name:$('newBoardName').value,sourceBoardName:state.board});
+    state.board=board.name;state.calendar=board.calendarName;state.printHeader=board.attributes.HideStripBoardHeader!=='1';
+    $('calendarSelect').value=state.calendar;syncPrintOptions();refreshBoardOptions();showStatus('');$('newBoardDialog').close();setMode('board');edited();
+  }catch(error){showStatus(error.message)}
+});
+$('boardView').addEventListener('click',event=>{
+  const button=event.target.closest('.strip-move-button');
+  if(button)openMoveDialog(movePositionFrom(button.closest('.strip-outer')));
+});
+$('moveGroup').addEventListener('change',refreshMovePositions);
+$('moveForm').addEventListener('submit',event=>{
+  event.preventDefault();
+  if(event.submitter?.value==='move'){
+    const [container,index]=$('moveGroup').value.split(':');
+    const to={container,groupIndex:Number(index),stripIndex:Number($('movePosition').value)};
+    try{if(moveStrip(state.project,{boardName:state.board,from:state.moveFrom,to}))edited();showStatus('')}
+    catch(error){showStatus(error.message)}
+  }
+  $('moveDialog').close();state.moveFrom=null;
+});
+$('saveButton').addEventListener('click',async()=>{
+  if(!state.project||state.serializationState==='saving')return;
+  const token=beginDocumentSave(state),project=token.project;
+  updateDocumentStatus();showStatus('');
+  try{
+    const bytes=serializeMsd(project);
+    const fileName=project.fileName.replace(/\.msd$/i,'')+'-edited.msd';
+    if(window.showSaveFilePicker){
+      const handle=await window.showSaveFilePicker({suggestedName:fileName,types:[{description:'Movie Magic Scheduling',accept:{'application/octet-stream':['.msd']}}]});
+      const writer=await handle.createWritable();await writer.write(bytes);await writer.close();
+    }else{
+      const url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));
+      try{const link=document.createElement('a');link.href=url;link.download=fileName;document.body.append(link);link.click();link.remove()}
+      finally{setTimeout(()=>URL.revokeObjectURL(url),60000)}
+    }
+    finishDocumentSave(state,token,true);
+  }catch(error){finishDocumentSave(state,token,false);if(error.name!=='AbortError')showStatus(`Salvataggio non riuscito: ${error.message}`)}
+  finally{updateDocumentStatus()}
+});
+window.addEventListener('beforeunload',event=>{if(isDirty()){event.preventDefault();event.returnValue=''}});
 $('layoutSelect').addEventListener('change',e=>{state.layout=e.target.value;state.allReport=false;render()});
+$('calendarSelect').addEventListener('change',e=>{
+  state.calendar=e.target.value;
+  state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
+  state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);
+  render();
+});
 $('boardNav').addEventListener('click',()=>setMode('board'));
 $('reportNav').addEventListener('click',()=>setMode('report'));
+$('calendarNav').addEventListener('click',()=>setMode('calendar'));
+$('redFlagNav').addEventListener('click',()=>setMode('redflags'));
+$('calendarView').addEventListener('click',event=>{
+  const go=event.target.closest('[data-go-date]');
+  if(go){state.calendarDate=go.dataset.goDate;state.calendarMonth=state.calendarDate.slice(0,7);render();return}
+  const calendar=event.target.closest('[data-calendar-name]');
+  if(calendar){state.calendar=calendar.dataset.calendarName;$('calendarSelect').value=state.calendar;
+    state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
+    state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);render();return}
+  const step=event.target.closest('[data-month-step]');
+  if(step){state.calendarMonth=monthShift(state.calendarMonth,Number(step.dataset.monthStep));state.calendarDate=`${state.calendarMonth}-01`;render();return}
+  const date=event.target.closest('[data-date]');
+  if(date){state.calendarDate=date.dataset.date;render()}
+});
+$('calendarView').addEventListener('change',event=>{
+  if(event.target.id==='calendarMonthInput'&&/^\d{4}-\d{2}$/.test(event.target.value)){
+    state.calendarMonth=event.target.value;state.calendarDate=`${state.calendarMonth}-01`;render();
+  }
+});
+$('redFlagView').addEventListener('click',event=>{
+  const step=event.target.closest('[data-flag-month-step]');
+  if(step){state.flagMonth=monthShift(state.flagMonth,Number(step.dataset.flagMonthStep));render();return}
+  const date=event.target.closest('[data-date]');
+  if(date){state.flagStart=date.dataset.date;state.flagEnd=date.dataset.date;render();return}
+  if(event.target.closest('#rfClearDates')){state.flagStart='';state.flagEnd='';render();return}
+  const row=event.target.closest('[data-flag-id]');
+  if(row){state.flagSelectedId=row.dataset.flagId;render()}
+});
+$('redFlagView').addEventListener('keydown',event=>{
+  if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-flag-id]')){
+    event.preventDefault();state.flagSelectedId=event.target.dataset.flagId;render();
+  }
+});
+$('redFlagView').addEventListener('change',event=>{
+  const {id,value}=event.target;
+  if(id==='rfCategory'){state.flagCategory=value;state.flagElement=''}
+  else if(id==='rfElement')state.flagElement=value;
+  else if(id==='rfType')state.flagName=value;
+  else if(id==='rfFrom'){state.flagStart=value;if(value)state.flagMonth=value.slice(0,7)}
+  else if(id==='rfTo'){state.flagEnd=value;if(value)state.flagMonth=value.slice(0,7)}
+  else if(id==='rfCalendar')state.flagCalendar=value;
+  else if(id==='rfMonthInput'&&/^\d{4}-\d{2}$/.test(value))state.flagMonth=value;
+  else return;
+  render();
+});
 $('search').addEventListener('input',e=>{state.query=e.target.value;render()});
 $('toggleUnscheduled').addEventListener('click',()=>{state.unscheduled=!state.unscheduled;$('toggleUnscheduled').classList.toggle('selected',state.unscheduled);render()});
 $('showColors').addEventListener('change',e=>{state.showColors=e.target.checked;render()});
@@ -373,16 +795,22 @@ $('hideBanners').addEventListener('change',e=>{state.hideBanners=e.target.checke
 $('hideDayBreaks').addEventListener('change',e=>{state.hideDayBreaks=e.target.checked;render()});
 $('printPageBreaks').addEventListener('change',e=>{state.printPageBreaks=e.target.checked;render()});
 $('printHeader').addEventListener('change',e=>{state.printHeader=e.target.checked;syncPrintOptions()});
+$('reportSeparateRecords').addEventListener('change',e=>{
+  state.reportOptions.set(state.layout,{...state.reportOptions.get(state.layout),SeparateRecordsWithALine:e.target.checked});render();
+});
 $('printButton').addEventListener('click',()=>{
   if(state.mode==='report'&&!state.allReport){state.allReport=true;renderReport(selectedBoard(),selectedLayout())}
   requestAnimationFrame(()=>window.print());
 });
 new ResizeObserver(fitBoardPreview).observe($('boardView'));
 $('fileInput').addEventListener('change',async e=>{
-  const file=e.target.files[0];if(!file)return;showStatus('');$('projectTitle').textContent='Importazione…';
-  try{if(file.size>20*1024*1024)throw Error('Il file deve essere inferiore a 20 MB');const data=await parseMsd(await file.arrayBuffer(),file.name);state.imported=data;
+  const file=e.target.files[0];if(!file)return;
+  try{if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Importare un altro file?'))return;
+    showStatus('');$('projectTitle').textContent='Importazione…';
+    if(file.size>20*1024*1024)throw Error('Il file deve essere inferiore a 20 MB');const bytes=await file.arrayBuffer(),data=await parseMsd(bytes.slice(0),file.name);
+    state.importedSource={bytes,name:file.name};
     if(!$('projectSelect').querySelector('[value="imported"]')){$('projectSelect').insertAdjacentHTML('beforeend','<option value="imported">File importato</option>')}
-    $('projectSelect').value='imported';setProject(data);
+    $('projectSelect').value='imported';setProject(data);state.projectChoice='imported';
   }catch(err){showStatus(err.message);$('projectTitle').textContent='Importazione non riuscita'}finally{e.target.value=''}
 });
 loadSample('wonderful');

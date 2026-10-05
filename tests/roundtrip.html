@@ -1,0 +1,90 @@
+<!doctype html><html lang="it"><meta charset="utf-8"><title>MSD round-trip</title>
+<body><h1>MSD round-trip</h1><pre id="result">In corso…</pre><a id="downloadResult" hidden>Scarica MSD modificato di prova</a><script type="module">
+import {parseMsd} from '../assets/msd-parser.js';
+import {serializeMsd} from '../assets/msd-writer.js';
+import {moveStrip,createStripboard} from '../assets/scheduling.js';
+const lines=[];let failures=0;
+const check=(label,yes)=>{lines.push(`${yes?'✓':'✗'} ${label}`);if(!yes)failures++};
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const bytesEqual=(a,b)=>a.byteLength===b.byteLength&&new Uint8Array(a).every((value,index)=>value===new Uint8Array(b)[index]);
+const stripSignature=board=>[board.scheduledGroups,board.unscheduledGroups].map(groups=>groups.map(group=>({
+  kind:group.kind,strips:group.strips.map(strip=>[strip.kind,strip.bdsId,strip.text])})));
+const sectionBytes=(buffer)=>{
+  const data=new Uint8Array(buffer),view=new DataView(buffer),map=view.getUint32(260),count=view.getUint32(264),result=new Map();
+  for(let i=0;i<count;i++){
+    const entry=map+i*332,offset=view.getUint32(entry+68),length=view.getUint32(entry+72);
+    const name=new TextDecoder().decode(data.subarray(entry+76,entry+140)).replace(/\0.*$/s,'');
+    result.set(name,data.slice(offset,offset+length));
+  }
+  return result;
+};
+try{
+  const response=await fetch('../samples/Wonderful%20Life%20Demo.msd');
+  if(!response.ok)throw Error(`HTTP ${response.status}`);
+  const original=await response.arrayBuffer(),project=await parseMsd(original,'Wonderful Life Demo.msd');
+  const noEdit=serializeMsd(project),reopenedNoEdit=await parseMsd(noEdit,'unchanged.msd');
+  check('nessuna modifica: identità binaria',bytesEqual(original,noEdit));
+  check('nessuna modifica: manager e record equivalenti',same(project.counts,reopenedNoEdit.counts)&&
+    same(project.boards.map(stripSignature),reopenedNoEdit.boards.map(stripSignature))&&
+    same(project.sourceXmlSections,reopenedNoEdit.sourceXmlSections));
+
+  const board=project.boards.find(item=>item.name==='Actor Scenario');
+  const first=board.scheduledGroups.findIndex(group=>group.kind==='ScheduleDay');
+  const second=board.scheduledGroups.findIndex((group,index)=>index>first&&group.kind==='ScheduleDay');
+  const beforeSame=board.scheduledGroups[first].strips.map(strip=>strip.sourceKey);
+  check('move nello stesso giorno applicato al modello',moveStrip(project,{boardName:board.name,
+    from:{container:'scheduledGroups',groupIndex:first,stripIndex:0},
+    to:{container:'scheduledGroups',groupIndex:first,stripIndex:3}})&&
+    !same(beforeSame,board.scheduledGroups[first].strips.map(strip=>strip.sourceKey)));
+  const cross=board.scheduledGroups[first].strips[0];
+  check('move tra giorni applicato al modello',moveStrip(project,{boardName:board.name,
+    from:{container:'scheduledGroups',groupIndex:first,stripIndex:0},
+    to:{container:'scheduledGroups',groupIndex:second,stripIndex:0}})&&
+    board.scheduledGroups[second].strips[0]===cross);
+  const unscheduled=board.unscheduledGroups.findIndex(group=>group.strips.some(strip=>strip.kind==='scene'));
+  if(unscheduled>=0){
+    const stripIndex=board.unscheduledGroups[unscheduled].strips.findIndex(strip=>strip.kind==='scene');
+    const item=board.unscheduledGroups[unscheduled].strips[stripIndex];
+    check('move da non programmato a giornata',moveStrip(project,{boardName:board.name,
+      from:{container:'unscheduledGroups',groupIndex:unscheduled,stripIndex},
+      to:{container:'scheduledGroups',groupIndex:first,stripIndex:0}})&&board.scheduledGroups[first].strips[0]===item);
+  }else check('campione con strip non programmate',false);
+  const originalBoard=stripSignature(board);
+  const newBoard=createStripboard(project,{name:'Piano alternativo',sourceBoardName:board.name});
+  check('nuovo piano con identità Name, SortOrder e CalendarName',newBoard.identitySource==='Name'&&
+    newBoard.attributes.Name==='Piano alternativo'&&newBoard.calendarName===board.calendarName&&project.activeBoard===newBoard.name);
+  moveStrip(project,{boardName:newBoard.name,from:{container:'scheduledGroups',groupIndex:first,stripIndex:0},
+    to:{container:'scheduledGroups',groupIndex:first,stripIndex:2}});
+  check('ordine indipendente del piano duplicato',same(originalBoard,stripSignature(board))&&!same(stripSignature(newBoard),stripSignature(board)));
+  const updated=serializeMsd(project),reopened=await parseMsd(updated,'edited.msd');
+  const download=document.querySelector('#downloadResult');
+  download.href=URL.createObjectURL(new Blob([updated],{type:'application/octet-stream'}));
+  download.download='roundtrip-edited-test.msd';download.hidden=false;
+  check('file modificato riaperto con quattro piani',reopened.boards.length===4&&reopened.activeBoard==='Piano alternativo');
+  check('conteggi manager coerenti dopo riapertura',same(project.counts,reopened.counts));
+  check('ordine originale modificato persistente',same(stripSignature(board),stripSignature(reopened.boards.find(item=>item.name===board.name))));
+  check('ordine del nuovo piano persistente',same(stripSignature(newBoard),stripSignature(reopened.boards.find(item=>item.name===newBoard.name))));
+  const beforeSections=sectionBytes(original),afterSections=sectionBytes(updated);
+  check('stesso numero e tipi di sezioni',same([...beforeSections.keys()],[...afterSections.keys()]));
+  for(const name of beforeSections.keys())if(name!=='StripBoardMgr'){
+    check(`sezione opaca ${name} identica`,bytesEqual(beforeSections.get(name).buffer,afterSections.get(name).buffer));
+  }
+  check('template, Calendar, Red Flags, breakdown e report intatti',
+    ['StripLayouts','Calendars','RedFlags','BreakdownSheets','ReportLayouts'].every(name=>
+      bytesEqual(beforeSections.get(name).buffer,afterSections.get(name).buffer)));
+  check('differenze binarie limitate a manager/offset',!bytesEqual(original,updated)&&
+    !bytesEqual(beforeSections.get('StripBoardMgr').buffer,afterSections.get('StripBoardMgr').buffer));
+  check('riapertura e nuovo save senza modifiche: identità binaria',bytesEqual(updated,serializeMsd(reopened)));
+  const opaque=await parseMsd(original,'opaque.msd');
+  opaque.sourceXmlSections.StripBoardMgr=opaque.sourceXmlSections.StripBoardMgr
+    .replace('<StripBoard Name="Actor Scenario"','<StripBoard StudioOpaque="42" Name="Actor Scenario"')
+    .replace('</StripBoardMgr>','<StudioExtension Secret="kept"><Child X="7"/></StudioExtension></StripBoardMgr>');
+  moveStrip(opaque,{boardName:'Actor Scenario',from:{container:'scheduledGroups',groupIndex:0,stripIndex:0},
+    to:{container:'scheduledGroups',groupIndex:0,stripIndex:2}});
+  const opaqueReopened=await parseMsd(serializeMsd(opaque),'opaque-edited.msd');
+  check('attributi e nodi sconosciuti nel manager preservati',opaqueReopened.sourceXmlSections.StripBoardMgr.includes('StudioOpaque="42"')&&
+    opaqueReopened.sourceXmlSections.StripBoardMgr.includes('<StudioExtension Secret="kept"><Child X="7"/></StudioExtension>'));
+}catch(error){failures++;lines.push(`✗ Eccezione: ${error.stack||error.message}`)}
+document.querySelector('#result').textContent=lines.join('\n')+`\n\n${failures?'ERRORI: '+failures:'TUTTI I CONTROLLI SUPERATI'}`;
+document.body.dataset.passed=String(failures===0);
+</script></body></html>

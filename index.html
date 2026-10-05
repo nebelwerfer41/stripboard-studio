@@ -15,6 +15,8 @@
       <div class="side-label navigation-label">NAVIGAZIONE</div>
       <button class="nav active" id="boardNav" type="button"><span>▤</span> Stripboard <em id="boardCount">—</em></button>
       <button class="nav" id="reportNav" type="button"><span>▧</span> Report <em id="reportCount">—</em></button>
+      <button class="nav" id="calendarNav" type="button"><span>▦</span> Calendari <em id="calendarCount">—</em></button>
+      <button class="nav" id="redFlagNav" type="button"><span>⚑</span> Red Flag Entry <em id="redFlagCount">—</em></button>
       <div class="side-bottom">
         <div class="source-note"><span class="dot"></span> File elaborati in locale</div>
         <p>Layout e contenuti provengono dai file Movie Magic Scheduling.</p>
@@ -23,35 +25,43 @@
     <main class="main">
       <header class="topbar">
         <div class="breadcrumb">WORKSPACE <span>/</span> <b id="crumb">STRIPBOARD</b></div>
-        <div class="top-actions"><span class="version-badge">v1.3.1</span><span class="local-badge">● &nbsp; Locale</span><label class="upload"><input id="fileInput" type="file" accept=".msd">＋ &nbsp; Importa .msd</label></div>
+        <div class="top-actions"><span class="version-badge">v1.4</span><span class="local-badge">● &nbsp; Locale</span><label class="upload"><input id="fileInput" type="file" accept=".msd">＋ &nbsp; Importa .msd</label></div>
       </header>
       <div class="page">
-        <div class="eyebrow">MOVIE MAGIC SCHEDULING · VISUALIZZATORE</div>
-        <div class="title-row"><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><button id="printButton" class="print-button" type="button">↗ &nbsp; Stampa vista</button></div>
+        <div class="eyebrow">MOVIE MAGIC SCHEDULING · STRIPBOARD STUDIO</div>
+        <div class="title-row"><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><div class="document-actions"><span id="dirtyIndicator" role="status">Salvato</span><button id="saveButton" type="button">↓ &nbsp; Salva .msd</button><button id="printButton" class="print-button" type="button">↗ &nbsp; Stampa vista</button></div></div>
         <div id="status" class="status" hidden></div>
-        <section class="controls">
-          <div class="control"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div>
-          <div class="control"><label for="boardSelect">PIANO DI LAVORAZIONE</label><select id="boardSelect"></select></div>
-          <div class="control"><label for="layoutSelect" id="layoutLabel">LAYOUT STRIPBOARD</label><select id="layoutSelect"></select></div>
+        <section class="controls" id="controls">
+          <div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div>
+          <div class="control" id="boardControl"><label for="boardSelect">PIANO DI LAVORAZIONE</label><div class="board-choice"><select id="boardSelect"></select><button id="newBoardButton" type="button" title="Crea un nuovo piano da quello corrente">＋</button></div></div>
+          <div class="control" id="layoutControl"><label for="layoutSelect" id="layoutLabel">LAYOUT STRIPBOARD</label><select id="layoutSelect"></select></div>
+          <div class="control" id="calendarControl"><label for="calendarSelect">CALENDARIO DEL PIANO</label><select id="calendarSelect"></select></div>
         </section>
         <section class="print-options" id="printOptions" aria-label="Opzioni di stampa stripboard">
           <label><input id="printPageBreaks" type="checkbox"> Nuova pagina dopo ogni giorno</label>
           <label><input id="printHeader" type="checkbox"> Header di stampa</label>
         </section>
-        <section class="visibility-options" aria-label="Visibilità delle righe">
+        <section class="report-options" id="reportOptions" aria-label="Parametri generali del report" hidden>
+          <label title="Separate records with a line"><input id="reportSeparateRecords" type="checkbox"> Separa record con una linea</label>
+        </section>
+        <section class="visibility-options" id="visibilityOptions" aria-label="Visibilità delle righe">
           <label><input id="hideBanners" type="checkbox"> Nascondi banner</label>
           <label><input id="hideDayBreaks" type="checkbox"> Nascondi fine giornata</label>
         </section>
         <section class="stats" id="stats"></section>
         <section class="content-panel">
-          <div class="panel-header"><div><div class="section-kicker" id="sectionKicker">PIANO DI LAVORAZIONE</div><h2 id="viewTitle">Stripboard</h2><p id="viewSubtitle"></p></div><div class="panel-tools"><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="Cerca scena, set, testo…"></label><label class="color-switch" id="colorSwitch"><input id="showColors" type="checkbox" checked><span class="switch-track"></span><span>Colori strip</span></label><button id="toggleUnscheduled" class="subtle-button" type="button">Coda non programmata</button></div></div>
+          <div class="panel-header"><div><div class="section-kicker" id="sectionKicker">PIANO DI LAVORAZIONE</div><h2 id="viewTitle">Stripboard</h2><p id="viewSubtitle"></p></div><div class="panel-tools" id="panelTools"><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="Cerca scena, set, testo…"></label><label class="color-switch" id="colorSwitch"><input id="showColors" type="checkbox" checked><span class="switch-track"></span><span>Colori strip</span></label><button id="toggleUnscheduled" class="subtle-button" type="button">Coda non programmata</button></div></div>
           <div id="boardView" class="view"></div>
           <div id="reportView" class="view" hidden></div>
+          <div id="calendarView" class="view" hidden></div>
+          <div id="redFlagView" class="view" hidden></div>
         </section>
-        <footer>Stripboard Studio v1.3.1 <span>·</span> Crediti: <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41 su GitHub</a></footer>
+        <footer>Stripboard Studio v1.4 <span>·</span> Crediti: <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41 su GitHub</a></footer>
       </div>
     </main>
   </div>
+  <dialog id="moveDialog" aria-labelledby="moveTitle"><form method="dialog" id="moveForm"><h2 id="moveTitle">Sposta strip</h2><p id="moveSource"></p><label for="moveGroup">Destinazione</label><select id="moveGroup"></select><label for="movePosition">Posizione</label><select id="movePosition"></select><div class="dialog-actions"><button value="cancel" type="submit">Annulla</button><button value="move" type="submit">Sposta</button></div></form></dialog>
+  <dialog id="newBoardDialog" aria-labelledby="newBoardTitle"><form method="dialog" id="newBoardForm"><h2 id="newBoardTitle">Nuova stripboard</h2><p>Il nuovo piano copia l’ordine corrente e usa gli stessi riferimenti alle scene.</p><label for="newBoardName">Nome del piano</label><input id="newBoardName" type="text" maxlength="128" required><div class="dialog-actions"><button value="cancel" type="submit">Annulla</button><button value="create" type="submit">Crea piano</button></div></form></dialog>
   <script type="module" src="assets/app.js"></script>
 </body>
 </html>

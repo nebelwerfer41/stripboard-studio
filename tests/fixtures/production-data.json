@@ -1,0 +1,24 @@
+{
+  "calendars": [
+    {
+      "name": "Five day",
+      "scheduleDates": {"ProductionStartDate":{"iso":"2026-10-06"}},
+      "daysOff": {"Sun":"1","Mon":"0","Tue":"0","Wed":"0","Thu":"0","Fri":"0","Sat":"1"},
+      "specialDays": [
+        {"date":"2026-10-05","attributes":{"Date":"10/05/2026","Off":"0","Holiday":"1","CompanyTravel":"0","ExceptionWorkday":"0"}},
+        {"date":"2026-10-10","attributes":{"Date":"10/10/2026","Off":"0","Holiday":"0","CompanyTravel":"0","ExceptionWorkday":"1"}}
+      ]
+    },
+    {
+      "name": "Six day",
+      "scheduleDates": {"ProductionStartDate":{"iso":"2026-10-05"}},
+      "daysOff": {"Sun":"1","Mon":"0","Tue":"0","Wed":"0","Thu":"0","Fri":"0","Sat":"0"},
+      "specialDays": []
+    }
+  ],
+  "redFlags": [
+    {"id":"red-flag-1","date":"2026-10-10","target":{"kind":"project"}},
+    {"id":"red-flag-2","date":"2026-10-10","target":{"kind":"element","category":"Cast Members","element":"George"}},
+    {"id":"red-flag-3","date":"2026-10-10","target":{"kind":"element","category":"Location","element":"Stage 2"}}
+  ]
+}
