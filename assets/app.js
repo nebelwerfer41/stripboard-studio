@@ -1,3 +1,5 @@
+import {parseMmsx,serializeMmsx} from './mmsx-project.js';
+const parseSchedule=(bytes,name)=>/^(MMS2|MMSX)$/.test(new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4,bytes.byteLength))))?parseMmsx(bytes,name):parseMsd(bytes,name);
 import {parseMsd} from './msd-parser.js';
 import {serializeMsd} from './msd-writer.js';
 import {moveBoardItems,dayBreakKey,isDayBreakKey,snapshotBoardOrder,restoreBoardOrder,dragSummary,createStripboard} from './scheduling.js';
@@ -53,6 +55,11 @@ async function loadSample(id){
 }
 function setProject(data){
   resetDocumentState(state);
+  const isMmsx=data.format==='mmsx';
+  if(isMmsx)state.mode='board';
+  for(const id of ['reportNav','calendarNav','redFlagNav','newBoardButton'])$(id).disabled=isMmsx;
+  $('saveButton').textContent=isMmsx?'↓ Esporta copia .mmsx':'↓ Salva .msd';
+  $('formatNotice').hidden=!isMmsx;
   state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;
   clearStripSelection();
   state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;
@@ -74,6 +81,7 @@ function setProject(data){
   showStatus('');updateDocumentStatus();setMode(state.mode);
 }
 function setMode(mode){
+  if(state.project?.format==='mmsx')mode='board';
   state.mode=mode;
   for(const [id,key] of [['boardNav','board'],['reportNav','report'],['calendarNav','calendar'],['redFlagNav','redflags']])$(id).classList.toggle('active',mode===key);
   $('crumb').textContent={board:'STRIPBOARD',report:'REPORT',calendar:'PRODUCTION CALENDARS',redflags:'RED FLAG ENTRY'}[mode];
@@ -87,7 +95,7 @@ function setMode(mode){
   $('visibilityOptions').hidden=mode!=='board'&&mode!=='report';
   $('boardControl').hidden=mode==='redflags';
   $('layoutControl').hidden=mode==='calendar'||mode==='redflags';
-  $('calendarControl').hidden=mode!=='board'&&mode!=='calendar';
+  $('calendarControl').hidden=state.project?.format==='mmsx'||(mode!=='board'&&mode!=='calendar');
   $('panelTools').hidden=mode==='calendar'||mode==='redflags';
   $('stats').hidden=mode==='calendar'||mode==='redflags';
   $('controls').classList.toggle('minimal',mode==='redflags');
@@ -322,6 +330,7 @@ function matchColorIndex(labels,value){
   return exact?.[0]??Object.entries(labels||{}).find(([,label])=>label==='Other')?.[0]??'11';
 }
 function sceneColors(scene){
+  if(scene.mmsxColors)return scene.mmsxColors;
   const colors=state.project.colors||{};
   const row=matchColorIndex(colors.rows,scene.dn),col=matchColorIndex(colors.columns,scene.ie);
   return colors.cells?.[`${row}:${col}`];
@@ -354,7 +363,7 @@ function makeSpecialStrip(kind,text,layout,metrics,style={}){
   strip.style.width=metrics.width+'px';strip.style.height=metrics.height+'px';
   const prefs=state.project.colors?.preferences?.[kind==='banner'?'Banner':'DayStrip'];
   if(state.showColors){
-    if(prefs?.bg)strip.style.backgroundColor=prefs.bg;
+    if(style.backgroundColor||prefs?.bg)strip.style.backgroundColor=style.backgroundColor||prefs.bg;
     strip.style.color=kind==='banner'?(style.fontColor||prefs?.fg||'#263746'):(prefs?.fg||'#fff');
   }
   const layoutStyle=kind==='banner'?layout.bannerStyle:layout.dayBreakStyle;
@@ -487,8 +496,10 @@ function renderBoard(board,layout){
       if(item.kind==='scene'&&scene)outer=makeStrip(scene,layout,metrics,group);
       else if(item.kind==='banner'&&!state.hideBanners)outer=makeSpecialStrip('banner',formatTemplate(item.text??'',{group,board}),layout,metrics,item.style);
       if(outer){
-        Object.assign(outer.dataset,{container,groupIndex,stripIndex});
-        makeItemInteractive(outer,item.kind==='scene'?`Scena ${scene?.scene||item.bdsId}`:`Banner ${item.text||''}`);
+        if(!item.mmsxLocked){
+          Object.assign(outer.dataset,{container,groupIndex,stripIndex});
+          makeItemInteractive(outer,item.kind==='scene'?`Scena ${scene?.scene||item.bdsId}`:`Banner ${item.text||''}`);
+        }
         wrap.append(outer);
       }
     }
@@ -868,7 +879,7 @@ $('projectSelect').addEventListener('change',async e=>{
   if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Aprire un altro progetto?')){e.target.value=state.projectChoice;return}
   try{
     if(choice==='imported'&&state.importedSource){
-      const {bytes,name}=state.importedSource;setProject(await parseMsd(bytes.slice(0),name));state.projectChoice='imported';
+      const {bytes,name}=state.importedSource;setProject(await parseSchedule(bytes.slice(0),name));state.projectChoice='imported';
     }else await loadSample(choice);
   }catch(error){showStatus(error.message);e.target.value=state.projectChoice}
 });
@@ -997,10 +1008,12 @@ $('saveButton').addEventListener('click',async()=>{
   const token=beginDocumentSave(state),project=token.project;
   updateDocumentStatus();showStatus('');
   try{
-    const bytes=serializeMsd(project);
-    const fileName=project.fileName.replace(/\.msd$/i,'')+'-edited.msd';
-    if(window.showSaveFilePicker){
-      const handle=await window.showSaveFilePicker({suggestedName:fileName,types:[{description:'Movie Magic Scheduling',accept:{'application/octet-stream':['.msd']}}]});
+    const isMmsx=project.format==='mmsx',extension=isMmsx?'.mmsx':'.msd';
+    const fileName=isMmsx?project.fileName.replace(/\.mmsx$/i,'')+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID().slice(0,8)+'.mmsx':project.fileName.replace(/\.msd$/i,'')+'-edited.msd';
+    // Open the picker during the user gesture, before asynchronous compression.
+    const handle=window.showSaveFilePicker?await window.showSaveFilePicker({suggestedName:fileName,types:[{description:'Movie Magic Scheduling',accept:{'application/octet-stream':[extension]}}]}):null;
+    const bytes=isMmsx?await serializeMmsx(project,fileName):serializeMsd(project);
+    if(handle){
       const writer=await handle.createWritable();await writer.write(bytes);await writer.close();
     }else{
       const url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));
@@ -1085,7 +1098,7 @@ $('fileInput').addEventListener('change',async e=>{
   const file=e.target.files[0];if(!file)return;
   try{if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Importare un altro file?'))return;
     showStatus('');$('projectTitle').textContent='Importazione…';
-    if(file.size>20*1024*1024)throw Error('Il file deve essere inferiore a 20 MB');const bytes=await file.arrayBuffer(),data=await parseMsd(bytes.slice(0),file.name);
+    if(file.size>64*1024*1024)throw Error('Il file deve essere inferiore a 64 MB');const bytes=await file.arrayBuffer(),data=await parseSchedule(bytes.slice(0),file.name);
     state.importedSource={bytes,name:file.name};
     if(!$('projectSelect').querySelector('[value="imported"]')){$('projectSelect').insertAdjacentHTML('beforeend','<option value="imported">File importato</option>')}
     $('projectSelect').value='imported';setProject(data);state.projectChoice='imported';

@@ -15,6 +15,7 @@ export function moveStrip(project,{boardName,from,to}){
   if(!Number.isInteger(from.stripIndex)||from.stripIndex<0||from.stripIndex>=source.strips.length)throw Error('Strip sorgente non valida');
   if(!Number.isInteger(to.stripIndex)||to.stripIndex<0||to.stripIndex>target.strips.length)throw Error('Posizione di destinazione non valida');
   if(source===target&&(to.stripIndex===from.stripIndex||to.stripIndex===from.stripIndex+1))return false;
+  if(project.format==='mmsx'&&source.strips[from.stripIndex].mmsxLocked)throw Error('I fine giornata originali nel Boneyard non sono spostabili');
   const [strip]=source.strips.splice(from.stripIndex,1);
   const insertion=source===target&&to.stripIndex>from.stripIndex?to.stripIndex-1:to.stripIndex;
   target.strips.splice(insertion,0,strip);
@@ -27,6 +28,7 @@ export function moveStrips(project,{boardName,sourceKeys,to}){
   if(!board)throw Error('Stripboard non trovata');
   const target=locate(board,to);
   if(!Number.isInteger(to.stripIndex)||to.stripIndex<0||to.stripIndex>target.strips.length)throw Error('Posizione di destinazione non valida');
+  if(project.format==='mmsx'&&[...board.scheduledGroups,...board.unscheduledGroups].flatMap(g=>g.strips).some(s=>s.mmsxLocked&&sourceKeys.includes(s.sourceKey)))throw Error('I fine giornata originali nel Boneyard non sono spostabili');
   const keys=new Set(sourceKeys);
   if(!keys.size||keys.size!==sourceKeys.length)throw Error('Selezione strip non valida');
   const groups=[...board.scheduledGroups,...board.unscheduledGroups];
@@ -51,6 +53,7 @@ export function moveBoardItems(project,{boardName,sourceKeys,to}){
   const groups=board.scheduledGroups;
   if(groups.filter(group=>group.kind!=='ScheduleDay').length>1||groups.some((group,index)=>group.kind!=='ScheduleDay'&&index!==groups.length-1))
     throw Error('Struttura dei gruppi non supportata per lo spostamento day break');
+  if(project.format==='mmsx'&&[...board.scheduledGroups,...board.unscheduledGroups].flatMap(g=>g.strips).some(s=>s.mmsxLocked&&sourceKeys.includes(s.sourceKey)))throw Error('I fine giornata originali nel Boneyard non sono spostabili');
   const keys=new Set(sourceKeys);
   if(!keys.size||keys.size!==sourceKeys.length)throw Error('Selezione non valida');
   const target=locate(board,to);
@@ -85,12 +88,14 @@ export function moveBoardItems(project,{boardName,sourceKeys,to}){
     board.unscheduledGroups.some((group,index)=>group.strips.length!==nextUnscheduled[index].length);
   if(!changed)return false;
   const dayDates=groups.filter(group=>group.kind==='ScheduleDay').map(group=>group.date);
+  const dayNumbers=groups.filter(group=>group.kind==='ScheduleDay').map(group=>group.shootingDayNumber);
   groups.splice(0,groups.length,...ordered.map(item=>item.group));
   for(const item of ordered)item.group.strips=item.strips;
   board.unscheduledGroups.forEach((group,index)=>{group.strips=nextUnscheduled[index]});
   let ordinal=0;
   for(const group of groups)if(group.kind==='ScheduleDay'){
-    group.ordinal=group.shootingDayNumber=++ordinal;
+    ++ordinal;
+    group.ordinal=group.shootingDayNumber=project.format==='mmsx'?dayNumbers[ordinal-1]:ordinal;
     group.date=dayDates[ordinal-1];
   }
   return true;
@@ -125,6 +130,7 @@ export function dragSummary(strips,scenes){
 }
 
 export function createStripboard(project,{name,sourceBoardName}){
+  if(project.format==='mmsx')throw Error('Creazione di piani MMSX non disponibile');
   const cleanName=String(name||'').trim();
   if(!cleanName||cleanName.length>128)throw Error('Inserisci un nome per il piano (massimo 128 caratteri)');
   if(project.boards.some(board=>board.name.toLocaleLowerCase()===cleanName.toLocaleLowerCase()))throw Error('Esiste già un piano con questo nome');

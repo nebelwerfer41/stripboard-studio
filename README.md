@@ -1,3 +1,5 @@
+> **Supporto MMSX:** importazione ed esportazione locale dei piani dataFormat 5, oltre al supporto MSD. Funzioni, limiti e test in [docs/mmsx-support.md](docs/mmsx-support.md).
+
 # Stripboard Studio v1.4
 
 Il supporto ai **Production Calendars** e alle **Red Flags** del file MSD è descritto in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Le viste Calendari e Red Flag Entry permettono di consultare questi dati senza modificare il file.

@@ -25,12 +25,13 @@
     <main class="main">
       <header class="topbar">
         <div class="breadcrumb">WORKSPACE <span>/</span> <b id="crumb">STRIPBOARD</b></div>
-        <div class="top-actions"><span class="version-badge">v1.4</span><span class="local-badge">● &nbsp; Locale</span><label class="upload"><input id="fileInput" type="file" accept=".msd">＋ &nbsp; Importa .msd</label></div>
+        <div class="top-actions"><span class="version-badge">v1.4 + MMSX</span><span class="local-badge">● &nbsp; Locale</span><label class="upload"><input id="fileInput" type="file" accept=".msd,.mmsx">＋ &nbsp; Importa .msd / .mmsx</label></div>
       </header>
       <div class="page">
         <div class="eyebrow">MOVIE MAGIC SCHEDULING · STRIPBOARD STUDIO</div>
         <div class="title-row"><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><div class="document-actions"><span id="dirtyIndicator" role="status">Salvato</span><button id="saveButton" type="button">↓ &nbsp; Salva .msd</button><button id="printButton" class="print-button" type="button">↗ &nbsp; Stampa vista</button></div></div>
         <div id="status" class="status" hidden></div>
+        <p id="formatNotice" class="status" hidden>MMSX · Vista compatta con colori originali. Sposta strips tra giornate e Boneyard, poi esporta una nuova copia locale. Layout, report, calendari e altri dati originali sono conservati nel file; la loro modifica non è disponibile in questa versione. Salva le modifiche prima di chiudere la pagina.</p>
         <section class="controls" id="controls">
           <div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div>
           <div class="control" id="boardControl"><label for="boardSelect">PIANO DI LAVORAZIONE</label><div class="board-choice"><select id="boardSelect"></select><button id="newBoardButton" type="button" title="Crea un nuovo piano da quello corrente">＋</button></div></div>
@@ -56,7 +57,7 @@
           <div id="calendarView" class="view" hidden></div>
           <div id="redFlagView" class="view" hidden></div>
         </section>
-        <footer>Stripboard Studio v1.4 <span>·</span> Crediti: <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41 su GitHub</a></footer>
+        <footer>Stripboard Studio v1.4 + MMSX <span>·</span> Crediti: <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41 su GitHub</a></footer>
       </div>
     </main>
   </div>
