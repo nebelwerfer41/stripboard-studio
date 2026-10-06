@@ -561,7 +561,12 @@ button {
     position: relative
 }
 
-.strip-outer[data-strip-index] { user-select: none; cursor: pointer; touch-action: pan-y; outline: none }
+.strip-outer, .strip-outer * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none
+}
+.strip-outer[data-strip-index] { cursor: pointer; touch-action: pan-y; outline: none }
 .strip-outer[data-strip-index]:focus-visible:not(.strip-selected) .strip-layout { outline: 2px solid #176d62; outline-offset: -3px }
 .strip-outer.strip-long-press .strip-layout { box-shadow: 0 0 0 3px #168d7f66 }
 .strip-outer.strip-selected .strip-layout { outline: 2px solid #168d7f; outline-offset: -3px }
@@ -576,13 +581,17 @@ button {
     border-radius: 999px;
     background: #168d7f
 }
-.strip-dragging { user-select: none; cursor: grabbing }
+.strip-dragging { -webkit-user-select: none; user-select: none; cursor: grabbing }
 .strip-drag-preview {
     position: fixed;
     z-index: 1001;
     top: 0;
     left: 0;
     pointer-events: none;
+    max-width: calc(100vw - 24px);
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
     border: 1px solid #94bdb6;
     border-radius: 6px;
@@ -595,7 +604,7 @@ button {
 }
 .strip-drop-indicator {
     position: fixed;
-    z-index: 1000;
+    z-index: 1002;
     pointer-events: none;
     border-radius: 3px;
     background: #078b7d;

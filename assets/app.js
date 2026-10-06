@@ -568,7 +568,11 @@ function showDropPosition(slot){
 function positionDrag(x,y){
   if(!stripPointer?.active)return;
   stripPointer.x=x;stripPointer.y=y;
-  stripPointer.preview.style.transform=`translate(${Math.min(x+18,window.innerWidth-215)}px, ${Math.min(y+18,window.innerHeight-52)}px)`;
+  const preview=stripPointer.preview,touch=stripPointer.pointerType==='touch';
+  // Keep touch feedback above the finger and within narrow phone viewports.
+  const left=Math.max(12,Math.min(x+18,window.innerWidth-preview.offsetWidth-12));
+  const top=Math.max(12,Math.min(touch?y-preview.offsetHeight-48:y+18,window.innerHeight-preview.offsetHeight-12));
+  preview.style.transform=`translate(${left}px, ${top}px)`;
   stripPointer.slot=dropPosition(x,y);
   stripPointer.marker.hidden=!stripPointer.slot;
   if(stripPointer.slot)showDropPosition(stripPointer.slot);
