@@ -45,11 +45,15 @@ function sourceStrips(board){
 function patchGroups(node,board,original){
   const sources=sourceStrips(original),used=new Set();
   for(const [modelName,xmlName] of [['scheduledGroups','ScheduledStrips'],['unscheduledGroups','UnscheduledStrips']]){
-    const modelGroups=board[modelName],targetGroups=groups(node,xmlName),sourceGroups=groups(original,xmlName);
-    if(modelGroups.length!==targetGroups.length||modelGroups.length!==sourceGroups.length)throw Error(`Gruppi ${xmlName} incompatibili`);
+    const modelGroups=board[modelName],sourceGroups=groups(original,xmlName),usedGroups=new Set(),orderedGroups=[];
+    if(modelGroups.length!==sourceGroups.length)throw Error(`Gruppi ${xmlName} incompatibili`);
+    const targetContainer=child(node,xmlName);
+    if(!targetContainer){if(modelGroups.length)throw Error(`Contenitore ${xmlName} mancante`);continue}
     for(const [index,group] of modelGroups.entries()){
-      const target=targetGroups[index];
-      if(group.kind!==target.tagName||group.kind!==sourceGroups[index].tagName)throw Error('Tipo di gruppo MSD modificato');
+      const sourceGroup=sourceGroups[group.sourceIndex??index];
+      if(!sourceGroup||usedGroups.has(sourceGroup)||group.kind!==sourceGroup.tagName)throw Error('Tipo di gruppo MSD modificato');
+      usedGroups.add(sourceGroup);
+      const target=sourceGroup.cloneNode(true);
       const desired=group.strips.map(strip=>{
         const key=strip.sourceKey;
         if(!sources.has(key)||used.has(key))throw Error('Riferimento strip mancante o ripetuto');
@@ -59,7 +63,11 @@ function patchGroups(node,board,original){
       if([...target.childNodes].some(item=>item.nodeType!==1&&item.nodeType!==3)||
         [...target.childNodes].some(item=>item.nodeType===3&&item.nodeValue.trim()))throw Error('Contenuto opaco nel gruppo strip');
       target.replaceChildren(...desired);
+      orderedGroups.push(target);
     }
+    let nextGroup=0;
+    targetContainer.replaceChildren(...[...targetContainer.childNodes].map(item=>
+      item.nodeType===1?orderedGroups[nextGroup++]:item.cloneNode(true)));
   }
   if(used.size!==sources.size)throw Error('Una o più strip originali andrebbero perse');
 }

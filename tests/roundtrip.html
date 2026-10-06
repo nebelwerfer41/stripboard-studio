@@ -2,13 +2,13 @@
 <body><h1>MSD round-trip</h1><pre id="result">In corso…</pre><a id="downloadResult" hidden>Scarica MSD modificato di prova</a><script type="module">
 import {parseMsd} from '../assets/msd-parser.js';
 import {serializeMsd} from '../assets/msd-writer.js';
-import {moveStrip,createStripboard} from '../assets/scheduling.js';
+import {moveStrip,moveStrips,moveDayBreak,moveBoardItems,dayBreakKey,createStripboard} from '../assets/scheduling.js';
 const lines=[];let failures=0;
 const check=(label,yes)=>{lines.push(`${yes?'✓':'✗'} ${label}`);if(!yes)failures++};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const bytesEqual=(a,b)=>a.byteLength===b.byteLength&&new Uint8Array(a).every((value,index)=>value===new Uint8Array(b)[index]);
 const stripSignature=board=>[board.scheduledGroups,board.unscheduledGroups].map(groups=>groups.map(group=>({
-  kind:group.kind,strips:group.strips.map(strip=>[strip.kind,strip.bdsId,strip.text])})));
+  kind:group.kind,attributes:group.attributes,strips:group.strips.map(strip=>[strip.kind,strip.bdsId,strip.text])})));
 const sectionBytes=(buffer)=>{
   const data=new Uint8Array(buffer),view=new DataView(buffer),map=view.getUint32(260),count=view.getUint32(264),result=new Map();
   for(let i=0;i<count;i++){
@@ -41,6 +41,22 @@ try{
     from:{container:'scheduledGroups',groupIndex:first,stripIndex:0},
     to:{container:'scheduledGroups',groupIndex:second,stripIndex:0}})&&
     board.scheduledGroups[second].strips[0]===cross);
+  const grouped=board.scheduledGroups[first].strips.filter(strip=>strip.kind==='scene').slice(0,2);
+  check('multi-drag tra giorni applicato al modello',moveStrips(project,{boardName:board.name,
+    sourceKeys:grouped.map(strip=>strip.sourceKey),
+    to:{container:'scheduledGroups',groupIndex:second,stripIndex:0}})&&
+    board.scheduledGroups[second].strips[0]===grouped[0]&&board.scheduledGroups[second].strips[1]===grouped[1]);
+  const dayBoundary=board.scheduledGroups[first];
+  check('day break spostato con metadati del giorno intatti',moveDayBreak(project,{boardName:board.name,
+    from:{container:'scheduledGroups',groupIndex:first},
+    to:{container:'scheduledGroups',groupIndex:second,stripIndex:1}})&&
+    board.scheduledGroups[first]===dayBoundary);
+  const mixedScene=board.scheduledGroups[first].strips.find(strip=>strip.kind==='scene');
+  const mixedBanner=board.scheduledGroups.flatMap(group=>group.strips).find(strip=>strip.kind==='banner');
+  check('selezione mista scena, banner e day break applicata come un solo move',
+    !!mixedScene&&!!mixedBanner&&moveBoardItems(project,{boardName:board.name,
+      sourceKeys:[mixedScene.sourceKey,mixedBanner.sourceKey,dayBreakKey(board.name,dayBoundary)],
+      to:{container:'scheduledGroups',groupIndex:second,stripIndex:0}}));
   const unscheduled=board.unscheduledGroups.findIndex(group=>group.strips.some(strip=>strip.kind==='scene'));
   if(unscheduled>=0){
     const stripIndex=board.unscheduledGroups[unscheduled].strips.findIndex(strip=>strip.kind==='scene');

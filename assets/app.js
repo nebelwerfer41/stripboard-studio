@@ -1,6 +1,6 @@
 import {parseMsd} from './msd-parser.js';
 import {serializeMsd} from './msd-writer.js';
-import {moveStrip,createStripboard} from './scheduling.js';
+import {moveBoardItems,dayBreakKey,isDayBreakKey,snapshotBoardOrder,restoreBoardOrder,dragSummary,createStripboard} from './scheduling.js';
 import {resetDocumentState,documentIsDirty,markDocumentEdited,beginDocumentSave,finishDocumentSave} from './document-state.js';
 import {elementSumText,categoryElementsText,elementLabel,sortCategoryElements} from './element-format.js';
 import {expandReportBoxes} from './report-layout.js';
@@ -11,7 +11,7 @@ const state = {project:null, mode:'board', board:null, calendar:null, calendarMo
   flagMonth:null,flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null,
   layout:null, query:'', unscheduled:false, showColors:true, hideBanners:false, hideDayBreaks:false,
   allReport:false, importedSource:null, printPageBreaks:false, printHeader:true,reportOptions:new Map(),
-  revision:0,savedRevision:0,serializationState:'idle',moveFrom:null};
+  revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],selectedItemKeys:new Set(),selectionAnchor:null,recentItemKey:null};
 const SCREEN_PX_PER_INCH=76;
 const collator = new Intl.Collator('it',{numeric:true,sensitivity:'base'});
 const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Senza data';
@@ -51,6 +51,8 @@ async function loadSample(id){
 }
 function setProject(data){
   resetDocumentState(state);
+  state.orderHistory=[];state.moveIntent=null;
+  clearStripSelection();
   state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;
   state.calendar=selectedBoard()?.calendarName||data.defaultCalendar||data.calendars[0]?.name;
   state.calendarMonth=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso?.slice(0,7)||new Date().toISOString().slice(0,7);
@@ -110,7 +112,7 @@ function render(){
   }
   const board=state.mode==='board'?displayedBoard():selectedBoard(),layout=selectedLayout();if(!board||!layout)return;
   $('viewTitle').textContent=state.mode==='board'?board.name:layout.name;
-  $('viewSubtitle').textContent=state.mode==='board'?`Calendario: ${board.calendarName}${board.sourceCalendarName?` · nel file: ${board.sourceCalendarName}`:''} · Layout: ${layout.name} · Usa «Sposta» sulle strip per cambiare ordine`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
+  $('viewSubtitle').textContent=state.mode==='board'?`Calendario: ${board.calendarName}${board.sourceCalendarName?` · nel file: ${board.sourceCalendarName}`:''} · Layout: ${layout.name} · Seleziona a sinistra; trascina la strip o la maniglia per spostare`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
   renderStats(board);
   if(state.mode==='board')renderBoard(board,layout);else renderReport(board,layout);
 }
@@ -380,18 +382,61 @@ function groupLabel(group){
   return 'Scene non programmate';
 }
 function movePositionFrom(element){return {container:element.dataset.container,groupIndex:Number(element.dataset.groupIndex),stripIndex:Number(element.dataset.stripIndex)}}
-function openMoveDialog(position){
-  const board=selectedBoard(),group=board[position.container][position.groupIndex],strip=group?.strips[position.stripIndex];
-  if(!strip)return;
-  state.moveFrom=position;
-  const scene=state.sceneMap.get(strip.bdsId);
-  $('moveSource').textContent=strip.kind==='scene'?`Scena ${scene?.scene||strip.bdsId}`:`Banner: ${strip.text||''}`;
+function stripAt(position){return selectedBoard()?.[position.container]?.[position.groupIndex]?.strips[position.stripIndex]}
+function itemKey(element){
+  const position=movePositionFrom(element);
+  return element.dataset.itemKind==='dayBreak'?
+    dayBreakKey(state.board,selectedBoard()?.[position.container]?.[position.groupIndex]):stripAt(position)?.sourceKey;
+}
+function orderedItemKeys(){
+  const board=selectedBoard(),keys=[];
+  for(const group of board.scheduledGroups){
+    keys.push(...group.strips.map(strip=>strip.sourceKey));
+    if(group.kind==='ScheduleDay')keys.push(dayBreakKey(state.board,group));
+  }
+  for(const group of board.unscheduledGroups)keys.push(...group.strips.map(strip=>strip.sourceKey));
+  return keys;
+}
+function clearStripSelection(){state.selectedItemKeys.clear();state.selectionAnchor=null;state.recentItemKey=null;syncStripSelection()}
+function syncStripSelection(){
+  for(const outer of $('boardView').querySelectorAll('.strip-outer[data-strip-index]')){
+    const key=itemKey(outer),selected=state.selectedItemKeys.has(key);
+    outer.classList.toggle('strip-selected',selected);
+    outer.classList.toggle('strip-recent',state.recentItemKey===key);
+    const select=outer.querySelector('.strip-select-button'),handle=outer.querySelector('.strip-drag-handle');
+    if(select){select.hidden=!!selected;select.setAttribute('aria-pressed',String(selected))}
+    if(handle)handle.hidden=!selected;
+  }
+}
+function selectItem(key,{toggle=false,range=false}={}){
+  if(!key)return;
+  if(range&&state.selectionAnchor){
+    const ordered=orderedItemKeys();
+    const start=ordered.indexOf(state.selectionAnchor),end=ordered.indexOf(key);
+    if(start>=0&&end>=0){if(!toggle)state.selectedItemKeys.clear();for(const item of ordered.slice(Math.min(start,end),Math.max(start,end)+1))state.selectedItemKeys.add(item)}
+  }else if(toggle){
+    if(state.selectedItemKeys.has(key))state.selectedItemKeys.delete(key);else state.selectedItemKeys.add(key);
+    state.selectionAnchor=key;
+  }else{state.selectedItemKeys.clear();state.selectedItemKeys.add(key);state.selectionAnchor=key}
+  state.recentItemKey=key;
+  syncStripSelection();
+}
+function openMoveDialog(intent){
+  const board=selectedBoard(),group=board[intent.from.container]?.[intent.from.groupIndex],
+    isBreak=intent.fromKind==='dayBreak',strip=isBreak?null:group?.strips[intent.from.stripIndex];
+  if(!group||(!isBreak&&!strip))return;
+  state.moveIntent=intent;
+  const scene=state.sceneMap.get(strip?.bdsId);
+  $('moveSource').textContent=intent.sourceKeys.length>1?`${intent.sourceKeys.length} elementi selezionati`:
+    isBreak?`Fine ${groupLabel(group)}`:
+    strip.kind==='scene'?`Scena ${scene?.scene||strip.bdsId}`:`Banner: ${strip.text||''}`;
+  const includesBreak=intent.sourceKeys.some(isDayBreakKey);
   const destinations=[...board.scheduledGroups.map((group,index)=>({group,container:'scheduledGroups',index})),
-    ...board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',index}))];
+    ...(!includesBreak?board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',index})):[])];
   $('moveGroup').innerHTML=destinations.map(({group,container,index})=>
     `<option value="${container}:${index}">${safe(groupLabel(group))}</option>`).join('');
-  $('moveGroup').value=`${position.container}:${position.groupIndex}`;
-  refreshMovePositions();$('movePosition').value=String(position.stripIndex);
+  $('moveGroup').value=`${intent.from.container}:${intent.from.groupIndex}`;
+  refreshMovePositions();$('movePosition').value=String(isBreak?group.strips.length:intent.from.stripIndex);
   $('moveDialog').showModal();
 }
 function refreshMovePositions(){
@@ -407,12 +452,29 @@ function fitBoardPreview(){
   const view=$('boardView');
   if(view.hidden||view.classList.contains('is-vertical')||!view.classList.contains('print-fit'))return;
   const styles=getComputedStyle(view);
-  const available=view.clientWidth-parseFloat(styles.paddingLeft)-parseFloat(styles.paddingRight);
+  const available=view.clientWidth-parseFloat(styles.paddingRight);
   const width=parseFloat(view.style.getPropertyValue('--print-board-width'));
-  if(available>0&&width>0)view.style.setProperty('--live-board-zoom',String(available/width));
+  if(available>0&&width>0){
+    const zoom=Math.max(0.1,(available-36)/width);
+    const fittedZoom=zoom<=1?zoom:available/(width+36);
+    view.style.setProperty('--board-control-gutter',`${Math.max(36,36*fittedZoom)}px`);
+    view.style.setProperty('--live-board-zoom',String(fittedZoom));
+  }
+}
+function addItemControls(outer,label){
+  const select=document.createElement('button');select.className='strip-select-button';select.type='button';
+  select.innerHTML='<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="4" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
+  select.title='Aggiungi o rimuovi dalla selezione';
+  select.setAttribute('aria-label',`Seleziona ${label}`);
+  const handle=document.createElement('button');handle.className='strip-drag-handle';handle.type='button';
+  handle.innerHTML='<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="5" r="1"/><circle cx="13" cy="5" r="1"/><circle cx="7" cy="10" r="1"/><circle cx="13" cy="10" r="1"/><circle cx="7" cy="15" r="1"/><circle cx="13" cy="15" r="1"/></svg>';
+  handle.title='Trascina o tocca per scegliere la destinazione';
+  handle.setAttribute('aria-label',`Sposta ${label}`);
+  outer.append(select,handle);
 }
 function renderBoard(board,layout){
-  const view=$('boardView');view.replaceChildren();view.style.setProperty('--live-board-zoom','1');const q=state.query.trim().toLocaleLowerCase();
+  const view=$('boardView');view.replaceChildren();view.style.setProperty('--live-board-zoom','1');view.style.setProperty('--board-control-gutter','36px');const q=state.query.trim().toLocaleLowerCase();
+  $('undoMoveButton').disabled=!state.orderHistory.length;
   const vertical=layout.orientation==='VERTICAL';
   view.classList.toggle('is-vertical',vertical);
   const metrics=stripMetrics(layout);
@@ -426,6 +488,7 @@ function renderBoard(board,layout){
   const visibleGroups=positioned.filter(({group})=>groupMatches(group,q));
   for(const [index,{group,container,groupIndex}] of visibleGroups.entries()){
     const day=document.createElement('section');day.className='day';
+    Object.assign(day.dataset,{container,groupIndex});
     if(state.printPageBreaks&&group.kind==='ScheduleDay'&&index<visibleGroups.length-1)day.classList.add('print-page-break');
     day.setAttribute('aria-label',group.kind==='ScheduleDay'?`Giorno ${group.ordinal}, ${fmtDate(group.date)}`:group.kind);
     const wrap=document.createElement('div');wrap.className=vertical?'vertical-grid':'strips';
@@ -437,14 +500,17 @@ function renderBoard(board,layout){
       else if(item.kind==='banner'&&!state.hideBanners)outer=makeSpecialStrip('banner',formatTemplate(item.text??'',{group,board}),layout,metrics,item.style);
       if(outer){
         Object.assign(outer.dataset,{container,groupIndex,stripIndex});
-        const button=document.createElement('button');button.className='strip-move-button';button.type='button';
-        button.textContent='Sposta';button.setAttribute('aria-label',`Sposta ${item.kind==='scene'?'scena '+(scene?.scene||item.bdsId):'banner'}`);
-        outer.append(button);wrap.append(outer);
+        outer.style.setProperty('--strip-control-height',`${vertical?25:metrics.height}px`);
+        addItemControls(outer,item.kind==='scene'?`scena ${scene?.scene||item.bdsId}`:`banner ${item.text||''}`);
+        wrap.append(outer);
       }
     }
     if(group.kind==='ScheduleDay'&&layout.dayBreakText&&!state.hideDayBreaks){
       const dayPages=group.strips.reduce((sum,x)=>sum+(state.sceneMap.get(x.bdsId)?.pagesEighths||0),0);
-      wrap.append(makeSpecialStrip('dayBreak',formatTemplate(layout.dayBreakText,{group,board,dayPages}),layout,metrics));
+      const outer=makeSpecialStrip('dayBreak',formatTemplate(layout.dayBreakText,{group,board,dayPages}),layout,metrics);
+      Object.assign(outer.dataset,{container,groupIndex,stripIndex:group.strips.length,itemKind:'dayBreak'});
+      outer.style.setProperty('--strip-control-height',`${vertical?25:metrics.height}px`);
+      addItemControls(outer,`fine ${groupLabel(group)}`);wrap.append(outer);
     }
     if(!wrap.children.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Nessuna strip in questo giorno';wrap.append(empty)}
     day.append(wrap);
@@ -457,7 +523,124 @@ function renderBoard(board,layout){
   view.style.setProperty('--print-board-width',`${Math.max(1,...printWidths)}px`);
   view.style.setProperty('--print-strip-height',`${Math.max(1,...printStrips.map(strip=>strip.offsetHeight))}px`);
   if(!shown){const el=document.createElement('div');el.className='empty';el.textContent='Nessun risultato per questa ricerca.';view.append(el)}
-  fitBoardPreview();
+  fitBoardPreview();syncStripSelection();
+}
+let stripPointer=null,skipStripClick=false;
+function pointerDistance(rect,x,y){
+  const dx=Math.max(rect.left-x,0,x-rect.right),dy=Math.max(rect.top-y,0,y-rect.bottom);
+  return dx*dx+dy*dy;
+}
+function dropPosition(x,y){
+  const view=$('boardView'),bounds=view.getBoundingClientRect();
+  if(x<bounds.left||x>bounds.right||y<bounds.top||y>bounds.bottom)return null;
+  const days=[...view.querySelectorAll('.day')];
+  const day=days.sort((a,b)=>pointerDistance(a.getBoundingClientRect(),x,y)-pointerDistance(b.getBoundingClientRect(),x,y))[0];
+  if(!day)return null;
+  const wrap=day.firstElementChild,vertical=$('boardView').classList.contains('is-vertical');
+  const position={container:day.dataset.container,groupIndex:Number(day.dataset.groupIndex),stripIndex:0};
+  const group=selectedBoard()?.[position.container]?.[position.groupIndex];
+  if(!group)return null;
+  if(stripPointer?.intent.sourceKeys.some(isDayBreakKey)&&position.container!=='scheduledGroups')return null;
+  const outers=[...wrap.querySelectorAll(':scope > .strip-outer[data-strip-index]')];
+  const coordinate=vertical?x:y;
+  let anchor=null,after=false;
+  for(const outer of outers){
+    const rect=outer.getBoundingClientRect(),mid=vertical?(rect.left+rect.right)/2:(rect.top+rect.bottom)/2;
+    if(coordinate<mid){position.stripIndex=Number(outer.dataset.stripIndex);anchor=outer;break}
+  }
+  if(!anchor){
+    position.stripIndex=group.strips.length;
+    anchor=outers.at(-1)||null;
+    after=!!anchor&&anchor.dataset.itemKind!=='dayBreak';
+    if(anchor?.dataset.itemKind==='dayBreak'){
+      const next=days.filter(item=>item.dataset.container===day.dataset.container&&Number(item.dataset.groupIndex)>Number(day.dataset.groupIndex))
+        .sort((a,b)=>Number(a.dataset.groupIndex)-Number(b.dataset.groupIndex))[0];
+      if(next){position.groupIndex=Number(next.dataset.groupIndex);position.stripIndex=0;after=true}
+    }
+  }
+  return {position,anchor,after,wrap,vertical};
+}
+function showDropPosition(slot){
+  const marker=stripPointer?.marker;if(!marker)return;
+  const rect=(slot.anchor||slot.wrap).getBoundingClientRect();
+  marker.classList.toggle('vertical',slot.vertical);
+  if(slot.vertical){
+    marker.style.left=`${slot.after?rect.right:rect.left}px`;marker.style.top=`${rect.top}px`;
+    marker.style.width='3px';marker.style.height=`${rect.height}px`;
+  }else{
+    marker.style.left=`${rect.left}px`;marker.style.top=`${slot.after?rect.bottom:rect.top}px`;
+    marker.style.width=`${rect.width}px`;marker.style.height='3px';
+  }
+}
+function positionDrag(x,y){
+  if(!stripPointer?.active)return;
+  stripPointer.x=x;stripPointer.y=y;
+  stripPointer.preview.style.transform=`translate(${Math.min(x+18,window.innerWidth-215)}px, ${Math.min(y+18,window.innerHeight-52)}px)`;
+  stripPointer.slot=dropPosition(x,y);
+  stripPointer.marker.hidden=!stripPointer.slot;
+  if(stripPointer.slot)showDropPosition(stripPointer.slot);
+}
+function dragAutoscroll(){
+  if(!stripPointer?.active)return;
+  const edge=42,{x,y}=stripPointer;
+  if(y<edge)window.scrollBy(0,-Math.ceil((edge-y)/5));
+  else if(y>window.innerHeight-edge)window.scrollBy(0,Math.ceil((y-(window.innerHeight-edge))/5));
+  const view=$('boardView'),rect=view.getBoundingClientRect();
+  if(y>=rect.top&&y<=rect.bottom){
+    const left=Math.max(0,rect.left),right=Math.min(window.innerWidth,rect.right);
+    let dx=0;
+    if(x>=left&&x<left+edge)dx=-Math.ceil((left+edge-x)/5);
+    else if(x<=right&&x>right-edge)dx=Math.ceil((x-(right-edge))/5);
+    if(dx){if(view.scrollWidth>view.clientWidth+1)view.scrollLeft+=dx;else window.scrollBy(dx,0)}
+  }
+  positionDrag(x,y);
+  stripPointer.frame=requestAnimationFrame(dragAutoscroll);
+}
+function startStripDrag(event){
+  const pointer=stripPointer,intent=pointer.intent;
+  pointer.preview=document.createElement('div');pointer.preview.className='strip-drag-preview';
+  const keys=new Set(intent.sourceKeys);
+  const chosen=[...selectedBoard().scheduledGroups,...selectedBoard().unscheduledGroups]
+    .flatMap(group=>group.strips.filter(item=>keys.has(item.sourceKey)));
+  const summary=dragSummary(chosen,state.project.scenes),other=intent.sourceKeys.length-summary.count;
+  pointer.preview.textContent=summary.count?`${summary.label}${other?` · +${other} elementi`:''}`:
+    `${other} ${other===1?'elemento':'elementi'}`;
+  pointer.marker=document.createElement('div');pointer.marker.className='strip-drop-indicator';
+  document.body.append(pointer.preview,pointer.marker);
+  pointer.active=true;
+  $('boardView').setPointerCapture(event.pointerId);
+  document.body.classList.add('strip-dragging');
+  positionDrag(event.clientX,event.clientY);
+  pointer.frame=requestAnimationFrame(dragAutoscroll);
+}
+function endStripDrag(event,cancel=false){
+  const pointer=stripPointer;if(!pointer)return;
+  stripPointer=null;
+  if(pointer.frame)cancelAnimationFrame(pointer.frame);
+  pointer.preview?.remove();pointer.marker?.remove();
+  document.body.classList.remove('strip-dragging');
+  if(pointer.active){
+    skipStripClick=true;setTimeout(()=>{skipStripClick=false},0);
+    if(!cancel&&pointer.slot){
+      try{applyBoardMove(pointer.intent,pointer.slot.position);showStatus('')}
+      catch(error){showStatus(error.message)}
+    }
+  }
+}
+function applyBoardMove(intent,to){
+  const board=selectedBoard(),before=snapshotBoardOrder(board);
+  const changed=moveBoardItems(state.project,{boardName:state.board,sourceKeys:intent.sourceKeys,to});
+  if(changed){
+    state.orderHistory.push({boardName:state.board,before});
+    edited();
+  }else syncStripSelection();
+  return changed;
+}
+function undoBoardMove(){
+  const entry=state.orderHistory.pop();if(!entry)return;
+  const board=state.project.boards.find(item=>item.name===entry.boardName);
+  if(!board)return;
+  restoreBoardOrder(board,entry.before);clearStripSelection();edited();showStatus('');
 }
 function syncPrintOptions(){
   $('printPageBreaks').checked=state.printPageBreaks;$('printHeader').checked=state.printHeader;
@@ -678,6 +861,7 @@ $('projectSelect').addEventListener('change',async e=>{
   }catch(error){showStatus(error.message);e.target.value=state.projectChoice}
 });
 $('boardSelect').addEventListener('change',e=>{
+  clearStripSelection();
   const changed=state.project.activeBoard!==e.target.value;
   state.board=e.target.value;state.project.activeBoard=state.board;
   state.calendar=selectedBoard()?.calendarName||state.project.defaultCalendar;
@@ -695,24 +879,62 @@ $('newBoardForm').addEventListener('submit',event=>{
   if(event.submitter?.value!=='create'){$('newBoardDialog').close();return}
   try{
     const board=createStripboard(state.project,{name:$('newBoardName').value,sourceBoardName:state.board});
+    clearStripSelection();
     state.board=board.name;state.calendar=board.calendarName;state.printHeader=board.attributes.HideStripBoardHeader!=='1';
     $('calendarSelect').value=state.calendar;syncPrintOptions();refreshBoardOptions();showStatus('');$('newBoardDialog').close();setMode('board');edited();
   }catch(error){showStatus(error.message)}
 });
 $('boardView').addEventListener('click',event=>{
-  const button=event.target.closest('.strip-move-button');
-  if(button)openMoveDialog(movePositionFrom(button.closest('.strip-outer')));
+  if(skipStripClick){event.preventDefault();event.stopPropagation();return}
+  const outer=event.target.closest('.strip-outer[data-strip-index]');
+  if(!outer)return;
+  const from=movePositionFrom(outer);
+  if(event.target.closest('.strip-drag-handle')){
+    openMoveDialog({from,fromKind:outer.dataset.itemKind||stripAt(from)?.kind,sourceKeys:[...state.selectedItemKeys]});
+    return;
+  }
+  const touchSelection=(event.pointerType==='touch'||event.pointerType==='pen')&&state.selectedItemKeys.size>0;
+  selectItem(itemKey(outer),{toggle:!!event.target.closest('.strip-select-button')||event.ctrlKey||event.metaKey||touchSelection,range:event.shiftKey});
 });
+$('boardView').addEventListener('pointerdown',event=>{
+  if(event.button!==0||stripPointer||event.target.closest('.strip-select-button,.red-flag-icon'))return;
+  const outer=event.target.closest('.strip-outer[data-strip-index]');
+  if(!outer)return;
+  const fromHandle=!!event.target.closest('.strip-drag-handle');
+  if(event.pointerType==='touch'&&!fromHandle)return;
+  const from=movePositionFrom(outer),intent={from,fromKind:outer.dataset.itemKind||stripAt(from)?.kind,
+    sourceKeys:state.selectedItemKeys.has(itemKey(outer))?[...state.selectedItemKeys]:[itemKey(outer)]};
+  if(!intent.sourceKeys.length)return;
+  stripPointer={pointerId:event.pointerId,intent,startX:event.clientX,startY:event.clientY,active:false};
+});
+window.addEventListener('pointermove',event=>{
+  if(!stripPointer||event.pointerId!==stripPointer.pointerId)return;
+  if(!stripPointer.active){
+    const distance=Math.hypot(event.clientX-stripPointer.startX,event.clientY-stripPointer.startY);
+    if(distance<(event.pointerType==='mouse'?7:11))return;
+    startStripDrag(event);
+  }
+  if(stripPointer?.active){event.preventDefault();positionDrag(event.clientX,event.clientY)}
+},{passive:false});
+window.addEventListener('pointerup',event=>{if(event.pointerId===stripPointer?.pointerId)endStripDrag(event)});
+window.addEventListener('pointercancel',event=>{if(event.pointerId===stripPointer?.pointerId)endStripDrag(event,true)});
 $('moveGroup').addEventListener('change',refreshMovePositions);
 $('moveForm').addEventListener('submit',event=>{
   event.preventDefault();
   if(event.submitter?.value==='move'){
     const [container,index]=$('moveGroup').value.split(':');
     const to={container,groupIndex:Number(index),stripIndex:Number($('movePosition').value)};
-    try{if(moveStrip(state.project,{boardName:state.board,from:state.moveFrom,to}))edited();showStatus('')}
+    try{applyBoardMove(state.moveIntent,to);showStatus('')}
     catch(error){showStatus(error.message)}
   }
-  $('moveDialog').close();state.moveFrom=null;
+  $('moveDialog').close();state.moveIntent=null;
+});
+$('undoMoveButton').addEventListener('click',undoBoardMove);
+document.addEventListener('keydown',event=>{
+  if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'&&!event.shiftKey&&
+    !event.target.closest('input,textarea,[contenteditable="true"]')&&state.mode==='board'&&state.orderHistory.length){
+    event.preventDefault();undoBoardMove();
+  }
 });
 $('saveButton').addEventListener('click',async()=>{
   if(!state.project||state.serializationState==='saving')return;
@@ -788,8 +1010,8 @@ $('redFlagView').addEventListener('change',event=>{
   else return;
   render();
 });
-$('search').addEventListener('input',e=>{state.query=e.target.value;render()});
-$('toggleUnscheduled').addEventListener('click',()=>{state.unscheduled=!state.unscheduled;$('toggleUnscheduled').classList.toggle('selected',state.unscheduled);render()});
+$('search').addEventListener('input',e=>{clearStripSelection();state.query=e.target.value;render()});
+$('toggleUnscheduled').addEventListener('click',()=>{clearStripSelection();state.unscheduled=!state.unscheduled;$('toggleUnscheduled').classList.toggle('selected',state.unscheduled);render()});
 $('showColors').addEventListener('change',e=>{state.showColors=e.target.checked;render()});
 $('hideBanners').addEventListener('change',e=>{state.hideBanners=e.target.checked;render()});
 $('hideDayBreaks').addEventListener('change',e=>{state.hideDayBreaks=e.target.checked;render()});
