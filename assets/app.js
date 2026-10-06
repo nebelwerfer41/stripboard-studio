@@ -909,9 +909,15 @@ $('newBoardForm').addEventListener('submit',event=>{
 });
 const isMac=/Mac|iPhone|iPad|iPod/i.test(navigator.userAgentData?.platform||navigator.platform||'');
 function isToggleGesture(event){return isMac?event.metaKey:event.ctrlKey}
+const stripInteractionControls='button,a,input,select,textarea,label,dialog,[contenteditable]:not([contenteditable="false"]),[role="button"]:not(.strip-outer)';
 function isEmptyBoardPoint(event){
   const view=$('boardView');
-  if(!view.contains(event.target)||event.target.closest('.strip-outer,button,a,input,select,textarea,[contenteditable="true"]'))return false;
+  if(state.mode!=='board'||event.target.closest(`.strip-outer,${stripInteractionControls}`))return false;
+  // Blank space throughout the page dismisses selection; controls keep their own interactions.
+  if(!view.contains(event.target)){
+    const root=document.documentElement;
+    return event.clientX<root.clientWidth&&event.clientY<root.clientHeight;
+  }
   const rect=view.getBoundingClientRect(),scrollbarX=view.offsetWidth-view.clientWidth,scrollbarY=view.offsetHeight-view.clientHeight;
   if(scrollbarX>0&&event.clientX>=rect.right-scrollbarX)return false;
   if(scrollbarY>0&&event.clientY>=rect.bottom-scrollbarY)return false;
@@ -937,9 +943,9 @@ $('boardView').addEventListener('keydown',event=>{
     openMoveDialog({from,fromKind:outer.dataset.itemKind||stripAt(from)?.kind,sourceKeys:[...state.selectedStripIds]});
   }
 });
-$('boardView').addEventListener('pointerdown',event=>{
-  if(event.button!==0||stripPointer||event.target.closest('button,a,input,select,textarea,[contenteditable="true"]'))return;
-  const outer=event.target.closest('.strip-outer[data-strip-index]');
+document.addEventListener('pointerdown',event=>{
+  if(state.mode!=='board'||event.button!==0||stripPointer||event.target.closest(stripInteractionControls))return;
+  const outer=$('boardView').contains(event.target)?event.target.closest('.strip-outer[data-strip-index]'):null;
   const empty=!outer&&isEmptyBoardPoint(event);
   if(!outer&&!empty)return;
   const from=outer&&movePositionFrom(outer);
@@ -968,7 +974,7 @@ window.addEventListener('pointermove',event=>{
     const intent=movementIntent(pointer,distance);
     if(intent==='scroll'){clearTimeout(pointer.longPressTimer);pointer.scrolling=true;return}
     if(intent==='wait')return;
-    if(!pointer.outer)return;
+    if(!pointer.outer){pointer.scrolling=true;return}
     startStripDrag(event);
   }
   if(stripPointer?.active){event.preventDefault();positionDrag(event.clientX,event.clientY)}
