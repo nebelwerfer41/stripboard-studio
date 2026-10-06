@@ -5,13 +5,15 @@ import {resetDocumentState,documentIsDirty,markDocumentEdited,beginDocumentSave,
 import {elementSumText,categoryElementsText,elementLabel,sortCategoryElements} from './element-format.js';
 import {expandReportBoxes} from './report-layout.js';
 import {redFlagsForStrip,redFlagsOnDate,calendarDate,boardWithCalendar,outsideCalendarActivity} from './production-data.js';
+import {STRIP_GESTURE,selectStripState,clearStripState,movementIntent} from './strip-interaction.js';
 const $ = id => document.getElementById(id);
 const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
 const state = {project:null, mode:'board', board:null, calendar:null, calendarMonth:null, calendarDate:null,
   flagMonth:null,flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null,
   layout:null, query:'', unscheduled:false, showColors:true, hideBanners:false, hideDayBreaks:false,
   allReport:false, importedSource:null, printPageBreaks:false, printHeader:true,reportOptions:new Map(),
-  revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],selectedItemKeys:new Set(),selectionAnchor:null,recentItemKey:null};
+  revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],redoHistory:[],
+  selectedStripIds:new Set(),activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
 const SCREEN_PX_PER_INCH=76;
 const collator = new Intl.Collator('it',{numeric:true,sensitivity:'base'});
 const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Senza data';
@@ -51,7 +53,7 @@ async function loadSample(id){
 }
 function setProject(data){
   resetDocumentState(state);
-  state.orderHistory=[];state.moveIntent=null;
+  state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;
   clearStripSelection();
   state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;
   state.calendar=selectedBoard()?.calendarName||data.defaultCalendar||data.calendars[0]?.name;
@@ -112,7 +114,7 @@ function render(){
   }
   const board=state.mode==='board'?displayedBoard():selectedBoard(),layout=selectedLayout();if(!board||!layout)return;
   $('viewTitle').textContent=state.mode==='board'?board.name:layout.name;
-  $('viewSubtitle').textContent=state.mode==='board'?`Calendario: ${board.calendarName}${board.sourceCalendarName?` · nel file: ${board.sourceCalendarName}`:''} · Layout: ${layout.name} · Seleziona a sinistra; trascina la strip o la maniglia per spostare`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
+  $('viewSubtitle').textContent=state.mode==='board'?`Calendario: ${board.calendarName}${board.sourceCalendarName?` · nel file: ${board.sourceCalendarName}`:''} · Layout: ${layout.name} · Clic/tap: seleziona · ⌘/Ctrl-clic o pressione lunga: multi · Drag: riordina`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
   renderStats(board);
   if(state.mode==='board')renderBoard(board,layout);else renderReport(board,layout);
 }
@@ -388,38 +390,30 @@ function itemKey(element){
   return element.dataset.itemKind==='dayBreak'?
     dayBreakKey(state.board,selectedBoard()?.[position.container]?.[position.groupIndex]):stripAt(position)?.sourceKey;
 }
-function orderedItemKeys(){
-  const board=selectedBoard(),keys=[];
-  for(const group of board.scheduledGroups){
-    keys.push(...group.strips.map(strip=>strip.sourceKey));
-    if(group.kind==='ScheduleDay')keys.push(dayBreakKey(state.board,group));
-  }
-  for(const group of board.unscheduledGroups)keys.push(...group.strips.map(strip=>strip.sourceKey));
-  return keys;
+function isSceneKey(key){return [...selectedBoard().scheduledGroups,...selectedBoard().unscheduledGroups]
+  .some(group=>group.strips.some(strip=>strip.kind==='scene'&&strip.sourceKey===key))}
+// Future scene detail can follow active changes and open only on stripopenrequest (never on drag).
+function selectionChanged(previousActive,reason='selection',open=false){
+  syncStripSelection();
+  const detail={selectedStripIds:[...state.selectedStripIds],activeStripId:state.activeStripId,reason};
+  $('boardView').dispatchEvent(new CustomEvent('stripselectionchange',{detail}));
+  if(previousActive!==state.activeStripId)$('boardView').dispatchEvent(new CustomEvent('stripactivechange',{detail}));
+  if(open&&state.activeStripId)$('boardView').dispatchEvent(new CustomEvent('stripopenrequest',{detail}));
 }
-function clearStripSelection(){state.selectedItemKeys.clear();state.selectionAnchor=null;state.recentItemKey=null;syncStripSelection()}
+function clearStripSelection(){
+  selectionChanged(clearStripState(state),'clear');
+}
 function syncStripSelection(){
   for(const outer of $('boardView').querySelectorAll('.strip-outer[data-strip-index]')){
-    const key=itemKey(outer),selected=state.selectedItemKeys.has(key);
+    const key=itemKey(outer),selected=state.selectedStripIds.has(key);
     outer.classList.toggle('strip-selected',selected);
-    outer.classList.toggle('strip-recent',state.recentItemKey===key);
-    const select=outer.querySelector('.strip-select-button'),handle=outer.querySelector('.strip-drag-handle');
-    if(select){select.hidden=!!selected;select.setAttribute('aria-pressed',String(selected))}
-    if(handle)handle.hidden=!selected;
+    outer.classList.toggle('strip-active',state.activeStripId===key);
+    outer.setAttribute('aria-pressed',String(selected));
   }
 }
-function selectItem(key,{toggle=false,range=false}={}){
+function selectItem(key,{toggle=false,reason='selection',open=false}={}){
   if(!key)return;
-  if(range&&state.selectionAnchor){
-    const ordered=orderedItemKeys();
-    const start=ordered.indexOf(state.selectionAnchor),end=ordered.indexOf(key);
-    if(start>=0&&end>=0){if(!toggle)state.selectedItemKeys.clear();for(const item of ordered.slice(Math.min(start,end),Math.max(start,end)+1))state.selectedItemKeys.add(item)}
-  }else if(toggle){
-    if(state.selectedItemKeys.has(key))state.selectedItemKeys.delete(key);else state.selectedItemKeys.add(key);
-    state.selectionAnchor=key;
-  }else{state.selectedItemKeys.clear();state.selectedItemKeys.add(key);state.selectionAnchor=key}
-  state.recentItemKey=key;
-  syncStripSelection();
+  selectionChanged(selectStripState(state,key,{toggle,isSceneKey}),reason,open);
 }
 function openMoveDialog(intent){
   const board=selectedBoard(),group=board[intent.from.container]?.[intent.from.groupIndex],
@@ -457,24 +451,18 @@ function fitBoardPreview(){
   if(available>0&&width>0){
     const zoom=Math.max(0.1,(available-36)/width);
     const fittedZoom=zoom<=1?zoom:available/(width+36);
-    view.style.setProperty('--board-control-gutter',`${Math.max(36,36*fittedZoom)}px`);
     view.style.setProperty('--live-board-zoom',String(fittedZoom));
   }
 }
-function addItemControls(outer,label){
-  const select=document.createElement('button');select.className='strip-select-button';select.type='button';
-  select.innerHTML='<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="4" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
-  select.title='Aggiungi o rimuovi dalla selezione';
-  select.setAttribute('aria-label',`Seleziona ${label}`);
-  const handle=document.createElement('button');handle.className='strip-drag-handle';handle.type='button';
-  handle.innerHTML='<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="5" r="1"/><circle cx="13" cy="5" r="1"/><circle cx="7" cy="10" r="1"/><circle cx="13" cy="10" r="1"/><circle cx="7" cy="15" r="1"/><circle cx="13" cy="15" r="1"/></svg>';
-  handle.title='Trascina o tocca per scegliere la destinazione';
-  handle.setAttribute('aria-label',`Sposta ${label}`);
-  outer.append(select,handle);
+function makeItemInteractive(outer,label){
+  outer.tabIndex=0;outer.setAttribute('role','button');outer.setAttribute('aria-label',label);
+  outer.setAttribute('aria-keyshortcuts','F2');outer.title=`${label} · Invio per selezionare · F2 per spostare`;
+  outer.draggable=false;
 }
 function renderBoard(board,layout){
-  const view=$('boardView');view.replaceChildren();view.style.setProperty('--live-board-zoom','1');view.style.setProperty('--board-control-gutter','36px');const q=state.query.trim().toLocaleLowerCase();
+  const view=$('boardView');view.replaceChildren();view.style.setProperty('--live-board-zoom','1');const q=state.query.trim().toLocaleLowerCase();
   $('undoMoveButton').disabled=!state.orderHistory.length;
+  $('redoMoveButton').disabled=!state.redoHistory.length;
   const vertical=layout.orientation==='VERTICAL';
   view.classList.toggle('is-vertical',vertical);
   const metrics=stripMetrics(layout);
@@ -500,8 +488,7 @@ function renderBoard(board,layout){
       else if(item.kind==='banner'&&!state.hideBanners)outer=makeSpecialStrip('banner',formatTemplate(item.text??'',{group,board}),layout,metrics,item.style);
       if(outer){
         Object.assign(outer.dataset,{container,groupIndex,stripIndex});
-        outer.style.setProperty('--strip-control-height',`${vertical?25:metrics.height}px`);
-        addItemControls(outer,item.kind==='scene'?`scena ${scene?.scene||item.bdsId}`:`banner ${item.text||''}`);
+        makeItemInteractive(outer,item.kind==='scene'?`Scena ${scene?.scene||item.bdsId}`:`Banner ${item.text||''}`);
         wrap.append(outer);
       }
     }
@@ -509,8 +496,7 @@ function renderBoard(board,layout){
       const dayPages=group.strips.reduce((sum,x)=>sum+(state.sceneMap.get(x.bdsId)?.pagesEighths||0),0);
       const outer=makeSpecialStrip('dayBreak',formatTemplate(layout.dayBreakText,{group,board,dayPages}),layout,metrics);
       Object.assign(outer.dataset,{container,groupIndex,stripIndex:group.strips.length,itemKind:'dayBreak'});
-      outer.style.setProperty('--strip-control-height',`${vertical?25:metrics.height}px`);
-      addItemControls(outer,`fine ${groupLabel(group)}`);wrap.append(outer);
+      makeItemInteractive(outer,`Fine ${groupLabel(group)}`);wrap.append(outer);
     }
     if(!wrap.children.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Nessuna strip in questo giorno';wrap.append(empty)}
     day.append(wrap);
@@ -525,7 +511,7 @@ function renderBoard(board,layout){
   if(!shown){const el=document.createElement('div');el.className='empty';el.textContent='Nessun risultato per questa ricerca.';view.append(el)}
   fitBoardPreview();syncStripSelection();
 }
-let stripPointer=null,skipStripClick=false;
+let stripPointer=null,lastDragAt=0;
 function pointerDistance(rect,x,y){
   const dx=Math.max(rect.left-x,0,x-rect.right),dy=Math.max(rect.top-y,0,y-rect.bottom);
   return dx*dx+dy*dy;
@@ -582,7 +568,7 @@ function positionDrag(x,y){
 }
 function dragAutoscroll(){
   if(!stripPointer?.active)return;
-  const edge=42,{x,y}=stripPointer;
+  const edge=STRIP_GESTURE.autoscrollEdgePx,{x,y}=stripPointer;
   if(y<edge)window.scrollBy(0,-Math.ceil((edge-y)/5));
   else if(y>window.innerHeight-edge)window.scrollBy(0,Math.ceil((y-(window.innerHeight-edge))/5));
   const view=$('boardView'),rect=view.getBoundingClientRect();
@@ -597,7 +583,10 @@ function dragAutoscroll(){
   stripPointer.frame=requestAnimationFrame(dragAutoscroll);
 }
 function startStripDrag(event){
-  const pointer=stripPointer,intent=pointer.intent;
+  const pointer=stripPointer;
+  if(!pointer.wasSelected)selectItem(pointer.key,{reason:'drag'});
+  const intent={from:pointer.from,fromKind:pointer.fromKind,sourceKeys:[...state.selectedStripIds]};
+  pointer.intent=intent;state.draggedStripIds=new Set(intent.sourceKeys);
   pointer.preview=document.createElement('div');pointer.preview.className='strip-drag-preview';
   const keys=new Set(intent.sourceKeys);
   const chosen=[...selectedBoard().scheduledGroups,...selectedBoard().unscheduledGroups]
@@ -615,23 +604,38 @@ function startStripDrag(event){
 }
 function endStripDrag(event,cancel=false){
   const pointer=stripPointer;if(!pointer)return;
-  stripPointer=null;
+  stripPointer=null;clearTimeout(pointer.longPressTimer);
   if(pointer.frame)cancelAnimationFrame(pointer.frame);
   pointer.preview?.remove();pointer.marker?.remove();
+  pointer.outer?.classList.remove('strip-long-press');
   document.body.classList.remove('strip-dragging');
   if(pointer.active){
-    skipStripClick=true;setTimeout(()=>{skipStripClick=false},0);
+    lastDragAt=performance.now();
     if(!cancel&&pointer.slot){
       try{applyBoardMove(pointer.intent,pointer.slot.position);showStatus('')}
       catch(error){showStatus(error.message)}
     }
+  }else if(!cancel&&!pointer.scrolling){
+    if(pointer.outer){
+      if(!pointer.longPress){
+        if(pointer.pointerType==='touch'){
+          const toggle=state.touchMultiSelect;
+          selectItem(pointer.key,{toggle,reason:'tap',open:!toggle});
+        }else{
+          state.touchMultiSelect=false;
+          selectItem(pointer.key,{toggle:pointer.toggle,reason:'click',open:!pointer.toggle});
+        }
+      }
+    }else if(pointer.empty&&isEmptyBoardPoint(event))clearStripSelection();
   }
+  state.draggedStripIds.clear();
 }
 function applyBoardMove(intent,to){
   const board=selectedBoard(),before=snapshotBoardOrder(board);
   const changed=moveBoardItems(state.project,{boardName:state.board,sourceKeys:intent.sourceKeys,to});
   if(changed){
     state.orderHistory.push({boardName:state.board,before});
+    state.redoHistory=[];
     edited();
   }else syncStripSelection();
   return changed;
@@ -640,6 +644,14 @@ function undoBoardMove(){
   const entry=state.orderHistory.pop();if(!entry)return;
   const board=state.project.boards.find(item=>item.name===entry.boardName);
   if(!board)return;
+  state.redoHistory.push({boardName:entry.boardName,before:snapshotBoardOrder(board)});
+  restoreBoardOrder(board,entry.before);clearStripSelection();edited();showStatus('');
+}
+function redoBoardMove(){
+  const entry=state.redoHistory.pop();if(!entry)return;
+  const board=state.project.boards.find(item=>item.name===entry.boardName);
+  if(!board)return;
+  state.orderHistory.push({boardName:entry.boardName,before:snapshotBoardOrder(board)});
   restoreBoardOrder(board,entry.before);clearStripSelection();edited();showStatus('');
 }
 function syncPrintOptions(){
@@ -884,37 +896,74 @@ $('newBoardForm').addEventListener('submit',event=>{
     $('calendarSelect').value=state.calendar;syncPrintOptions();refreshBoardOptions();showStatus('');$('newBoardDialog').close();setMode('board');edited();
   }catch(error){showStatus(error.message)}
 });
+const isMac=/Mac|iPhone|iPad|iPod/i.test(navigator.userAgentData?.platform||navigator.platform||'');
+function isToggleGesture(event){return isMac?event.metaKey:event.ctrlKey}
+function isEmptyBoardPoint(event){
+  const view=$('boardView');
+  if(!view.contains(event.target)||event.target.closest('.strip-outer,button,a,input,select,textarea,[contenteditable="true"]'))return false;
+  const rect=view.getBoundingClientRect(),scrollbarX=view.offsetWidth-view.clientWidth,scrollbarY=view.offsetHeight-view.clientHeight;
+  if(scrollbarX>0&&event.clientX>=rect.right-scrollbarX)return false;
+  if(scrollbarY>0&&event.clientY>=rect.bottom-scrollbarY)return false;
+  if(view.scrollWidth>view.clientWidth+1&&event.clientY>=rect.bottom-STRIP_GESTURE.scrollbarGuardPx&&event.target===view)return false;
+  return true;
+}
+// Pointer completion owns mouse/touch selection. A click with detail 0 is keyboard or assistive activation.
 $('boardView').addEventListener('click',event=>{
-  if(skipStripClick){event.preventDefault();event.stopPropagation();return}
+  if(event.detail!==0){if(performance.now()-lastDragAt<STRIP_GESTURE.postDragClickMs){event.preventDefault();event.stopPropagation()}return}
   const outer=event.target.closest('.strip-outer[data-strip-index]');
-  if(!outer)return;
-  const from=movePositionFrom(outer);
-  if(event.target.closest('.strip-drag-handle')){
-    openMoveDialog({from,fromKind:outer.dataset.itemKind||stripAt(from)?.kind,sourceKeys:[...state.selectedItemKeys]});
-    return;
+  if(outer){const toggle=isToggleGesture(event);selectItem(itemKey(outer),{toggle,reason:'keyboard',open:!toggle})}
+});
+$('boardView').addEventListener('keydown',event=>{
+  const outer=event.target.closest('.strip-outer[data-strip-index]');
+  if(!outer||event.target!==outer)return;
+  if(event.key==='Enter'||event.key===' '){
+    event.preventDefault();
+    const toggle=isToggleGesture(event);selectItem(itemKey(outer),{toggle,reason:'keyboard',open:!toggle});
+  }else if(event.key==='F2'){
+    event.preventDefault();
+    const key=itemKey(outer),from=movePositionFrom(outer);
+    if(!state.selectedStripIds.has(key))selectItem(key);
+    openMoveDialog({from,fromKind:outer.dataset.itemKind||stripAt(from)?.kind,sourceKeys:[...state.selectedStripIds]});
   }
-  const touchSelection=(event.pointerType==='touch'||event.pointerType==='pen')&&state.selectedItemKeys.size>0;
-  selectItem(itemKey(outer),{toggle:!!event.target.closest('.strip-select-button')||event.ctrlKey||event.metaKey||touchSelection,range:event.shiftKey});
 });
 $('boardView').addEventListener('pointerdown',event=>{
-  if(event.button!==0||stripPointer||event.target.closest('.strip-select-button,.red-flag-icon'))return;
+  if(event.button!==0||stripPointer||event.target.closest('button,a,input,select,textarea,[contenteditable="true"]'))return;
   const outer=event.target.closest('.strip-outer[data-strip-index]');
-  if(!outer)return;
-  const fromHandle=!!event.target.closest('.strip-drag-handle');
-  if(event.pointerType==='touch'&&!fromHandle)return;
-  const from=movePositionFrom(outer),intent={from,fromKind:outer.dataset.itemKind||stripAt(from)?.kind,
-    sourceKeys:state.selectedItemKeys.has(itemKey(outer))?[...state.selectedItemKeys]:[itemKey(outer)]};
-  if(!intent.sourceKeys.length)return;
-  stripPointer={pointerId:event.pointerId,intent,startX:event.clientX,startY:event.clientY,active:false};
+  const empty=!outer&&isEmptyBoardPoint(event);
+  if(!outer&&!empty)return;
+  const from=outer&&movePositionFrom(outer);
+  stripPointer={pointerId:event.pointerId,pointerType:event.pointerType,outer,empty,
+    key:outer&&itemKey(outer),from,fromKind:outer&&(outer.dataset.itemKind||stripAt(from)?.kind),
+    wasSelected:!!outer&&state.selectedStripIds.has(itemKey(outer)),
+    toggle:isToggleGesture(event),startX:event.clientX,startY:event.clientY,active:false,longPress:false,scrolling:false};
+  if(event.pointerType==='touch'&&outer){
+    const pointer=stripPointer;
+    pointer.longPressTimer=setTimeout(()=>{
+      if(stripPointer!==pointer||pointer.scrolling)return;
+      pointer.longPress=true;pointer.dragStartX=pointer.lastX??pointer.startX;pointer.dragStartY=pointer.lastY??pointer.startY;
+      pointer.outer.classList.add('strip-long-press');
+      if(!state.selectedStripIds.has(pointer.key))selectItem(pointer.key,{toggle:state.touchMultiSelect,reason:'longpress'});
+      state.touchMultiSelect=true;
+    },STRIP_GESTURE.longPressMs);
+  }
 });
 window.addEventListener('pointermove',event=>{
-  if(!stripPointer||event.pointerId!==stripPointer.pointerId)return;
-  if(!stripPointer.active){
-    const distance=Math.hypot(event.clientX-stripPointer.startX,event.clientY-stripPointer.startY);
-    if(distance<(event.pointerType==='mouse'?7:11))return;
+  const pointer=stripPointer;
+  if(!pointer||event.pointerId!==pointer.pointerId)return;
+  pointer.lastX=event.clientX;pointer.lastY=event.clientY;
+  if(!pointer.active){
+    const distance=Math.hypot(event.clientX-(pointer.longPress?pointer.dragStartX:pointer.startX),
+      event.clientY-(pointer.longPress?pointer.dragStartY:pointer.startY));
+    const intent=movementIntent(pointer,distance);
+    if(intent==='scroll'){clearTimeout(pointer.longPressTimer);pointer.scrolling=true;return}
+    if(intent==='wait')return;
+    if(!pointer.outer)return;
     startStripDrag(event);
   }
   if(stripPointer?.active){event.preventDefault();positionDrag(event.clientX,event.clientY)}
+},{passive:false});
+window.addEventListener('touchmove',event=>{
+  if(stripPointer?.pointerType==='touch'&&(stripPointer.longPress||stripPointer.active))event.preventDefault();
 },{passive:false});
 window.addEventListener('pointerup',event=>{if(event.pointerId===stripPointer?.pointerId)endStripDrag(event)});
 window.addEventListener('pointercancel',event=>{if(event.pointerId===stripPointer?.pointerId)endStripDrag(event,true)});
@@ -929,11 +978,18 @@ $('moveForm').addEventListener('submit',event=>{
   }
   $('moveDialog').close();state.moveIntent=null;
 });
+$('moveDialog').addEventListener('close',()=>{state.moveIntent=null});
 $('undoMoveButton').addEventListener('click',undoBoardMove);
+$('redoMoveButton').addEventListener('click',redoBoardMove);
 document.addEventListener('keydown',event=>{
-  if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'&&!event.shiftKey&&
-    !event.target.closest('input,textarea,[contenteditable="true"]')&&state.mode==='board'&&state.orderHistory.length){
-    event.preventDefault();undoBoardMove();
+  if(event.key==='Escape'&&state.mode==='board'&&!event.target.closest('dialog')){
+    if(stripPointer)endStripDrag(event,true);
+    clearStripSelection();
+  }
+  if((event.metaKey||event.ctrlKey)&&!event.target.closest('input,textarea,[contenteditable="true"]')&&state.mode==='board'){
+    const key=event.key.toLowerCase();
+    if(key==='z'&&!event.shiftKey&&state.orderHistory.length){event.preventDefault();undoBoardMove()}
+    else if(((key==='z'&&event.shiftKey)||key==='y')&&state.redoHistory.length){event.preventDefault();redoBoardMove()}
   }
 });
 $('saveButton').addEventListener('click',async()=>{

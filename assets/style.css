@@ -556,7 +556,9 @@ button {
     position: relative
 }
 
-.strip-outer[data-strip-index] { user-select: none }
+.strip-outer[data-strip-index] { user-select: none; cursor: pointer; touch-action: pan-y }
+.strip-outer[data-strip-index]:focus-visible .strip-layout { outline: 2px solid #176d62; outline-offset: 2px }
+.strip-outer.strip-long-press .strip-layout { box-shadow: 0 0 0 3px #168d7f66 }
 .strip-outer.strip-selected .strip-layout { outline: 2px solid #168d7f; outline-offset: -3px }
 .strip-outer.strip-selected::before {
     content: '';
@@ -569,47 +571,7 @@ button {
     border-radius: 999px;
     background: #168d7f
 }
-.strip-select-button, .strip-drag-handle {
-    position: absolute;
-    z-index: 5;
-    top: 0;
-    box-sizing: border-box;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    left: -30px;
-    width: 30px;
-    height: var(--strip-control-height, 20px);
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: #176d62;
-    cursor: pointer;
-    touch-action: none;
-    opacity: 0;
-    pointer-events: none
-}
-.strip-select-button[hidden], .strip-drag-handle[hidden] { display: none }
-.strip-select-button svg, .strip-drag-handle svg { display: block; width: 18px; height: 18px; flex: none }
-.strip-drag-handle {
-    left: 3px;
-    width: 21px;
-    justify-content: center;
-    border: 1px solid #65a99c;
-    border-radius: 2px;
-    background: #f2faf7;
-    color: #176d62;
-    cursor: grab
-}
-.strip-outer:hover > .strip-select-button,
-.strip-outer:hover > .strip-drag-handle,
-.strip-outer.strip-recent > .strip-select-button,
-.strip-outer.strip-recent > .strip-drag-handle,
-.strip-select-button:focus-visible, .strip-drag-handle:focus-visible { opacity: 1; pointer-events: auto }
-.strip-select-button:focus-visible, .strip-drag-handle:focus-visible { outline: 2px solid #176d62; outline-offset: 2px }
-#boardView { padding-left: var(--board-control-gutter, 36px) }
-.strip-dragging { user-select: none }
+.strip-dragging { user-select: none; cursor: grabbing }
 .strip-drag-preview {
     position: fixed;
     z-index: 1001;
@@ -751,7 +713,7 @@ button {
     display: block
 }
 
-.vertical-grid .strip-select-button, .vertical-grid .strip-drag-handle { top: 12px; height: 25px }
+.vertical-grid .strip-outer[data-strip-index] { touch-action: pan-x pan-y }
 
 .report-intro {
     display: flex;
@@ -1044,7 +1006,7 @@ footer span {
     .panel-header {
         display: none !important
     }
-    .strip-select-button, .strip-drag-handle, .strip-drag-preview, .strip-drop-indicator,
+    .strip-drag-preview, .strip-drop-indicator,
     #moveDialog, #newBoardDialog { display: none !important }
     .strip-outer.strip-selected::before { display: none }
     .strip-outer.strip-selected .strip-layout { outline: none }
