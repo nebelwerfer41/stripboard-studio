@@ -1,78 +1,86 @@
-> **Supporto MMSX:** importazione ed esportazione locale dei piani dataFormat 3 e 5, oltre al supporto MSD. Funzioni, limiti e test in [docs/mmsx-support.md](docs/mmsx-support.md).
+[Catalog](https://nebelwerfer41.github.io/) · [Repository](https://github.com/nebelwerfer41/stripboard-studio)
+
+> **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
 # Stripboard Studio v1.4
 
-Il supporto ai **Production Calendars** e alle **Red Flags** del file MSD è descritto in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Le viste Calendari e Red Flag Entry permettono di consultare questi dati senza modificare il file.
+Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). The Calendars and Red Flag Entry views display these records without changing the file.
 
-L'audit del formato per l'editor e la strategia conservativa di scrittura sono in [docs/msd-writer-audit.md](docs/msd-writer-audit.md).
+The editor’s format audit and conservative writing strategy are described in [docs/msd-writer-audit.md](docs/msd-writer-audit.md).
 
-App statica per visualizzare e riordinare stripboard, creare piani alternativi e consultare i modelli di report contenuti nei file Movie Magic Scheduling 6 (`.msd`). Parser, renderer e writer funzionano nel browser: nessun backend, database o account richiesto. I file importati restano nel browser e non vengono caricati su un server.
+A static application for viewing and reordering stripboards, creating alternative schedules, and inspecting report templates in Movie Magic Scheduling 6 (`.msd`) files. Parsing, rendering, and writing run in the browser, without a backend, database, or account. Imported files remain in the browser and are not uploaded to a server.
 
 ## GitHub Pages
 
-Carica il contenuto di questa cartella nella radice di un repository GitHub. Nelle impostazioni del repository, apri **Pages**, scegli **Deploy from a branch**, quindi `main` e `/ (root)`. L'app sarà disponibile all'indirizzo Pages del repository. I percorsi HTML, CSS, JavaScript e dei campioni sono relativi, quindi funzionano anche con l'URL di un repository (`/nome-repository/`).
+Upload this folder’s contents to the root of a GitHub repository. In the repository settings, open **Pages**, select **Deploy from a branch**, then `main` and `/ (root)`. The application will be available at the repository’s Pages URL. HTML, CSS, JavaScript, and sample paths are relative, so they also work under a repository path such as `/repository-name/`.
 
-Il solo file di esempio incluso è `samples/Wonderful Life Demo.msd`; verrà pubblicato insieme al sito. Puoi comunque usare **Importa .msd** per aprire un file locale. GitHub Pages serve i file statici; l'importazione e il parsing avvengono nel browser.
+The only included sample is `samples/Wonderful Life Demo.msd`; it will be published with the site. Use **Import .msd** to open a local file. GitHub Pages serves static files; importing and parsing happen in the browser.
 
-## Avvio locale
+## Local setup
 
-Su macOS, fai doppio clic su `Avvia Stripboard Studio.command`. Se macOS blocca il primo avvio, apri Terminale nella cartella dell'app ed esegui:
+On macOS, double-click `Avvia Stripboard Studio.command`. If macOS blocks the first launch, open Terminal in the application folder and run:
 
 ```sh
 python3 -m http.server 0 --bind 127.0.0.1
 ```
 
-Apri l'indirizzo con la porta indicata dal comando. Il launcher sceglie automaticamente una porta libera e apre il browser. Python serve solo i file statici durante la prova locale: non legge né interpreta gli MSD. Puoi usare qualsiasi altro server HTTP statico. L'apertura diretta di `index.html` con `file://` non è supportata dai browser per moduli JavaScript e caricamento dei campioni.
+Open the address using the port printed by the command. The launcher selects an available port and opens the browser. Python only serves static files during local testing; it does not read or interpret MSD files. Any static HTTP server can be used. Opening `index.html` directly through `file://` is unsupported for JavaScript modules and sample loading.
 
-Il browser deve supportare `DecompressionStream('deflate-raw')`, `DOMParser`, `XMLSerializer` e i moduli JavaScript. Parser e writer accettano la variante EPSF/MSD 6 osservata nei campioni.
+The browser must support `DecompressionStream('deflate-raw')`, `DOMParser`, `XMLSerializer`, and JavaScript modules. The parser and writer accept the EPSF/MSD 6 variant observed in the samples.
 
-## Funzioni
+## Features
 
-- Selezione di progetto, piano di lavorazione e layout di stripboard salvato nel `.msd`.
-- Clic o tap su una scena per selezionarla e renderla attiva. Shift+clic seleziona l’intervallo dalla strip di partenza, inclusi banner e fine giornata; Ctrl/⌘-Shift+clic aggiunge l’intervallo alla selezione. Ctrl/⌘-clic aggiunge o rimuove elementi; su touch, tieni premuta una strip per entrare nella multiselezione, poi usa i tap per aggiungere o rimuovere. Esc o un clic nello spazio vuoto azzerano la selezione. La strip si trascina direttamente; su touch il drag inizia dopo una pressione lunga e un movimento intenzionale. Se la strip era già selezionata, si sposta l’intero gruppo mantenendo l’ordine relativo. La preview mostra numero di scene e ottavi totali, più gli altri elementi, e una linea indica l’inserimento. Banner e fine giornata si trascinano allo stesso modo, dentro e fuori dal Boneyard; F2 offre le stesse destinazioni.
-- **Annulla** (o Ctrl/⌘-Z) ripristina l’ordine prima dell’ultima operazione; **Ripeti** (o Ctrl/⌘-Maiusc-Z) applica di nuovo il riordino annullato. Da tastiera, Invio o Spazio selezionano una strip e F2 apre la scelta di giornata e posizione. La posizione «Alla fine» di un `ScheduleDay` è prima del day break generato dal layout.
-- **＋** accanto al piano crea una nuova stripboard copiando l'ordine corrente. Il nuovo piano usa gli stessi riferimenti alle scene e può essere modificato indipendentemente; il nome univoco è l'identità prevista dal formato osservato. Il selettore cambia il piano corrente e il valore `ActiveStripBoard` esportato.
-- **Salva .msd** produce un nuovo file `-edited.msd`. Il testo «Modifiche non salvate» segue le revisioni del documento; se il salvataggio fallisce, le modifiche restano disponibili. Se il browser non offre un selettore di salvataggio con esito confermato, viene avviato un download e lo stato diventa salvato quando il browser accetta il download.
-- Selettore del calendario accanto al layout: mostra lo stesso piano con le date inferite dal calendario scelto, senza cambiare il riferimento `CalendarName` nel file.
-- Vista **Calendari** con elenco dei calendari MSD, giorni non lavorativi, date di produzione, eccezioni e griglia mensile con le giornate di ripresa del piano.
-- Vista **Red Flag Entry** con filtri per categoria, elemento, tipo e intervallo di date, griglia mensile, elenco e dettaglio delle segnalazioni. I tipi provengono dal `RedFlagMgr`; la gestione e la modifica restano future.
-- Visualizzazione di scene, banner, giorni, date e coda non programmata, con ricerca e controlli per nascondere banner e fine giornata.
-- Banner e fine giornata disegnati come strip a larghezza uguale alle scene.
-- Interruttore **Colori strip**: applica la griglia colori `INT/EXT` × `Giorno/Notte` del file, oltre ai colori dedicati di banner e fine giornata; può tornare alla vista neutra.
-- Giorni senza testata aggiunta e senza spazio finale; nei layout verticali, giorni affiancati con scorrimento orizzontale.
-- Anteprima orizzontale della stripboard adattata automaticamente alla larghezza del pannello, anche quando la finestra viene ridimensionata.
-- Anteprima dei layout report contenuti nel file, con campi collegati ai dati e stampa dal browser. Banner e fine giornata, quando previsti dal modello, compaiono come righe di testo nel flusso del report.
-- Stampa della stripboard con formato carta, orientamento, margini e scala gestiti dalla finestra di stampa del browser; nell'app restano le opzioni per header e nuova pagina dopo ogni giornata.
-- Importazione locale di altri file `.msd` compatibili con il formato dei campioni.
+Control names below are given in English; some labels in the application are currently in Italian.
 
-Le date dei giorni sono derivate dai calendari come nel parser incluso e vengono indicate come stimate. Cambiare calendario è una proiezione di lettura: conserva strip, scene e ordine del piano. L'anteprima dei report riproduce contenuti e geometria dei campi principali; funzioni di impaginazione e formule proprietarie di Movie Magic non sono replicate completamente.
+- Select a project, shooting schedule, and stripboard layout saved in the `.msd` file.
+- Click or tap a scene to select and activate it. Shift-click selects the range from the initial strip, including banners and day breaks; Ctrl/⌘-Shift-click adds that range to the selection. Ctrl/⌘-click adds or removes items. On touch devices, hold a strip to enter multi-selection mode, then tap to add or remove items. Esc or a click in empty space clears the selection. Drag a strip directly; on touch devices, dragging begins after a long press and deliberate movement. If the strip is already selected, the whole group moves while preserving its relative order. The preview shows the scene count, total page eighths, and other items, with a line marking the insertion point. Banners and day breaks can be dragged in the same way, including into and out of the Boneyard. F2 offers the same destinations.
+- **Undo** (Ctrl/⌘-Z) restores the order before the last operation; **Redo** (Ctrl/⌘-Shift-Z) reapplies the undone reorder. From the keyboard, Enter or Space selects a strip and F2 opens the day and position picker. The “At the end” position in a `ScheduleDay` is before the layout-generated day break.
+- **＋** beside the schedule creates a stripboard by copying the current order. The new schedule uses the same scene references and can be edited independently. Its unique name provides the identity expected by the observed format. The selector changes the current schedule and the exported `ActiveStripBoard` value.
+- **Save .msd** creates a new `-edited.msd` file. The unsaved-changes indicator tracks document revisions; edits remain available if saving fails. If the browser does not provide a file picker with a confirmed save result, a download starts and the state becomes saved when the browser accepts the download.
+- The calendar selector beside the layout displays the same schedule with dates inferred from the selected calendar, without changing the file’s `CalendarName` reference.
+- The **Calendars** view lists MSD calendars, non-working days, production dates, exceptions, and a monthly grid containing the schedule’s shooting days.
+- The **Red Flag Entry** view includes filters for category, element, type, and date range, along with a monthly grid, list, and flag details. Types come from `RedFlagMgr`; managing and editing flags remain future work.
+- Display scenes, banners, days, dates, and the unscheduled queue, with search and controls for hiding banners and day breaks.
+- Banners and day breaks are drawn as strips with the same width as scene strips.
+- The **Strip colors** toggle applies the file’s `INT/EXT` × `Day/Night` color grid, plus dedicated banner and day-break colors. The display can return to a neutral view.
+- Days have no additional heading or trailing space. In vertical layouts, days sit side by side with horizontal scrolling.
+- The horizontal stripboard preview automatically fits the panel width, including when the window is resized.
+- Preview report layouts stored in the file, with fields linked to data and browser printing. Banners and day breaks appear as text rows in the report flow when the template includes them.
+- Print stripboards with paper size, orientation, margins, and scaling controlled by the browser’s print dialog. The application retains options for the header and starting each day on a new page.
+- Import other local `.msd` files compatible with the sample format.
 
-## Writer MSD e integrità
+Day dates are derived from calendars by the included parser and marked as estimates. Selecting another calendar changes only the reading projection: strips, scenes, and schedule order remain intact. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
 
-Un salvataggio senza modifiche restituisce i byte originali. Dopo un edit, il writer ricostruisce soltanto la sezione XML `StripBoardMgr` usando i nodi originali delle strip, poi aggiorna offset e lunghezza nella section map EPSF. Le altre dodici sezioni del campione sono copiate byte per byte, inclusi Calendars, Red Flags, breakdown, template, report, layout, metadata e proprietà non interpretate. La sezione modificata usa blocchi DEFLATE raw non compressi: il file salvato può essere più grande, ma il contenuto delle altre sezioni resta identico. Il writer rifiuta un edit se una strip originale sarebbe persa o duplicata.
+## MSD writer and integrity
 
-Nel campione l'ordine delle strip è l'ordine dei figli di `ScheduleDay`, `RemainingScheduledStrips` e `RemainingUnscheduledStrips`/`UnscheduledDay`. I day break sono generati dal layout e non hanno un record proprio; spostarli ripartisce le strip tra i gruppi `ScheduleDay` e `UnscheduledDay`, preservandone attributi e identità anche nei trasferimenti da e verso il Boneyard. L'ordine dei piani e `SortOrder` sono distinti: nel campione differiscono e Movie Magic Scheduling 6.02.413 ha mostrato nel menu l'ordine fisico dei piani. Nessun ID numerico di piano, checksum o riferimento diretto da Red Flags ai piani è presente nei campioni. Il writer non attribuisce nuovi ID alle scene o ai piani.
+Saving without edits returns the original bytes. After an edit, the writer rebuilds only the `StripBoardMgr` XML section using the original strip nodes, then updates its offset and length in the EPSF section map. The sample’s other twelve sections are copied byte for byte, including Calendars, Red Flags, breakdowns, templates, reports, layouts, metadata, and uninterpreted properties. The modified section uses uncompressed raw DEFLATE blocks, so the saved file may be larger, while the other sections remain unchanged. The writer rejects an edit if an original strip would be lost or duplicated.
 
-`tests/roundtrip.html` verifica identità binaria senza edit, riapertura dopo movimenti e nuovo piano, conteggi/riferimenti e conservazione delle sezioni opache. `tests/strip-drag.mjs` copre il riordino di gruppo, l’attraversamento dei giorni e la preview. Il file modificato di prova è stato aperto in Movie Magic Scheduling 6.02.413: l'app ha mostrato il nuovo piano e le strip spostate tra le giornate. All'apertura ha selezionato il primo piano nonostante `ActiveStripBoard` puntasse al nuovo; il comportamento di questa preferenza resta da chiarire. Compatibilità con versioni MSD diverse, file con checksum/estensioni di contenitore e salvataggio successivo da Movie Magic non sono ancora verificati.
+In the sample, strip order follows the children of `ScheduleDay`, `RemainingScheduledStrips`, and `RemainingUnscheduledStrips`/`UnscheduledDay`. Day breaks are generated by the layout and have no record of their own. Moving them redistributes strips between `ScheduleDay` and `UnscheduledDay` groups, preserving attributes and identity, including transfers into and out of the Boneyard. Schedule order and `SortOrder` are separate: they differ in the sample, and Movie Magic Scheduling 6.02.413 displayed physical schedule order in its menu. The samples contain no numeric schedule ID, checksum, or direct reference from Red Flags to schedules. The writer does not assign new scene or schedule IDs.
 
-## Fedeltà dei layout MSD
+`tests/roundtrip.html` checks binary identity without edits, reopening after moves and schedule creation, counts and references, and preservation of opaque sections. `tests/strip-drag.mjs` covers group reordering, movement across days, and the preview. A modified test file was opened in Movie Magic Scheduling 6.02.413, which displayed the new schedule and strips moved between days. On opening, it selected the first schedule even though `ActiveStripBoard` pointed to the new one; this preference’s behavior remains unclear. Compatibility with other MSD versions, files containing checksums or container extensions, and subsequent saving from Movie Magic have not yet been verified.
 
-Il modello compatto espone dimensioni della strip (`StripLength`, `StripWidth`), geometria dei campi e delle linee, stili testuali, `PageFormat/Paper` con `PrintableRect`, layout del day break e dell'header, oltre agli attributi originali di layout e banner. Nei campi Element Sum, `Type=0/1` mostra il totale, `Type=2` solo il testo e `Type=3` testo e totale; `Suppress` nasconde il campo quando il totale è zero. Il totale usa il numero iniziale del nome di ciascun elemento, se presente, altrimenti conta l'elemento come uno. Nei report, `PrntCat=1` dei campi Custom List mostra il nome della categoria prima degli elementi.
+## MSD layout fidelity
 
-Nei report, `BDSCategoryElementsField` con `Style=GRID` dispone gli elementi su righe, mentre `Style=COMMA_DELIMETED_LIST` li separa con virgole. Il valore `COMMA_DELIMETED_LIST` è stato verificato nel layout «Report di Esempio» del file MSD fornito. `NumColumns` e `ColCnt` impostano il numero di colonne degli elenchi a griglia; `WrapText` controlla il ritorno a capo dentro ciascuna voce. Le tabelle di elementi della stripboard usano gli ID e i filtri `LowBoardIDFilter`/`HighBoardIDFilter`. `CategorySource=ALL_REMAINING` esclude le categorie già indicate dagli altri campi del report. `SeparateRecordsWithALine` controlla la linea tra i record e `KeepOnOnePage` evita che un record venga spezzato nella stampa. `IsGrowable`, `Flow`, `RowHeight` e `SplitColumnAfterRows` sono conservati dal parser ma richiedono ancora una verifica del comportamento originale prima di guidare l'impaginazione.
+The compact model exposes strip dimensions (`StripLength`, `StripWidth`), field and line geometry, text styles, `PageFormat/Paper` with `PrintableRect`, day-break and header layouts, and original layout and banner attributes. In Element Sum fields, `Type=0/1` shows the total, `Type=2` shows text only, and `Type=3` shows text and total. `Suppress` hides a field when its total is zero. The total uses the leading number in each element’s name where present, otherwise counts that element as one. In reports, `PrntCat=1` in Custom List fields displays the category name before its elements.
 
-Per gli stili di banner e day break, `Alignment` usa i valori `20` (sinistra), `21` (destra) e `22` (centro). La stampa elimina l'arrotondamento e il ritaglio del pannello dell'app, così i bordi delle strip restano squadrati.
+In reports, `BDSCategoryElementsField` with `Style=GRID` arranges elements in rows, while `Style=COMMA_DELIMETED_LIST` separates them with commas. The `COMMA_DELIMETED_LIST` value was verified in the supplied MSD file’s example-report layout. `NumColumns` and `ColCnt` set the column count for grid lists; `WrapText` controls wrapping within each entry. Stripboard element tables use IDs and the `LowBoardIDFilter`/`HighBoardIDFilter` filters. `CategorySource=ALL_REMAINING` excludes categories already included by other report fields. `SeparateRecordsWithALine` controls the line between records, and `KeepOnOnePage` prevents a record from splitting across printed pages. `IsGrowable`, `Flow`, `RowHeight`, and `SplitColumnAfterRows` are preserved by the parser but require verification against the original application before they can drive pagination.
 
-Nei file di esempio non esiste un attributo di margine/spaziatura del day break o di interruzione pagina della stripboard. Il day break occupa quindi una strip della stessa altezza prevista dal layout, senza margine esterno; il piccolo padding del testo è interno. La stampa della stripboard prosegue tra le giornate senza interruzioni pagina forzate. `HideStripBoardHeader` del piano determina lo stato iniziale dell'opzione header. Per i report, `ReportSettings.PageBreak` è una proprietà distinta e non viene applicata alla stripboard.
+For banner and day-break styles, `Alignment` uses `20` for left, `21` for right, and `22` for center. Printing removes the application panel’s rounding and clipping so strip borders remain square.
 
-Il browser gestisce la carta e l'area stampabile senza un vincolo `@page` imposto dall'app. La stripboard viene ingrandita o ridotta automaticamente per occupare la larghezza stampabile quando l'altezza delle strip lo consente; la scala resta regolabile nella finestra di stampa. Il file `.msd` conserva i suoi valori originali. `PrintScale` e `ScaleStyle` rimangono nel modello originale: nei template osservati `ScaleStyle=Refit`, mentre alcuni valori `PrintScale` non sono coerenti con la lunghezza della strip.
+The sample files contain no day-break margin/spacing attribute or stripboard page-break attribute. A day break therefore occupies a strip at the layout’s specified height, without an external margin; the small text padding is internal. Stripboard printing continues across days without forced page breaks. The schedule’s `HideStripBoardHeader` determines the header option’s initial state. For reports, `ReportSettings.PageBreak` is a separate property and is not applied to the stripboard.
 
-La barretta laterale è stata rimossa dalla stripboard. La larghezza del canvas di stampa dipende solo dalle strip; l'header opzionale e il bordo sinistro delle strip partono dallo stesso margine stampabile. Nei report, `IncludeBanners`, `IncludeDayBreaks` e `DayBreakFooterText` del template determinano le righe speciali di partenza; i controlli di visibilità possono nasconderle senza modificare il modello MSD.
+The browser controls paper and the printable area without an application-imposed `@page` constraint. The stripboard automatically enlarges or shrinks to fill the printable width when strip height permits; scaling remains adjustable in the print dialog. The `.msd` file retains its original values. `PrintScale` and `ScaleStyle` remain in the original model: the observed templates use `ScaleStyle=Refit`, while some `PrintScale` values do not match strip length.
 
-Restano da riprodurre con precisione alcuni dettagli proprietari: pattern e codici dei bordi dei singoli campi, stili `AREA`, formule dei tempi stimati nei banner/day break, immagini nei layout e l'esatta semantica di tutti i valori numerici di `Type` nei conteggi categoria. Gli attributi originali necessari sono mantenuti nel modello dove disponibili. Non è stato possibile confrontare visivamente questi campioni con un'installazione di Movie Magic Scheduling.
+The side marker has been removed from the stripboard. Print-canvas width depends only on the strips; the optional header and the strips’ left border start at the same printable margin. In reports, template properties `IncludeBanners`, `IncludeDayBreaks`, and `DayBreakFooterText` determine the initial special rows. Visibility controls can hide these rows without changing the MSD model.
 
-## Verifica
+Some proprietary details remain to be reproduced precisely: individual field border patterns and codes, `AREA` styles, estimated-time formulas in banners and day breaks, layout images, and the exact meaning of all numeric `Type` values in category counts. Required original attributes are retained where available. A visual comparison of these samples with a Movie Magic Scheduling installation was not possible.
 
-Apri `tests/parser.html` dal sito statico per confrontare il parser JavaScript con i valori attesi di Wonderful Life. I file Python originali sono in `legacy/` come riferimento storico; l'app non li usa.
+## Verification
 
-Crediti: [nebelwerfer41 su GitHub](https://github.com/nebelwerfer41).
+Open `tests/parser.html` from the static site to compare the JavaScript parser with the expected Wonderful Life values. The original Python files are in `legacy/` as historical references; the application does not use them.
+
+Credits: [nebelwerfer41 on GitHub](https://github.com/nebelwerfer41).
+
+## License
+
+[MIT](LICENSE). Copies and derivative works must retain the copyright notice and license text. Dependencies and third-party materials retain their own licenses.
