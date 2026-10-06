@@ -13,7 +13,7 @@ const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
 const state = {project:null, mode:'board', board:null, calendar:null, calendarMonth:null, calendarDate:null,
   flagMonth:null,flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null,
   layout:null, query:'', unscheduled:false, showColors:true, hideBanners:false, hideDayBreaks:false,
-  allReport:false, importedSource:null, printPageBreaks:false, printHeader:true,reportOptions:new Map(),
+  allReport:false, importedSource:null, printHeader:true,reportOptions:new Map(),
   revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],redoHistory:[],
   selectedStripIds:new Set(),selectionAnchorId:null,activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
 const SCREEN_PX_PER_INCH=76;
@@ -62,7 +62,6 @@ function setProject(data){
   if(isMmsx)state.mode='board';
   for(const id of ['reportNav','calendarNav','redFlagNav','newBoardButton'])$(id).disabled=isMmsx;
   $('saveButton').textContent=isMmsx?'↓ Esporta copia .mmsx':'↓ Salva .msd';
-  $('formatNotice').hidden=!isMmsx;
   state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;
   clearStripSelection();
   state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;
@@ -75,7 +74,7 @@ function setProject(data){
   state.categorySettings=new Map((data.categorySettings||[]).map(c=>[c.name,c.attributes]));state.reportOptions.clear();
   state.unscheduled=false;state.allReport=false;state.query='';$('search').value='';
   state.hideBanners=false;state.hideDayBreaks=false;$('hideBanners').checked=false;$('hideDayBreaks').checked=false;
-  state.printPageBreaks=false;state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
+  state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
   $('sideProject').textContent=data.title;$('projectTitle').textContent=data.title;
   refreshBoardOptions();$('reportCount').textContent=data.reportLayouts.length;
   $('calendarCount').textContent=data.calendars.length;$('redFlagCount').textContent=data.redFlags.length;
@@ -132,8 +131,8 @@ function render(){
 function renderStats(board){
   const dated=board.scheduledGroups.filter(g=>g.kind==='ScheduleDay');
   const used=board.scheduledGroups.flatMap(g=>g.strips).filter(s=>s.kind==='scene').length;
-  const vals=[['GIORNI DI RIPRESE',dated.length],['SCENE IN PIANO',used],['PRIMO GIORNO',shortDate(board.dateAudit.firstDate)],['ULTIMO GIORNO',shortDate(board.dateAudit.lastDate)]];
-  $('stats').innerHTML=vals.map(([label,value])=>`<div class="stat"><div class="label">${label}</div><div class="value ${String(value).length>10?'small':''}">${safe(value)}</div></div>`).join('');
+  const vals=[['Giorni di riprese',dated.length],['Scene in piano',used],['Primo giorno',shortDate(board.dateAudit.firstDate)],['Ultimo giorno',shortDate(board.dateAudit.lastDate)]];
+  $('stats').innerHTML=vals.map(([label,value])=>`<div class="stat"><span class="label">${label}</span><span class="value">${safe(value)}</span></div>`).join('');
 }
 function formatTemplate(t,ctx){
   return String(t||'').replace(/\{([^}]+)\}/g,(_,raw)=>{
@@ -457,11 +456,10 @@ function fitBoardPreview(){
   const view=$('boardView');
   if(view.hidden||view.classList.contains('is-vertical')||!view.classList.contains('print-fit'))return;
   const styles=getComputedStyle(view);
-  const available=view.clientWidth-parseFloat(styles.paddingRight);
+  const available=view.clientWidth-parseFloat(styles.paddingLeft)-parseFloat(styles.paddingRight);
   const width=parseFloat(view.style.getPropertyValue('--print-board-width'));
   if(available>0&&width>0){
-    const zoom=Math.max(0.1,(available-36)/width);
-    const fittedZoom=zoom<=1?zoom:available/(width+36);
+    const fittedZoom=available/width;
     view.style.setProperty('--live-board-zoom',String(fittedZoom));
   }
 }
@@ -485,10 +483,9 @@ function renderBoard(board,layout){
   const positioned=[...board.scheduledGroups.map((group,index)=>({group,container:'scheduledGroups',groupIndex:index})),
     ...(state.unscheduled?board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',groupIndex:index})):[])];
   const visibleGroups=positioned.filter(({group})=>groupMatches(group,q));
-  for(const [index,{group,container,groupIndex}] of visibleGroups.entries()){
+  for(const {group,container,groupIndex} of visibleGroups){
     const day=document.createElement('section');day.className='day';
     Object.assign(day.dataset,{container,groupIndex});
-    if(state.printPageBreaks&&group.kind==='ScheduleDay'&&index<visibleGroups.length-1)day.classList.add('print-page-break');
     day.setAttribute('aria-label',group.kind==='ScheduleDay'?`Giorno ${group.ordinal}, ${fmtDate(group.date)}`:group.kind);
     const wrap=document.createElement('div');wrap.className=vertical?'vertical-grid':'strips';
     for(const [stripIndex,item] of group.strips.entries()){
@@ -665,7 +662,7 @@ function redoBoardMove(){
   restoreBoardOrder(board,entry.before);clearStripSelection();edited();showStatus('');
 }
 function syncPrintOptions(){
-  $('printPageBreaks').checked=state.printPageBreaks;$('printHeader').checked=state.printHeader;
+  $('printHeader').checked=state.printHeader;
   document.body.classList.toggle('print-with-header',state.printHeader);
 }
 function reportRecords(board,layout){
@@ -1083,7 +1080,6 @@ $('toggleUnscheduled').addEventListener('click',()=>{clearStripSelection();state
 $('showColors').addEventListener('change',e=>{state.showColors=e.target.checked;render()});
 $('hideBanners').addEventListener('change',e=>{state.hideBanners=e.target.checked;render()});
 $('hideDayBreaks').addEventListener('change',e=>{state.hideDayBreaks=e.target.checked;render()});
-$('printPageBreaks').addEventListener('change',e=>{state.printPageBreaks=e.target.checked;render()});
 $('printHeader').addEventListener('change',e=>{state.printHeader=e.target.checked;syncPrintOptions()});
 $('reportSeparateRecords').addEventListener('change',e=>{
   state.reportOptions.set(state.layout,{...state.reportOptions.get(state.layout),SeparateRecordsWithALine:e.target.checked});render();

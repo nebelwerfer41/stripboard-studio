@@ -31,25 +31,25 @@
         <div class="eyebrow">MOVIE MAGIC SCHEDULING · STRIPBOARD STUDIO</div>
         <div class="title-row"><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><div class="document-actions"><span id="dirtyIndicator" role="status">Salvato</span><button id="saveButton" type="button">↓ &nbsp; Salva .msd</button><button id="printButton" class="print-button" type="button">↗ &nbsp; Stampa vista</button></div></div>
         <div id="status" class="status" hidden></div>
-        <p id="formatNotice" class="status" hidden>MMSX · Vista compatta con colori originali. Sposta strips tra giornate e Boneyard, poi esporta una nuova copia locale. Layout, report, calendari e altri dati originali sono conservati nel file; la loro modifica non è disponibile in questa versione. Salva le modifiche prima di chiudere la pagina.</p>
         <section class="controls" id="controls">
           <div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div>
           <div class="control" id="boardControl"><label for="boardSelect">PIANO DI LAVORAZIONE</label><div class="board-choice"><select id="boardSelect"></select><button id="newBoardButton" type="button" title="Crea un nuovo piano da quello corrente">＋</button></div></div>
           <div class="control" id="layoutControl"><label for="layoutSelect" id="layoutLabel">LAYOUT STRIPBOARD</label><select id="layoutSelect"></select></div>
           <div class="control" id="calendarControl"><label for="calendarSelect">CALENDARIO DEL PIANO</label><select id="calendarSelect"></select></div>
         </section>
-        <section class="print-options" id="printOptions" aria-label="Opzioni di stampa stripboard">
-          <label><input id="printPageBreaks" type="checkbox"> Nuova pagina dopo ogni giorno</label>
-          <label><input id="printHeader" type="checkbox"> Header di stampa</label>
-        </section>
-        <section class="report-options" id="reportOptions" aria-label="Parametri generali del report" hidden>
-          <label title="Separate records with a line"><input id="reportSeparateRecords" type="checkbox"> Separa record con una linea</label>
-        </section>
-        <section class="visibility-options" id="visibilityOptions" aria-label="Visibilità delle righe">
-          <label><input id="hideBanners" type="checkbox"> Nascondi banner</label>
-          <label><input id="hideDayBreaks" type="checkbox"> Nascondi fine giornata</label>
-        </section>
-        <section class="stats" id="stats"></section>
+        <div class="options-row">
+          <section class="print-options" id="printOptions" aria-label="Opzioni di stampa stripboard">
+            <label><input id="printHeader" type="checkbox"> Header di stampa</label>
+          </section>
+          <section class="report-options" id="reportOptions" aria-label="Parametri generali del report" hidden>
+            <label title="Separate records with a line"><input id="reportSeparateRecords" type="checkbox"> Separa record con una linea</label>
+          </section>
+          <section class="visibility-options" id="visibilityOptions" aria-label="Visibilità delle righe">
+            <label><input id="hideBanners" type="checkbox"> Nascondi banner</label>
+            <label><input id="hideDayBreaks" type="checkbox"> Nascondi fine giornata</label>
+          </section>
+        </div>
+        <section class="stats" id="stats" aria-label="Riepilogo del piano"></section>
         <section class="content-panel">
           <div class="panel-header"><div><div class="section-kicker" id="sectionKicker">PIANO DI LAVORAZIONE</div><h2 id="viewTitle">Stripboard</h2><p id="viewSubtitle"></p></div><div class="panel-tools" id="panelTools"><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="Cerca scena, set, testo…"></label><label class="color-switch" id="colorSwitch"><input id="showColors" type="checkbox" checked><span class="switch-track"></span><span>Colori strip</span></label><button id="undoMoveButton" class="subtle-button" type="button" disabled title="Annulla l’ultimo spostamento">↶ Annulla</button><button id="redoMoveButton" class="subtle-button" type="button" disabled title="Ripristina l’ultimo spostamento annullato">↷ Ripeti</button><button id="toggleUnscheduled" class="subtle-button" type="button">Coda non programmata</button></div></div>
           <div id="boardView" class="view"></div>
