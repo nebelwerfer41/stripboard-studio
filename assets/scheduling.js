@@ -15,7 +15,6 @@ export function moveStrip(project,{boardName,from,to}){
   if(!Number.isInteger(from.stripIndex)||from.stripIndex<0||from.stripIndex>=source.strips.length)throw Error('Strip sorgente non valida');
   if(!Number.isInteger(to.stripIndex)||to.stripIndex<0||to.stripIndex>target.strips.length)throw Error('Posizione di destinazione non valida');
   if(source===target&&(to.stripIndex===from.stripIndex||to.stripIndex===from.stripIndex+1))return false;
-  if(project.format==='mmsx'&&source.strips[from.stripIndex].mmsxLocked)throw Error('I fine giornata originali nel Boneyard non sono spostabili');
   const [strip]=source.strips.splice(from.stripIndex,1);
   const insertion=source===target&&to.stripIndex>from.stripIndex?to.stripIndex-1:to.stripIndex;
   target.strips.splice(insertion,0,strip);
@@ -28,7 +27,6 @@ export function moveStrips(project,{boardName,sourceKeys,to}){
   if(!board)throw Error('Stripboard non trovata');
   const target=locate(board,to);
   if(!Number.isInteger(to.stripIndex)||to.stripIndex<0||to.stripIndex>target.strips.length)throw Error('Posizione di destinazione non valida');
-  if(project.format==='mmsx'&&[...board.scheduledGroups,...board.unscheduledGroups].flatMap(g=>g.strips).some(s=>s.mmsxLocked&&sourceKeys.includes(s.sourceKey)))throw Error('I fine giornata originali nel Boneyard non sono spostabili');
   const keys=new Set(sourceKeys);
   if(!keys.size||keys.size!==sourceKeys.length)throw Error('Selezione strip non valida');
   const groups=[...board.scheduledGroups,...board.unscheduledGroups];
@@ -42,61 +40,64 @@ export function moveStrips(project,{boardName,sourceKeys,to}){
   return changed;
 }
 
-export function dayBreakKey(boardName,group){return `dayBreak:${JSON.stringify([boardName,group.sourceIndex])}`}
+export function dayBreakKey(boardName,group){return `dayBreak:${JSON.stringify([boardName,group.mmsxDay||[group.sourceContainer||'ScheduledStrips',group.sourceIndex]])}`}
 export function isDayBreakKey(key){return typeof key==='string'&&key.startsWith('dayBreak:')}
 
-// Scenes and banners are strip nodes; a day break is the boundary owned by a
-// ScheduleDay. Reorder one flat sequence, then repartition the original groups.
+// Day breaks are group boundaries in both containers. Move a flat sequence,
+// then repartition it without carrying unselected scenes along with a boundary.
 export function moveBoardItems(project,{boardName,sourceKeys,to}){
   const board=project.boards.find(item=>item.name===boardName);
   if(!board)throw Error('Stripboard non trovata');
-  const groups=board.scheduledGroups;
-  if(groups.filter(group=>group.kind!=='ScheduleDay').length>1||groups.some((group,index)=>group.kind!=='ScheduleDay'&&index!==groups.length-1))
-    throw Error('Struttura dei gruppi non supportata per lo spostamento day break');
-  if(project.format==='mmsx'&&[...board.scheduledGroups,...board.unscheduledGroups].flatMap(g=>g.strips).some(s=>s.mmsxLocked&&sourceKeys.includes(s.sourceKey)))throw Error('I fine giornata originali nel Boneyard non sono spostabili');
   const keys=new Set(sourceKeys);
   if(!keys.size||keys.size!==sourceKeys.length)throw Error('Selezione non valida');
   const target=locate(board,to);
   if(!Number.isInteger(to.stripIndex)||to.stripIndex<0||to.stripIndex>target.strips.length)throw Error('Destinazione non valida');
-  const tokens=[],positions=new Map();
-  for(const group of groups){
-    positions.set(group,tokens.length);
-    tokens.push(...group.strips.map(strip=>({strip,key:strip.sourceKey})));
-    if(group.kind==='ScheduleDay')tokens.push({break:group,key:dayBreakKey(boardName,group)});
+  const containers=Object.keys(CONTAINERS),sequences={},positions=new Map();
+  for(const container of containers){
+    const tokens=[];
+    for(const group of board[container]){
+      positions.set(group,tokens.length);
+      tokens.push(...group.strips.map(strip=>({strip,key:strip.sourceKey})));
+      if(['ScheduleDay','UnscheduledDay'].includes(group.kind))tokens.push({break:group,key:dayBreakKey(boardName,group)});
+      else tokens.push({terminal:group});
+    }
+    sequences[container]=tokens;
   }
-  const unscheduled=board.unscheduledGroups.flatMap(group=>group.strips.map(strip=>({strip,key:strip.sourceKey})));
-  const chosen=[...tokens,...unscheduled].filter(token=>keys.has(token.key));
+  const chosen=containers.flatMap(container=>sequences[container]).filter(token=>keys.has(token.key));
   if(chosen.length!==keys.size)throw Error('Selezione non valida');
   if(!chosen.some(token=>token.break))return moveStrips(project,{boardName,sourceKeys,to});
-  if(to.container!=='scheduledGroups')throw Error('Un day break può essere collocato solo tra i giorni programmati');
-  const targetIndex=positions.get(target)+to.stripIndex;
-  const insertion=targetIndex-tokens.slice(0,targetIndex).filter(token=>keys.has(token.key)).length;
-  const next=tokens.filter(token=>!keys.has(token.key));
-  next.splice(insertion,0,...chosen);
-  const ordered=[],pending=[];
-  for(const token of next){
-    if(token.strip)pending.push(token.strip);
-    else{ordered.push({group:token.break,strips:pending.splice(0)})}
+  const targetTokens=sequences[to.container],targetIndex=positions.get(target)+to.stripIndex;
+  const insertion=targetIndex-targetTokens.slice(0,targetIndex).filter(token=>keys.has(token.key)).length;
+  const next=Object.fromEntries(containers.map(container=>[container,sequences[container].filter(token=>!keys.has(token.key))]));
+  next[to.container].splice(insertion,0,...chosen);
+  if(containers.every(container=>next[container].length===sequences[container].length&&next[container].every((token,i)=>token===sequences[container][i])))return false;
+  const ordered={};
+  for(const container of containers){
+    const pending=[];ordered[container]=[];
+    for(const token of next[container]){
+      if(token.strip)pending.push(token.strip);
+      else ordered[container].push({group:token.break||token.terminal,strips:pending.splice(0),boundary:!!token.break});
+    }
+    if(pending.length)ordered[container].push({group:{kind:container==='scheduledGroups'?'RemainingScheduledStrips':'RemainingUnscheduledStrips',attributes:{},strips:[],mmsxSegment:target.mmsxSegment},strips:pending,boundary:false});
   }
-  const terminal=groups.find(group=>group.kind!=='ScheduleDay');
-  if(terminal)ordered.push({group:terminal,strips:pending.splice(0)});
-  else if(pending.length)throw Error('Day break non può lasciare strip senza gruppo');
-  if(ordered.length!==groups.length)throw Error('Gruppi day break non validi');
-  const nextUnscheduled=board.unscheduledGroups.map(group=>group.strips.filter(strip=>!keys.has(strip.sourceKey)));
-  const changed=ordered.some((item,index)=>item.group!==groups[index]||item.strips.length!==groups[index].strips.length||
-    item.strips.some((strip,i)=>strip!==groups[index].strips[i]))||
-    board.unscheduledGroups.some((group,index)=>group.strips.length!==nextUnscheduled[index].length);
-  if(!changed)return false;
-  const dayDates=groups.filter(group=>group.kind==='ScheduleDay').map(group=>group.date);
-  const dayNumbers=groups.filter(group=>group.kind==='ScheduleDay').map(group=>group.shootingDayNumber);
-  groups.splice(0,groups.length,...ordered.map(item=>item.group));
-  for(const item of ordered)item.group.strips=item.strips;
-  board.unscheduledGroups.forEach((group,index)=>{group.strips=nextUnscheduled[index]});
+  const dayDates=board.scheduledGroups.filter(group=>group.kind==='ScheduleDay').map(group=>group.date);
+  const dayNumbers=board.scheduledGroups.filter(group=>group.kind==='ScheduleDay').map(group=>group.shootingDayNumber);
+  for(const container of containers){
+    for(const item of ordered[container]){
+      if(item.boundary){
+        item.group.kind=container==='scheduledGroups'?'ScheduleDay':'UnscheduledDay';
+        if(project.format==='mmsx'&&keys.has(dayBreakKey(boardName,item.group)))item.group.mmsxSegment=target.mmsxSegment;
+      }
+      item.group.strips=item.strips;
+    }
+    board[container].splice(0,board[container].length,...ordered[container].map(item=>item.group));
+  }
   let ordinal=0;
-  for(const group of groups)if(group.kind==='ScheduleDay'){
-    ++ordinal;
-    group.ordinal=group.shootingDayNumber=project.format==='mmsx'?dayNumbers[ordinal-1]:ordinal;
-    group.date=dayDates[ordinal-1];
+  for(const group of board.scheduledGroups)if(group.kind==='ScheduleDay'){
+    const index=ordinal++;
+    group.ordinal=ordinal;
+    group.shootingDayNumber=project.format==='mmsx'?(dayNumbers[index]??group.shootingDayNumber??ordinal):ordinal;
+    group.date=dayDates[index]??group.date??dayDates.at(-1)??null;
   }
   return true;
 }
@@ -104,14 +105,14 @@ export function moveBoardItems(project,{boardName,sourceKeys,to}){
 export function moveDayBreak(project,{boardName,from,to}){
   const board=project.boards.find(item=>item.name===boardName);
   const group=board&&locate(board,from);
-  if(from.container!=='scheduledGroups'||group?.kind!=='ScheduleDay')throw Error('Day break non valido');
+  if(!['ScheduleDay','UnscheduledDay'].includes(group?.kind))throw Error('Day break non valido');
   return moveBoardItems(project,{boardName,sourceKeys:[dayBreakKey(boardName,group)],to});
 }
 
 export function snapshotBoardOrder(board){
   return ['scheduledGroups','unscheduledGroups'].map(container=>({container,
     groups:board[container].slice(),strips:board[container].map(group=>group.strips.slice()),
-    dayMeta:board[container].map(group=>({ordinal:group.ordinal,shootingDayNumber:group.shootingDayNumber,date:group.date}))}));
+    dayMeta:board[container].map(group=>({kind:group.kind,mmsxSegment:group.mmsxSegment,ordinal:group.ordinal,shootingDayNumber:group.shootingDayNumber,date:group.date}))}));
 }
 export function restoreBoardOrder(board,snapshot){
   for(const {container,groups,strips,dayMeta} of snapshot){

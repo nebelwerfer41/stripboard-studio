@@ -44,31 +44,35 @@ function sourceStrips(board){
 
 function patchGroups(node,board,original){
   const sources=sourceStrips(original),used=new Set();
+  const usedGroups=new Set();
   for(const [modelName,xmlName] of [['scheduledGroups','ScheduledStrips'],['unscheduledGroups','UnscheduledStrips']]){
-    const modelGroups=board[modelName],sourceGroups=groups(original,xmlName),usedGroups=new Set(),orderedGroups=[];
-    if(modelGroups.length!==sourceGroups.length)throw Error(`Gruppi ${xmlName} incompatibili`);
-    const targetContainer=child(node,xmlName);
-    if(!targetContainer){if(modelGroups.length)throw Error(`Contenitore ${xmlName} mancante`);continue}
-    for(const [index,group] of modelGroups.entries()){
-      const sourceGroup=sourceGroups[group.sourceIndex??index];
-      if(!sourceGroup||usedGroups.has(sourceGroup)||group.kind!==sourceGroup.tagName)throw Error('Tipo di gruppo MSD modificato');
-      usedGroups.add(sourceGroup);
-      const target=sourceGroup.cloneNode(true);
+    const modelGroups=board[modelName],orderedGroups=[];
+    let targetContainer=child(node,xmlName);
+    if(!targetContainer){targetContainer=node.ownerDocument.createElement(xmlName);node.appendChild(targetContainer)}
+    for(const group of modelGroups){
+      const sourceGroup=group.sourceIndex===undefined?null:groups(original,group.sourceContainer||xmlName)[group.sourceIndex];
+      const boundary=['ScheduleDay','UnscheduledDay'].includes(group.kind);
+      if(sourceGroup&&(usedGroups.has(sourceGroup)||!(group.kind===sourceGroup.tagName||boundary&&['ScheduleDay','UnscheduledDay'].includes(sourceGroup.tagName))))throw Error('Tipo di gruppo MSD modificato');
+      if(!sourceGroup&&boundary)throw Error('Origine day break MSD mancante');
+      if(sourceGroup)usedGroups.add(sourceGroup);
+      const target=node.ownerDocument.createElement(group.kind);
+      if(sourceGroup)for(const attribute of sourceGroup.attributes)target.setAttribute(attribute.name,attribute.value);
       const desired=group.strips.map(strip=>{
         const key=strip.sourceKey;
         if(!sources.has(key)||used.has(key))throw Error('Riferimento strip mancante o ripetuto');
         used.add(key);return sources.get(key).cloneNode(true);
       });
-      // Preserve group attributes and opaque non-strip children; MSD strip groups contain only elements and whitespace.
-      if([...target.childNodes].some(item=>item.nodeType!==1&&item.nodeType!==3)||
-        [...target.childNodes].some(item=>item.nodeType===3&&item.nodeValue.trim()))throw Error('Contenuto opaco nel gruppo strip');
-      target.replaceChildren(...desired);
-      orderedGroups.push(target);
+      if(sourceGroup&&([...sourceGroup.childNodes].some(item=>item.nodeType!==1&&item.nodeType!==3)||
+        [...sourceGroup.childNodes].some(item=>item.nodeType===3&&item.nodeValue.trim())))throw Error('Contenuto opaco nel gruppo strip');
+      target.replaceChildren(...desired);orderedGroups.push(target);
     }
     let nextGroup=0;
-    targetContainer.replaceChildren(...[...targetContainer.childNodes].map(item=>
-      item.nodeType===1?orderedGroups[nextGroup++]:item.cloneNode(true)));
+    const children=[...targetContainer.childNodes].flatMap(item=>item.nodeType===1?
+      (orderedGroups[nextGroup]?[orderedGroups[nextGroup++]]:[]):[item.cloneNode(true)]);
+    targetContainer.replaceChildren(...children,...orderedGroups.slice(nextGroup));
   }
+  const originalGroups=[...groups(original,'ScheduledStrips'),...groups(original,'UnscheduledStrips')];
+  if(originalGroups.some(group=>!usedGroups.has(group)))throw Error('Un gruppo originale andrebbe perso');
   if(used.size!==sources.size)throw Error('Una o più strip originali andrebbero perse');
 }
 

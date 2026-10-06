@@ -208,7 +208,7 @@ function buildProject(container){
           ...compactStrip(stripNode),sourceKey:JSON.stringify([name,containerName,groupIndex,stripIndex])}));
         for(const strip of strips){if(strip.kind==='unknown')issue(issues,'UNKNOWN_STRIP_TYPE')}
         const shootingDayNumber=kind==='ScheduleDay'&&containerName==='ScheduledStrips'?ordinal:null;
-        return {kind,sourceIndex:groupIndex,ordinal:shootingDayNumber,shootingDayNumber,date,calendarName:shootingDayNumber?calendarName:null,
+        return {kind,sourceIndex:groupIndex,sourceContainer:containerName,ordinal:shootingDayNumber,shootingDayNumber,date,calendarName:shootingDayNumber?calendarName:null,
           attributes:attrs(group),strips};
       });
     };

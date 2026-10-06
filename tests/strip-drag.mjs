@@ -104,11 +104,36 @@ test('a mixed selection of scenes, banner and day break moves as one ordered uni
   assert.deepEqual(ids(board.scheduledGroups[1]),['f','g']);
 });
 
-test('mixed selection with a day break cannot drop into an unscheduled group',()=>{
-  const project=fixture(),board=project.boards[0],before=structuredClone(board);
-  assert.throws(()=>moveBoardItems(project,{boardName:'A',sourceKeys:['b',dayBreakKey('A',board.scheduledGroups[0])],
-    to:at(0,0,'unscheduledGroups')}));
-  assert.deepEqual(board,before);
+test('mixed scenes, banner and day break move into and out of Boneyard, with exact undo/redo',()=>{
+  const project=fixture(),board=project.boards[0],boundaryGroup=board.scheduledGroups[0];
+  const boundary=dayBreakKey('A',boundaryGroup),before=snapshotBoardOrder(board);
+  const command=(keys,to)=>moveBoardItems(project,{boardName:'A',sourceKeys:keys,to});
+  assert.equal(command(['divider','b',boundary],at(0,1,'unscheduledGroups')),true);
+  assert.deepEqual(ids(board.scheduledGroups[0]),['a','c','d','e','f','g']);
+  assert.equal(board.unscheduledGroups[0],boundaryGroup);
+  assert.equal(boundaryGroup.kind,'UnscheduledDay');
+  assert.equal(dayBreakKey('A',boundaryGroup),boundary);
+  assert.deepEqual(ids(boundaryGroup),['h','b','divider']);
+  assert.equal(boundaryGroup.attributes.Marker,'one');
+  const after=snapshotBoardOrder(board);
+  restoreBoardOrder(board,before);
+  assert.equal(boundaryGroup.kind,'ScheduleDay');
+  assert.deepEqual(ids(boundaryGroup),['a','b','divider','c','d','e']);
+  restoreBoardOrder(board,after);
+  assert.equal(boundaryGroup.kind,'UnscheduledDay');
+  assert.equal(command(['b','divider',boundary],at(0,1)),true);
+  assert.equal(boundaryGroup.kind,'ScheduleDay');
+  assert.deepEqual(ids(boundaryGroup),['a','b','divider']);
+  assert.deepEqual(ids(board.unscheduledGroups[0]),['h']);
+  assert.equal(new Set([...board.scheduledGroups,...board.unscheduledGroups].flatMap(ids)).size,9);
+});
+
+test('banner alone transfers between Boneyard and schedule without moving a day boundary',()=>{
+  const project=fixture(),board=project.boards[0];
+  assert.equal(moveBoardItems(project,{boardName:'A',sourceKeys:['divider'],to:at(0,0,'unscheduledGroups')}),true);
+  assert.deepEqual(ids(board.unscheduledGroups[0]),['divider','h']);
+  assert.equal(moveBoardItems(project,{boardName:'A',sourceKeys:['divider'],to:at(1,0)}),true);
+  assert.deepEqual(ids(board.scheduledGroups[1]),['divider','f','g']);
 });
 
 test('drag preview reports scene count and eighths as mixed pages',()=>{
@@ -117,4 +142,12 @@ test('drag preview reports scene count and eighths as mixed pages',()=>{
     {bdsId:'c',pagesEighths:6},{bdsId:'d',pagesEighths:8}];
   assert.deepEqual(dragSummary(strips,scenes),{count:4,eighths:29,label:'4 scene · 3 5/8 pag.'});
   assert.equal(dragSummary([scene('b')],scenes).label,'1 scena · 7/8 pag.');
+});
+
+test('day boundaries with the same source index in opposite MSD containers have distinct stable keys',()=>{
+  const scheduled={kind:'ScheduleDay',sourceIndex:0,sourceContainer:'ScheduledStrips'};
+  const yard={kind:'UnscheduledDay',sourceIndex:0,sourceContainer:'UnscheduledStrips'};
+  const key=dayBreakKey('A',yard);
+  assert.notEqual(dayBreakKey('A',scheduled),key);
+  yard.kind='ScheduleDay';assert.equal(dayBreakKey('A',yard),key);
 });

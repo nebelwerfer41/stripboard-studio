@@ -2,7 +2,7 @@
 <body><h1>MSD round-trip</h1><pre id="result">In corso…</pre><a id="downloadResult" hidden>Scarica MSD modificato di prova</a><script type="module">
 import {parseMsd} from '../assets/msd-parser.js';
 import {serializeMsd} from '../assets/msd-writer.js';
-import {moveStrip,moveStrips,moveDayBreak,moveBoardItems,dayBreakKey,createStripboard} from '../assets/scheduling.js';
+import {moveStrip,moveStrips,moveDayBreak,moveBoardItems,dayBreakKey,createStripboard,snapshotBoardOrder,restoreBoardOrder} from '../assets/scheduling.js';
 const lines=[];let failures=0;
 const check=(label,yes)=>{lines.push(`${yes?'✓':'✗'} ${label}`);if(!yes)failures++};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -51,6 +51,27 @@ try{
     from:{container:'scheduledGroups',groupIndex:first},
     to:{container:'scheduledGroups',groupIndex:second,stripIndex:1}})&&
     board.scheduledGroups[first]===dayBoundary);
+  const beforeYard=snapshotBoardOrder(board),boundaryKey=dayBreakKey(board.name,dayBoundary);
+  check('day break trasferito nel boneyard',moveBoardItems(project,{boardName:board.name,
+    sourceKeys:[boundaryKey],to:{container:'unscheduledGroups',groupIndex:0,stripIndex:0}}));
+  const yardExport=serializeMsd(project),yardReopened=await parseMsd(yardExport,'yard-test.msd');
+  const reopenedYardBoard=yardReopened.boards.find(item=>item.name===board.name);
+  check('day break nel boneyard persistente dopo salvataggio',same(stripSignature(board),stripSignature(reopenedYardBoard)));
+  const reopenedBoundary=reopenedYardBoard.unscheduledGroups.find(group=>group.kind==='UnscheduledDay');
+  check('day break reimportato torna nel piano',moveBoardItems(yardReopened,{boardName:board.name,
+    sourceKeys:[dayBreakKey(board.name,reopenedBoundary)],to:{container:'scheduledGroups',groupIndex:0,stripIndex:0}}));
+  const restoredFile=await parseMsd(serializeMsd(yardReopened),'restored-test.msd');
+  check('rientro nel piano persistente',same(stripSignature(reopenedYardBoard),stripSignature(restoredFile.boards.find(item=>item.name===board.name))));
+  const yardBeforeSections=sectionBytes(original),yardAfterSections=sectionBytes(yardExport);
+  check('trasferimento day break conserva tutte le sezioni opache',[...yardBeforeSections.keys()].filter(name=>name!=='StripBoardMgr')
+    .every(name=>bytesEqual(yardBeforeSections.get(name).buffer,yardAfterSections.get(name).buffer)));
+  restoreBoardOrder(board,beforeYard);
+  const lastBoundary=board.scheduledGroups.filter(group=>group.kind==='ScheduleDay').at(-1);
+  check('ultimo day break trasferito lasciando strip programmate senza giorno',moveBoardItems(project,{boardName:board.name,
+    sourceKeys:[dayBreakKey(board.name,lastBoundary)],to:{container:'unscheduledGroups',groupIndex:0,stripIndex:0}}));
+  const lastReopened=await parseMsd(serializeMsd(project),'last-day-yard.msd');
+  check('gruppo residuo senza giorno persistente',same(stripSignature(board),stripSignature(lastReopened.boards.find(item=>item.name===board.name))));
+  restoreBoardOrder(board,beforeYard);
   const mixedScene=board.scheduledGroups[first].strips.find(strip=>strip.kind==='scene');
   const mixedBanner=board.scheduledGroups.flatMap(group=>group.strips).find(strip=>strip.kind==='banner');
   check('selezione mista scena, banner e day break applicata come un solo move',

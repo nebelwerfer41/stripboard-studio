@@ -44,3 +44,22 @@ test('mouse drag starts after its threshold; touch movement scrolls until long p
   assert.equal(movementIntent(touch,STRIP_GESTURE.touchDragPx-1),'wait');
   assert.equal(movementIntent(touch,STRIP_GESTURE.touchDragPx),'drag');
 });
+
+const order=['105','banner','106','break','107'];
+const range=(model,key,toggle=false,orderedKeys=order)=>selectStripState(model,key,{range:true,toggle,orderedKeys,isSceneKey:value=>scenes.has(value)});
+test('Shift selects a contiguous range including banners and boundaries in either direction',()=>{
+  const model=state();select(model,'105');range(model,'107');
+  assert.deepEqual([...model.selectedStripIds],order);assert.equal(model.activeStripId,'107');
+  range(model,'106');assert.deepEqual([...model.selectedStripIds],order.slice(0,3));
+  assert.equal(model.selectionAnchorId,'105');
+  select(model,'107');range(model,'banner');
+  assert.deepEqual([...model.selectedStripIds],order.slice(1));check(model);
+});
+test('Ctrl/Command plus Shift adds a range while a missing or hidden anchor falls back to single selection',()=>{
+  const model=state();select(model,'105');select(model,'107',true);range(model,'break',true);
+  assert.deepEqual([...model.selectedStripIds],['105','107','break']);check(model);
+  range(model,'106',false,['106','break']);
+  assert.deepEqual([...model.selectedStripIds],['106']);
+  assert.equal(model.selectionAnchorId,'106');
+  clearStripState(model);range(model,'107');assert.deepEqual([...model.selectedStripIds],['107']);
+});

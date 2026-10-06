@@ -2,7 +2,7 @@ import {parseMmsx,serializeMmsx} from './mmsx-project.js';
 const parseSchedule=(bytes,name)=>/^(MMS2|MMSX)$/.test(new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4,bytes.byteLength))))?parseMmsx(bytes,name):parseMsd(bytes,name);
 import {parseMsd} from './msd-parser.js';
 import {serializeMsd} from './msd-writer.js';
-import {moveBoardItems,dayBreakKey,isDayBreakKey,snapshotBoardOrder,restoreBoardOrder,dragSummary,createStripboard} from './scheduling.js';
+import {moveBoardItems,dayBreakKey,snapshotBoardOrder,restoreBoardOrder,dragSummary,createStripboard} from './scheduling.js';
 import {resetDocumentState,documentIsDirty,markDocumentEdited,beginDocumentSave,finishDocumentSave} from './document-state.js';
 import {elementSumText,categoryElementsText,elementLabel,sortCategoryElements} from './element-format.js';
 import {expandReportBoxes} from './report-layout.js';
@@ -15,7 +15,7 @@ const state = {project:null, mode:'board', board:null, calendar:null, calendarMo
   layout:null, query:'', unscheduled:false, showColors:true, hideBanners:false, hideDayBreaks:false,
   allReport:false, importedSource:null, printPageBreaks:false, printHeader:true,reportOptions:new Map(),
   revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],redoHistory:[],
-  selectedStripIds:new Set(),activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
+  selectedStripIds:new Set(),selectionAnchorId:null,activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
 const SCREEN_PX_PER_INCH=76;
 const collator = new Intl.Collator('it',{numeric:true,sensitivity:'base'});
 const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Senza data';
@@ -40,7 +40,10 @@ function updateDocumentStatus(){
   $('dirtyIndicator').classList.toggle('dirty',isDirty());
   $('saveButton').disabled=saving||!state.project;
 }
-function edited(){markDocumentEdited(state);updateDocumentStatus();render()}
+function edited(){
+  state.project.counts.scheduleDays=state.project.boards.reduce((n,board)=>n+board.scheduledGroups.filter(group=>group.kind==='ScheduleDay').length,0);
+  state.project.counts.unscheduledDays=state.project.boards.reduce((n,board)=>n+board.unscheduledGroups.filter(group=>group.kind==='UnscheduledDay').length,0);
+  markDocumentEdited(state);updateDocumentStatus();render()}
 function refreshBoardOptions(){
   $('boardSelect').innerHTML=state.project.boards.map(b=>`<option value="${safe(b.name)}">${safe(b.name)}</option>`).join('');
   $('boardSelect').value=state.board;$('boardCount').textContent=state.project.boards.length;
@@ -395,9 +398,9 @@ function groupLabel(group){
 function movePositionFrom(element){return {container:element.dataset.container,groupIndex:Number(element.dataset.groupIndex),stripIndex:Number(element.dataset.stripIndex)}}
 function stripAt(position){return selectedBoard()?.[position.container]?.[position.groupIndex]?.strips[position.stripIndex]}
 function itemKey(element){
-  const position=movePositionFrom(element);
-  return element.dataset.itemKind==='dayBreak'?
-    dayBreakKey(state.board,selectedBoard()?.[position.container]?.[position.groupIndex]):stripAt(position)?.sourceKey;
+  const position=movePositionFrom(element),group=selectedBoard()?.[position.container]?.[position.groupIndex];
+  if(!group)return null;
+  return element.dataset.itemKind==='dayBreak'?dayBreakKey(state.board,group):stripAt(position)?.sourceKey;
 }
 function isSceneKey(key){return [...selectedBoard().scheduledGroups,...selectedBoard().unscheduledGroups]
   .some(group=>group.strips.some(strip=>strip.kind==='scene'&&strip.sourceKey===key))}
@@ -420,9 +423,9 @@ function syncStripSelection(){
     outer.setAttribute('aria-pressed',String(selected));
   }
 }
-function selectItem(key,{toggle=false,reason='selection',open=false}={}){
+function selectItem(key,{toggle=false,range=false,reason='selection',open=false}={}){
   if(!key)return;
-  selectionChanged(selectStripState(state,key,{toggle,isSceneKey}),reason,open);
+  selectionChanged(selectStripState(state,key,{toggle,range,isSceneKey,orderedKeys:[...$('boardView').querySelectorAll('.strip-outer[data-strip-index]')].map(itemKey)}),reason,open);
 }
 function openMoveDialog(intent){
   const board=selectedBoard(),group=board[intent.from.container]?.[intent.from.groupIndex],
@@ -433,9 +436,8 @@ function openMoveDialog(intent){
   $('moveSource').textContent=intent.sourceKeys.length>1?`${intent.sourceKeys.length} elementi selezionati`:
     isBreak?`Fine ${groupLabel(group)}`:
     strip.kind==='scene'?`Scena ${scene?.scene||strip.bdsId}`:`Banner: ${strip.text||''}`;
-  const includesBreak=intent.sourceKeys.some(isDayBreakKey);
   const destinations=[...board.scheduledGroups.map((group,index)=>({group,container:'scheduledGroups',index})),
-    ...(!includesBreak?board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',index})):[])];
+    ...board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',index}))];
   $('moveGroup').innerHTML=destinations.map(({group,container,index})=>
     `<option value="${container}:${index}">${safe(groupLabel(group))}</option>`).join('');
   $('moveGroup').value=`${intent.from.container}:${intent.from.groupIndex}`;
@@ -447,7 +449,7 @@ function refreshMovePositions(){
   const group=selectedBoard()?.[container]?.[Number(index)];if(!group)return;
   $('movePosition').innerHTML=Array.from({length:group.strips.length+1},(_,position)=>{
     const next=group.strips[position],scene=next&&state.sceneMap.get(next.bdsId);
-    const label=next?(next.kind==='scene'?`Prima della scena ${scene?.scene||next.bdsId}`:`Prima del banner ${next.text||''}`):'Alla fine, prima del day break';
+    const label=next?(next.kind==='scene'?`Prima della scena ${scene?.scene||next.bdsId}`:`Prima del banner ${next.text||''}`):(['ScheduleDay','UnscheduledDay'].includes(group.kind)?'Alla fine, prima del day break':'Alla fine');
     return `<option value="${position}">${safe(label)}</option>`;
   }).join('');
 }
@@ -465,7 +467,7 @@ function fitBoardPreview(){
 }
 function makeItemInteractive(outer,label){
   outer.tabIndex=0;outer.setAttribute('role','button');outer.setAttribute('aria-label',label);
-  outer.setAttribute('aria-keyshortcuts','F2');outer.title=`${label} · Invio per selezionare · F2 per spostare`;
+  outer.setAttribute('aria-keyshortcuts','F2');outer.title=`${label} · Invio per selezionare · Shift+clic per selezionare un intervallo · F2 per spostare`;
   outer.draggable=false;
 }
 function renderBoard(board,layout){
@@ -496,14 +498,12 @@ function renderBoard(board,layout){
       if(item.kind==='scene'&&scene)outer=makeStrip(scene,layout,metrics,group);
       else if(item.kind==='banner'&&!state.hideBanners)outer=makeSpecialStrip('banner',formatTemplate(item.text??'',{group,board}),layout,metrics,item.style);
       if(outer){
-        if(!item.mmsxLocked){
-          Object.assign(outer.dataset,{container,groupIndex,stripIndex});
-          makeItemInteractive(outer,item.kind==='scene'?`Scena ${scene?.scene||item.bdsId}`:`Banner ${item.text||''}`);
-        }
+        Object.assign(outer.dataset,{container,groupIndex,stripIndex});
+        makeItemInteractive(outer,item.kind==='scene'?`Scena ${scene?.scene||item.bdsId}`:`Banner ${item.text||''}`);
         wrap.append(outer);
       }
     }
-    if(group.kind==='ScheduleDay'&&layout.dayBreakText&&!state.hideDayBreaks){
+    if(['ScheduleDay','UnscheduledDay'].includes(group.kind)&&layout.dayBreakText&&!state.hideDayBreaks){
       const dayPages=group.strips.reduce((sum,x)=>sum+(state.sceneMap.get(x.bdsId)?.pagesEighths||0),0);
       const outer=makeSpecialStrip('dayBreak',formatTemplate(layout.dayBreakText,{group,board,dayPages}),layout,metrics);
       Object.assign(outer.dataset,{container,groupIndex,stripIndex:group.strips.length,itemKind:'dayBreak'});
@@ -537,7 +537,6 @@ function dropPosition(x,y){
   const position={container:day.dataset.container,groupIndex:Number(day.dataset.groupIndex),stripIndex:0};
   const group=selectedBoard()?.[position.container]?.[position.groupIndex];
   if(!group)return null;
-  if(stripPointer?.intent.sourceKeys.some(isDayBreakKey)&&position.container!=='scheduledGroups')return null;
   const outers=[...wrap.querySelectorAll(':scope > .strip-outer[data-strip-index]')];
   const coordinate=vertical?x:y;
   let anchor=null,after=false;
@@ -595,7 +594,7 @@ function dragAutoscroll(){
 }
 function startStripDrag(event){
   const pointer=stripPointer;
-  if(!pointer.wasSelected)selectItem(pointer.key,{reason:'drag'});
+  if(pointer.range||!pointer.wasSelected)selectItem(pointer.key,{toggle:pointer.toggle,range:pointer.range,reason:'drag'});
   const intent={from:pointer.from,fromKind:pointer.fromKind,sourceKeys:[...state.selectedStripIds]};
   pointer.intent=intent;state.draggedStripIds=new Set(intent.sourceKeys);
   pointer.preview=document.createElement('div');pointer.preview.className='strip-drag-preview';
@@ -634,7 +633,7 @@ function endStripDrag(event,cancel=false){
           selectItem(pointer.key,{toggle,reason:'tap',open:!toggle});
         }else{
           state.touchMultiSelect=false;
-          selectItem(pointer.key,{toggle:pointer.toggle,reason:'click',open:!pointer.toggle});
+          selectItem(pointer.key,{toggle:pointer.toggle,range:pointer.range,reason:'click',open:!pointer.toggle&&!pointer.range});
         }
       }
     }else if(pointer.empty&&isEmptyBoardPoint(event))clearStripSelection();
@@ -922,14 +921,14 @@ function isEmptyBoardPoint(event){
 $('boardView').addEventListener('click',event=>{
   if(event.detail!==0){if(performance.now()-lastDragAt<STRIP_GESTURE.postDragClickMs){event.preventDefault();event.stopPropagation()}return}
   const outer=event.target.closest('.strip-outer[data-strip-index]');
-  if(outer){const toggle=isToggleGesture(event);selectItem(itemKey(outer),{toggle,reason:'keyboard',open:!toggle})}
+  if(outer){const toggle=isToggleGesture(event);selectItem(itemKey(outer),{toggle,range:event.shiftKey,reason:'keyboard',open:!toggle&&!event.shiftKey})}
 });
 $('boardView').addEventListener('keydown',event=>{
   const outer=event.target.closest('.strip-outer[data-strip-index]');
   if(!outer||event.target!==outer)return;
   if(event.key==='Enter'||event.key===' '){
     event.preventDefault();
-    const toggle=isToggleGesture(event);selectItem(itemKey(outer),{toggle,reason:'keyboard',open:!toggle});
+    const toggle=isToggleGesture(event);selectItem(itemKey(outer),{toggle,range:event.shiftKey,reason:'keyboard',open:!toggle&&!event.shiftKey});
   }else if(event.key==='F2'){
     event.preventDefault();
     const key=itemKey(outer),from=movePositionFrom(outer);
@@ -946,7 +945,7 @@ $('boardView').addEventListener('pointerdown',event=>{
   stripPointer={pointerId:event.pointerId,pointerType:event.pointerType,outer,empty,
     key:outer&&itemKey(outer),from,fromKind:outer&&(outer.dataset.itemKind||stripAt(from)?.kind),
     wasSelected:!!outer&&state.selectedStripIds.has(itemKey(outer)),
-    toggle:isToggleGesture(event),startX:event.clientX,startY:event.clientY,active:false,longPress:false,scrolling:false};
+    toggle:isToggleGesture(event),range:event.shiftKey,startX:event.clientX,startY:event.clientY,active:false,longPress:false,scrolling:false};
   if(event.pointerType==='touch'&&outer){
     const pointer=stripPointer;
     pointer.longPressTimer=setTimeout(()=>{
