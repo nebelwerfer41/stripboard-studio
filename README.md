@@ -2,9 +2,9 @@
 
 > **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
-> **Flash common model:** calendars, calendar events, red flag intervals, production data and per-sheet quantities are now available for read-only inspection. Imported projects save in their original format; native MMSX dates are never recalculated on import or calendar selection. See [the common contract and save strategy](docs/flash-common-model.md).
+> **Flash common model:** calendars, calendar events, red flag intervals, production data and per-sheet quantities are now available for read-only inspection. Imported projects save in their original format; native MMSX dates are never recalculated on import or calendar selection. MMSX boards retain their sub-board hierarchy: use the Sub-board menu to show normal segments and the shared Boneyard together. Segment labels and spacing appear only in the editing UI. See [the common contract and save strategy](docs/flash-common-model.md).
 
-# Stripboard Studio v1.6
+# Stripboard Studio v1.7
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). The Calendars and Red Flag Entry views display these records without changing the file.
 
@@ -44,7 +44,7 @@ Control names below are given in English; some labels in the application are cur
 - The **Red Flag Entry** view includes filters for category, element, type, and date range, along with a monthly grid, list, and flag details. Types come from `RedFlagMgr`; managing and editing flags remain future work.
 - Display scenes, banners, days, dates, and the unscheduled queue, with search and controls for hiding banners and day breaks.
 - Banners and day breaks are drawn as strips with the same width as scene strips.
-- The **Strip colors** toggle applies the file’s `INT/EXT` × `Day/Night` color grid, plus dedicated banner and day-break colors. The display can return to a neutral view.
+- The **Black and white** checkbox beside the display/print options shows strips with white backgrounds and black text. Uncheck it to restore the file’s `INT/EXT` × `Day/Night` colors, plus dedicated banner and day-break colors.
 - Days have no additional heading or trailing space. In vertical layouts, days sit side by side with horizontal scrolling.
 - The horizontal stripboard preview automatically fits the panel width, including when the window is resized.
 - Preview report layouts stored in the file, with fields linked to data and browser printing. Banners and day breaks appear as text rows in the report flow when the template includes them.

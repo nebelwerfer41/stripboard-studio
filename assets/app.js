@@ -2,7 +2,8 @@ import {parseMmsx,serializeMmsx} from './mmsx-project.js';
 const parseSchedule=(bytes,name)=>/^(MMS2|MMSX)$/.test(new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4,bytes.byteLength))))?parseMmsx(bytes,name):parseMsd(bytes,name);
 import {parseMsd} from './msd-parser.js';
 import {serializeMsd} from './msd-writer.js';
-import {moveBoardItems,dayBreakKey,snapshotBoardOrder,restoreBoardOrder,dragSummary,createStripboard} from './scheduling.js';
+import {moveBoardItems,dayBreakKey,snapshotBoardFamily,restoreBoardFamily,dragSummary,createStripboard} from './scheduling.js';
+import {boardGroups,boardGroupForPlan,entriesForBoard} from './board-segments.js';
 import {resetDocumentState,documentIsDirty,markDocumentEdited,beginDocumentSave,finishDocumentSave} from './document-state.js';
 import {elementSumText,categoryElementsText,elementLabel,sortCategoryElements} from './element-format.js';
 import {expandReportBoxes} from './report-layout.js';
@@ -12,7 +13,7 @@ const $ = id => document.getElementById(id);
 const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
 const state = {project:null, mode:'board', board:null, calendar:null, calendarMonth:null, calendarDate:null,
   flagMonth:null,flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null,
-  layout:null, query:'', unscheduled:false, showColors:true, hideBanners:false, hideDayBreaks:false,
+  layout:null, query:'', unscheduled:false,segmentVisibility:new Map(),showColors:true, hideBanners:false, hideDayBreaks:false,
   allReport:false, importedSource:null, printHeader:true,reportOptions:new Map(),
   revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],redoHistory:[],
   selectedStripIds:new Set(),selectionAnchorId:null,activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
@@ -25,6 +26,27 @@ const rect = s => (s.a.BoundingRect||'').split(',').map(Number);
 const safe = v => String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const sceneIndex = () => new Map(state.project.scenes.map(s=>[s.bdsId,s]));
 const selectedBoard = () => state.project.boards.find(b=>b.name===state.board) || state.project.boards[0];
+const selectedBoardGroup = () => boardGroupForPlan(state.project,state.board);
+function visibleSegmentIds(){
+  const parent=selectedBoardGroup();
+  if(!parent)return new Set();
+  if(!state.segmentVisibility.has(parent.id))state.segmentVisibility.set(parent.id,new Set(parent.segments.filter(s=>s.type==='normal').map(s=>s.id)));
+  return state.segmentVisibility.get(parent.id);
+}
+function displayedEntries(){
+  const projected=displayedBoard();
+  return entriesForBoard(state.project,state.board,visibleSegmentIds()).map(entry=>entry.board.name===projected?.name&&entry.container==='scheduledGroups'?
+    {...entry,board:projected,group:projected.scheduledGroups[entry.groupIndex]}:entry);
+}
+function syncSegmentControls(){
+  const parent=selectedBoardGroup(),ids=visibleSegmentIds();
+  const focused=document.activeElement?.dataset?.segmentId;
+  state.unscheduled=Boolean(parent?.segments.some(s=>s.type==='boneyard'&&ids.has(s.id)));
+  $('toggleUnscheduled').textContent=`Sub-board · ${ids.size}/${parent?.segments.length||0} ▾`;
+  $('subboardMenu').innerHTML=(parent?.segments||[]).map(segment=>`<label><input type="checkbox" data-segment-id="${safe(segment.id)}" ${ids.has(segment.id)?'checked':''}><span>${safe(segment.name)}</span></label>`).join('');
+  if(focused)[...$('subboardMenu').querySelectorAll('input')].find(input=>input.dataset.segmentId===focused)?.focus();
+}
+function closeSegmentMenu(){$('subboardMenu').hidden=true;$('toggleUnscheduled').setAttribute('aria-expanded','false')}
 const displayedBoard = () => boardWithCalendar(state.project,state.board,state.calendar)||selectedBoard();
 const selectedProductionCalendar = () => findCalendar(state.project,state.calendar)||state.project.calendars[0];
 const selectedLayout = () => (state.mode==='board'?state.project.stripLayouts:state.project.reportLayouts).find(l=>l.name===state.layout);
@@ -45,9 +67,11 @@ function edited(){
   state.project.counts.unscheduledDays=state.project.boards.reduce((n,board)=>n+board.unscheduledGroups.filter(group=>group.kind==='UnscheduledDay').length,0);
   markDocumentEdited(state);updateDocumentStatus();render()}
 function refreshBoardOptions(){
-  $('boardSelect').innerHTML=state.project.boards.map(b=>`<option value="${safe(b.name)}">${safe(b.name)}</option>`).join('');
-  $('boardSelect').value=state.board;$('boardCount').textContent=state.project.boards.length;
-  $('projectSubtitle').textContent=`${state.project.fileName} · ${state.project.counts.scenes} scene · ${state.project.boards.length} piani disponibili`;
+  const parents=boardGroups(state.project);
+  $('boardSelect').innerHTML=parents.map(b=>`<option value="${safe(b.id)}">${safe(b.name)}</option>`).join('');
+  $('boardSelect').value=selectedBoardGroup()?.id;$('boardCount').textContent=parents.length;
+  document.querySelector('label[for="boardSelect"]').textContent=state.project.format==='mmsx'?'BOARD':'PIANO DI LAVORAZIONE';
+  $('projectSubtitle').textContent=`${state.project.fileName} · ${state.project.counts.scenes} scene · ${parents.length} ${state.project.format==='mmsx'?'board':'piani disponibili'}`;
 }
 async function loadSample(id){
   showStatus('');$('projectTitle').textContent='Caricamento…';
@@ -72,17 +96,18 @@ function setProject(data){
   Object.assign(state,{flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null});
   state.elementMap=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e]));
   state.categorySettings=new Map((data.categorySettings||[]).map(c=>[c.name,c.attributes]));state.reportOptions.clear();
-  state.unscheduled=false;state.allReport=false;state.query='';$('search').value='';
+  state.unscheduled=false;state.segmentVisibility.clear();closeSegmentMenu();state.allReport=false;state.query='';$('search').value='';
   state.hideBanners=false;state.hideDayBreaks=false;$('hideBanners').checked=false;$('hideDayBreaks').checked=false;
   state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
   $('sideProject').textContent=data.title;$('projectTitle').textContent=data.title;
   refreshBoardOptions();$('reportCount').textContent=data.reportLayouts.length;
   $('calendarCount').textContent=data.calendars.length;$('redFlagCount').textContent=data.redFlags.length;
   $('calendarSelect').innerHTML=data.calendars.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
-  $('toggleUnscheduled').classList.remove('selected');$('toggleUnscheduled').textContent='Visualizza Boneyard';
+  syncSegmentControls();
   showStatus('');updateDocumentStatus();setMode(state.mode);
 }
 function setMode(mode){
+  closeSegmentMenu();
   if(mode==='report'&&!state.project?.capabilities.reports)mode='board';
   state.mode=mode;
   for(const [id,key] of [['boardNav','board'],['reportNav','report'],['calendarNav','calendar'],['redFlagNav','redflags'],['dataNav','data']])$(id).classList.toggle('active',mode===key);
@@ -124,14 +149,15 @@ function render(){
     renderRedFlagViewer();return;
   }
   const board=state.mode==='board'?displayedBoard():selectedBoard(),layout=selectedLayout();if(!board||!layout)return;
-  $('viewTitle').textContent=state.mode==='board'?board.name:layout.name;
-  $('viewSubtitle').textContent=state.mode==='board'?`Calendario: ${board.calendarName}${board.sourceCalendarName?` · nel file: ${board.sourceCalendarName}`:''} · Layout: ${layout.name} · Clic/tap: seleziona · ⌘/Ctrl-clic o pressione lunga: multi · Drag: riordina`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
+  $('viewTitle').textContent=state.mode==='board'?selectedBoardGroup()?.name||board.name:layout.name;
+  $('viewSubtitle').textContent=state.mode==='board'?`${state.project.format==='mmsx'?`Sub-board: ${selectedBoardGroup().segments.filter(s=>visibleSegmentIds().has(s.id)).map(s=>s.name).join(', ')||'nessuna'}`:`Calendario: ${board.calendarName}${board.sourceCalendarName?` · nel file: ${board.sourceCalendarName}`:''}`} · Layout: ${layout.name} · Clic/tap: seleziona · ⌘/Ctrl-clic o pressione lunga: multi · Drag: riordina`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':layout.recordType==='BY_CATEGORY'?'per elemento':'per scena'}`;
   renderStats(board);
   if(state.mode==='board')renderBoard(board,layout);else renderReport(board,layout);
 }
 function renderStats(board){
-  const dated=board.scheduledGroups.filter(g=>g.kind==='ScheduleDay');
-  const used=board.scheduledGroups.flatMap(g=>g.strips).filter(s=>s.kind==='scene').length;
+  const scheduled=state.mode==='board'?displayedEntries().filter(entry=>entry.container==='scheduledGroups').map(entry=>entry.group):board.scheduledGroups;
+  const dated=scheduled.filter(g=>g.kind==='ScheduleDay');
+  const used=scheduled.flatMap(g=>g.strips).filter(s=>s.kind==='scene').length;
   const vals=[['Giorni di riprese',dated.length],['Scene in piano',used],['Primo giorno',shortDate(dated.find(g=>g.date)?.date)],['Ultimo giorno',shortDate(dated.filter(g=>g.date).at(-1)?.date)]];
   $('stats').innerHTML=vals.map(([label,value])=>`<div class="stat"><span class="label">${label}</span><span class="value">${safe(value)}</span></div>`).join('');
 }
@@ -395,15 +421,16 @@ function groupLabel(group){
   if(group.kind==='UnscheduledDay')return 'Giorno non programmato';
   return 'Scene non programmate';
 }
-function movePositionFrom(element){return {container:element.dataset.container,groupIndex:Number(element.dataset.groupIndex),stripIndex:Number(element.dataset.stripIndex)}}
-function stripAt(position){return selectedBoard()?.[position.container]?.[position.groupIndex]?.strips[position.stripIndex]}
+function movePositionFrom(element){return {boardName:element.dataset.boardName||state.board,container:element.dataset.container,groupIndex:Number(element.dataset.groupIndex),stripIndex:Number(element.dataset.stripIndex)}}
+function boardAt(position){return state.project.boards.find(b=>b.name===(position.boardName||state.board))}
+function stripAt(position){return boardAt(position)?.[position.container]?.[position.groupIndex]?.strips[position.stripIndex]}
 function itemKey(element){
-  const position=movePositionFrom(element),group=selectedBoard()?.[position.container]?.[position.groupIndex];
+  const position=movePositionFrom(element),group=boardAt(position)?.[position.container]?.[position.groupIndex];
   if(!group)return null;
-  return element.dataset.itemKind==='dayBreak'?dayBreakKey(state.board,group):stripAt(position)?.sourceKey;
+  return element.dataset.itemKind==='dayBreak'?dayBreakKey(position.boardName,group):stripAt(position)?.sourceKey;
 }
-function isSceneKey(key){return [...selectedBoard().scheduledGroups,...selectedBoard().unscheduledGroups]
-  .some(group=>group.strips.some(strip=>strip.kind==='scene'&&strip.sourceKey===key))}
+function isSceneKey(key){return entriesForBoard(state.project,state.board)
+  .some(({group})=>group.strips.some(strip=>strip.kind==='scene'&&strip.sourceKey===key))}
 // Future scene detail can follow active changes and open only on stripopenrequest (never on drag).
 function selectionChanged(previousActive,reason='selection',open=false){
   syncStripSelection();
@@ -428,7 +455,7 @@ function selectItem(key,{toggle=false,range=false,reason='selection',open=false}
   selectionChanged(selectStripState(state,key,{toggle,range,isSceneKey,orderedKeys:[...$('boardView').querySelectorAll('.strip-outer[data-strip-index]')].map(itemKey)}),reason,open);
 }
 function openMoveDialog(intent){
-  const board=selectedBoard(),group=board[intent.from.container]?.[intent.from.groupIndex],
+  const board=boardAt(intent.from),group=board?.[intent.from.container]?.[intent.from.groupIndex],
     isBreak=intent.fromKind==='dayBreak',strip=isBreak?null:group?.strips[intent.from.stripIndex];
   if(!group||(!isBreak&&!strip))return;
   state.moveIntent=intent;
@@ -436,17 +463,16 @@ function openMoveDialog(intent){
   $('moveSource').textContent=intent.sourceKeys.length>1?`${intent.sourceKeys.length} elementi selezionati`:
     isBreak?`Fine ${groupLabel(group)}`:
     strip.kind==='scene'?`Scena ${scene?.scene||strip.bdsId}`:`Banner: ${strip.text||''}`;
-  const destinations=[...board.scheduledGroups.map((group,index)=>({group,container:'scheduledGroups',index})),
-    ...board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',index}))];
-  $('moveGroup').innerHTML=destinations.map(({group,container,index})=>
-    `<option value="${container}:${index}">${safe(groupLabel(group))}</option>`).join('');
-  $('moveGroup').value=`${intent.from.container}:${intent.from.groupIndex}`;
+  const destinations=entriesForBoard(state.project,state.board);
+  $('moveGroup').innerHTML=destinations.map(({group,board,container,groupIndex,segment})=>
+    `<option value="${safe(JSON.stringify([board.name,container,groupIndex]))}">${safe(segment.name)} · ${safe(groupLabel(group))}</option>`).join('');
+  $('moveGroup').value=JSON.stringify([board.name,intent.from.container,intent.from.groupIndex]);
   refreshMovePositions();$('movePosition').value=String(isBreak?group.strips.length:intent.from.stripIndex);
   $('moveDialog').showModal();
 }
 function refreshMovePositions(){
-  const [container,index]=($('moveGroup').value||'').split(':');
-  const group=selectedBoard()?.[container]?.[Number(index)];if(!group)return;
+  const [boardName,container,index]=JSON.parse($('moveGroup').value||'[]');
+  const group=boardAt({boardName})?.[container]?.[index];if(!group)return;
   $('movePosition').innerHTML=Array.from({length:group.strips.length+1},(_,position)=>{
     const next=group.strips[position],scene=next&&state.sceneMap.get(next.bdsId);
     const label=next?(next.kind==='scene'?`Prima della scena ${scene?.scene||next.bdsId}`:`Prima del banner ${next.text||''}`):(['ScheduleDay','UnscheduledDay'].includes(group.kind)?'Alla fine, prima del day break':'Alla fine');
@@ -470,23 +496,30 @@ function makeItemInteractive(outer,label){
   outer.draggable=false;
 }
 function renderBoard(board,layout){
+  syncSegmentControls();
   const view=$('boardView');view.replaceChildren();view.style.setProperty('--live-board-zoom','1');const q=state.query.trim().toLocaleLowerCase();
+  view.classList.toggle('is-monochrome',!state.showColors);$('blackWhite').checked=!state.showColors;
   $('undoMoveButton').disabled=!state.orderHistory.length;
   $('redoMoveButton').disabled=!state.redoHistory.length;
   const vertical=layout.orientation==='VERTICAL';
   view.classList.toggle('is-vertical',vertical);
   const metrics=stripMetrics(layout);
   const printHeading=document.createElement('div');printHeading.className='print-heading';
-  printHeading.textContent=`${state.project.title} · ${board.name}`;
+  printHeading.textContent=`${state.project.title} · ${selectedBoardGroup()?.name||board.name}`;
   if(layout.header.length)printHeading.append(stripboardHeader(layout.header,metrics));
   view.append(printHeading);
   let shown=0;
-  const positioned=[...board.scheduledGroups.map((group,index)=>({group,container:'scheduledGroups',groupIndex:index})),
-    ...(state.unscheduled?board.unscheduledGroups.map((group,index)=>({group,container:'unscheduledGroups',groupIndex:index})):[])];
+  const positioned=displayedEntries();
   const visibleGroups=positioned.filter(({group})=>groupMatches(group,q));
-  for(const {group,container,groupIndex} of visibleGroups){
+  let section=null,sectionId=null;
+  for(const {group,board:plan,container,groupIndex,segment} of visibleGroups){
+    if(sectionId!==segment.id){
+      sectionId=segment.id;const block=document.createElement('div');block.className='board-segment';block.dataset.segmentId=segment.id;
+      const label=document.createElement('div');label.className='segment-heading';label.textContent=segment.name;
+      section=document.createElement('div');section.className='segment-days';block.append(label,section);view.append(block);
+    }
     const day=document.createElement('section');day.className='day';
-    Object.assign(day.dataset,{container,groupIndex});
+    Object.assign(day.dataset,{boardName:plan.name,container,groupIndex,segmentId:segment.id});
     day.setAttribute('aria-label',group.kind==='ScheduleDay'?`Giorno ${group.ordinal}, ${fmtDate(group.date)}`:group.kind);
     const wrap=document.createElement('div');wrap.className=vertical?'vertical-grid':'strips';
     for(const [stripIndex,item] of group.strips.entries()){
@@ -494,22 +527,22 @@ function renderBoard(board,layout){
       if(q&&!searchText(scene,item).includes(q))continue;
       let outer=null;
       if(item.kind==='scene'&&scene)outer=makeStrip(scene,layout,metrics,group);
-      else if(item.kind==='banner'&&!state.hideBanners)outer=makeSpecialStrip('banner',formatTemplate(item.text??'',{group,board}),layout,metrics,item.style);
+      else if(item.kind==='banner'&&!state.hideBanners)outer=makeSpecialStrip('banner',formatTemplate(item.text??'',{group,board:plan}),layout,metrics,item.style);
       if(outer){
-        Object.assign(outer.dataset,{container,groupIndex,stripIndex});
+        Object.assign(outer.dataset,{boardName:plan.name,container,groupIndex,stripIndex});
         makeItemInteractive(outer,item.kind==='scene'?`Scena ${scene?.scene||item.bdsId}`:`Banner ${item.text||''}`);
         wrap.append(outer);
       }
     }
     if(['ScheduleDay','UnscheduledDay'].includes(group.kind)&&layout.dayBreakText&&!state.hideDayBreaks){
       const dayPages=group.strips.reduce((sum,x)=>sum+(state.sceneMap.get(x.bdsId)?.pagesEighths||0),0);
-      const outer=makeSpecialStrip('dayBreak',formatTemplate(layout.dayBreakText,{group,board,dayPages}),layout,metrics);
-      Object.assign(outer.dataset,{container,groupIndex,stripIndex:group.strips.length,itemKind:'dayBreak'});
+      const outer=makeSpecialStrip('dayBreak',formatTemplate(layout.dayBreakText,{group,board:plan,dayPages}),layout,metrics);
+      Object.assign(outer.dataset,{boardName:plan.name,container,groupIndex,stripIndex:group.strips.length,itemKind:'dayBreak'});
       makeItemInteractive(outer,`Fine ${groupLabel(group)}`);wrap.append(outer);
     }
     if(!wrap.children.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Nessuna strip in questo giorno';wrap.append(empty)}
     day.append(wrap);
-    view.append(day);shown++;
+    section.append(day);shown++;
   }
   const printStrips=[...view.querySelectorAll('.strip-layout')];
   const printWidths=vertical?[...view.querySelectorAll('.vertical-grid')].map(grid=>grid.scrollWidth):
@@ -517,7 +550,7 @@ function renderBoard(board,layout){
   view.classList.toggle('print-fit',printStrips.length>0);
   view.style.setProperty('--print-board-width',`${Math.max(1,...printWidths)}px`);
   view.style.setProperty('--print-strip-height',`${Math.max(1,...printStrips.map(strip=>strip.offsetHeight))}px`);
-  if(!shown){const el=document.createElement('div');el.className='empty';el.textContent='Nessun risultato per questa ricerca.';view.append(el)}
+  if(!shown){const el=document.createElement('div');el.className='empty';el.textContent=visibleSegmentIds().size?'Nessun risultato per questa ricerca.':'Scegli le sub-board da mostrare.';view.append(el)}
   fitBoardPreview();syncStripSelection();
 }
 let stripPointer=null,lastDragAt=0;
@@ -532,8 +565,8 @@ function dropPosition(x,y){
   const day=days.sort((a,b)=>pointerDistance(a.getBoundingClientRect(),x,y)-pointerDistance(b.getBoundingClientRect(),x,y))[0];
   if(!day)return null;
   const wrap=day.firstElementChild,vertical=$('boardView').classList.contains('is-vertical');
-  const position={container:day.dataset.container,groupIndex:Number(day.dataset.groupIndex),stripIndex:0};
-  const group=selectedBoard()?.[position.container]?.[position.groupIndex];
+  const position={boardName:day.dataset.boardName,container:day.dataset.container,groupIndex:Number(day.dataset.groupIndex),stripIndex:0};
+  const group=boardAt(position)?.[position.container]?.[position.groupIndex];
   if(!group)return null;
   const outers=[...wrap.querySelectorAll(':scope > .strip-outer[data-strip-index]')];
   const coordinate=vertical?x:y;
@@ -547,7 +580,7 @@ function dropPosition(x,y){
     anchor=outers.at(-1)||null;
     after=!!anchor&&anchor.dataset.itemKind!=='dayBreak';
     if(anchor?.dataset.itemKind==='dayBreak'){
-      const next=days.filter(item=>item.dataset.container===day.dataset.container&&Number(item.dataset.groupIndex)>Number(day.dataset.groupIndex))
+      const next=days.filter(item=>item.dataset.boardName===day.dataset.boardName&&item.dataset.segmentId===day.dataset.segmentId&&item.dataset.container===day.dataset.container&&Number(item.dataset.groupIndex)>Number(day.dataset.groupIndex))
         .sort((a,b)=>Number(a.dataset.groupIndex)-Number(b.dataset.groupIndex))[0];
       if(next){position.groupIndex=Number(next.dataset.groupIndex);position.stripIndex=0;after=true}
     }
@@ -601,8 +634,8 @@ function startStripDrag(event){
   pointer.intent=intent;state.draggedStripIds=new Set(intent.sourceKeys);
   pointer.preview=document.createElement('div');pointer.preview.className='strip-drag-preview';
   const keys=new Set(intent.sourceKeys);
-  const chosen=[...selectedBoard().scheduledGroups,...selectedBoard().unscheduledGroups]
-    .flatMap(group=>group.strips.filter(item=>keys.has(item.sourceKey)));
+  const chosen=entriesForBoard(state.project,state.board)
+    .flatMap(({group})=>group.strips.filter(item=>keys.has(item.sourceKey)));
   const summary=dragSummary(chosen,state.project.scenes),other=intent.sourceKeys.length-summary.count;
   pointer.preview.textContent=summary.count?`${summary.label}${other?` · +${other} elementi`:''}`:
     `${other} ${other===1?'elemento':'elementi'}`;
@@ -643,8 +676,8 @@ function endStripDrag(event,cancel=false){
   state.draggedStripIds.clear();
 }
 function applyBoardMove(intent,to){
-  const board=selectedBoard(),before=snapshotBoardOrder(board);
-  const changed=moveBoardItems(state.project,{boardName:state.board,sourceKeys:intent.sourceKeys,to});
+  const before=snapshotBoardFamily(state.project,state.board);
+  const changed=moveBoardItems(state.project,{boardName:intent.from.boardName||state.board,sourceKeys:intent.sourceKeys,to});
   if(changed){
     state.orderHistory.push({boardName:state.board,before});
     state.redoHistory=[];
@@ -656,15 +689,15 @@ function undoBoardMove(){
   const entry=state.orderHistory.pop();if(!entry)return;
   const board=state.project.boards.find(item=>item.name===entry.boardName);
   if(!board)return;
-  state.redoHistory.push({boardName:entry.boardName,before:snapshotBoardOrder(board)});
-  restoreBoardOrder(board,entry.before);clearStripSelection();edited();showStatus('');
+  state.redoHistory.push({boardName:entry.boardName,before:snapshotBoardFamily(state.project,entry.boardName)});
+  restoreBoardFamily(state.project,entry.before);clearStripSelection();edited();showStatus('');
 }
 function redoBoardMove(){
   const entry=state.redoHistory.pop();if(!entry)return;
   const board=state.project.boards.find(item=>item.name===entry.boardName);
   if(!board)return;
-  state.orderHistory.push({boardName:entry.boardName,before:snapshotBoardOrder(board)});
-  restoreBoardOrder(board,entry.before);clearStripSelection();edited();showStatus('');
+  state.orderHistory.push({boardName:entry.boardName,before:snapshotBoardFamily(state.project,entry.boardName)});
+  restoreBoardFamily(state.project,entry.before);clearStripSelection();edited();showStatus('');
 }
 function syncPrintOptions(){
   $('printHeader').checked=state.printHeader;
@@ -820,7 +853,9 @@ function renderProductionViewer(){
       <label class="viewer-label" for="dataElementSelect">Elemento</label><select id="dataElementSelect" ${elements.length?'':'disabled'}>${elements.map(e=>`<option value="${safe(e.id)}" ${e===element?'selected':''}>${state.dataCategory?'':`${safe(e.category)} · `}${safe(e.name||'Senza nome')}</option>`).join('')||'<option>Nessun elemento in questa categoria</option>'}</select>${table(['Proprietà','Valore'],properties)}${element?.source?.notes?`<p>${safe(element.source.notes)}</p>`:''}</div></div>`;
 }
 function renderCalendarViewer(){
-  const view=$('calendarView'),calendar=selectedProductionCalendar(),board=displayedBoard();
+  const view=$('calendarView'),calendar=selectedProductionCalendar();
+  const board=!state.project.capabilities.calendarProjection?
+    state.project.boards.find(plan=>plan.parentBoardId===selectedBoard()?.parentBoardId&&plan.calendarId===calendar?.id)||displayedBoard():displayedBoard();
   if(!calendar){view.innerHTML='<p class="viewer-empty">Nessun calendario nel file.</p>';return}
   const month=state.calendarMonth||calendar.scheduleDates.ProductionStartDate?.iso?.slice(0,7)||new Date().toISOString().slice(0,7);
   const selected=state.calendarDate||`${month}-01`,day=calendarDate(calendar,selected);
@@ -920,14 +955,15 @@ $('projectSelect').addEventListener('change',async e=>{
 });
 $('boardSelect').addEventListener('change',e=>{
   clearStripSelection();
-  const changed=state.project.activeBoard!==e.target.value;
-  state.board=e.target.value;state.project.activeBoard=state.board;
+  const parent=boardGroups(state.project).find(item=>item.id===e.target.value);if(!parent)return;
+  const changed=state.project.activeBoard!==parent.plans[0].name;
+  state.board=parent.plans[0].name;state.project.activeBoard=state.board;closeSegmentMenu();syncSegmentControls();
   state.calendar=selectedBoard()?.calendarId||findCalendar(state.project,state.project.defaultCalendar)?.id;
   $('calendarSelect').value=state.calendar;
   state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
   state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);
   state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
-  if(changed)edited();else render();
+  if(changed&&state.project.format==='msd')edited();else render();
 });
 $('newBoardButton').addEventListener('click',()=>{
   $('newBoardName').value=`${state.board} copia`;$('newBoardDialog').showModal();$('newBoardName').focus();$('newBoardName').select();
@@ -1023,8 +1059,8 @@ $('moveGroup').addEventListener('change',refreshMovePositions);
 $('moveForm').addEventListener('submit',event=>{
   event.preventDefault();
   if(event.submitter?.value==='move'){
-    const [container,index]=$('moveGroup').value.split(':');
-    const to={container,groupIndex:Number(index),stripIndex:Number($('movePosition').value)};
+    const [boardName,container,index]=JSON.parse($('moveGroup').value);
+    const to={boardName,container,groupIndex:index,stripIndex:Number($('movePosition').value)};
     try{applyBoardMove(state.moveIntent,to);showStatus('')}
     catch(error){showStatus(error.message)}
   }
@@ -1035,6 +1071,7 @@ $('undoMoveButton').addEventListener('click',undoBoardMove);
 $('redoMoveButton').addEventListener('click',redoBoardMove);
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'&&state.mode==='board'&&!event.target.closest('dialog')){
+    closeSegmentMenu();
     if(stripPointer)endStripDrag(event,true);
     clearStripSelection();
   }
@@ -1128,8 +1165,16 @@ $('redFlagView').addEventListener('change',event=>{
   render();
 });
 $('search').addEventListener('input',e=>{clearStripSelection();state.query=e.target.value;render()});
-$('toggleUnscheduled').addEventListener('click',()=>{clearStripSelection();state.unscheduled=!state.unscheduled;$('toggleUnscheduled').classList.toggle('selected',state.unscheduled);render()});
-$('showColors').addEventListener('change',e=>{state.showColors=e.target.checked;render()});
+$('toggleUnscheduled').addEventListener('click',()=>{
+  const open=$('subboardMenu').hidden;$('subboardMenu').hidden=!open;$('toggleUnscheduled').setAttribute('aria-expanded',String(open));
+});
+$('subboardMenu').addEventListener('change',event=>{
+  const id=event.target.dataset.segmentId;if(!id)return;
+  const ids=visibleSegmentIds();if(event.target.checked)ids.add(id);else ids.delete(id);
+  clearStripSelection();render();
+});
+document.addEventListener('click',event=>{if(!event.target.closest('.subboard-picker'))closeSegmentMenu()});
+$('blackWhite').addEventListener('change',e=>{state.showColors=!e.target.checked;render()});
 $('hideBanners').addEventListener('change',e=>{state.hideBanners=e.target.checked;render()});
 $('hideDayBreaks').addEventListener('change',e=>{state.hideDayBreaks=e.target.checked;render()});
 $('printHeader').addEventListener('change',e=>{state.printHeader=e.target.checked;syncPrintOptions()});

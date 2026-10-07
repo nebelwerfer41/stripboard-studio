@@ -26,15 +26,16 @@ export async function parseMmsx(bytes,fileName='imported.mmsx'){
   const records=new Map();recordMaps.set(bid,records);
   const convert=(sid,id,r)=>{const key=JSON.stringify([bid,sid,id]);if(!['breakdown','banner','day'].includes(r.type))throw Error(`Tipo strip MMSX non supportato: ${r.type}`);if(r.type==='breakdown'&&!seen.has(r.sheet))throw Error('MMSX contiene una strip senza scheda');records.set(key,{id,sid,record:r});return {kind:r.type==='breakdown'?'scene':'banner',sourceKey:key,bdsId:r.sheet,text:r.type==='day'?'Fine giornata (Boneyard)':r.text||'',style:{backgroundColor:resolveColor(r.backgroundColor)||resolveColor(r.color)||'#663301',fontColor:'#FFFFFF'}}};
   const yards=sorted(b.segmentMap).filter(([,s])=>s.type==='boneyard');
+  const yardSegments=yards.map(([id,s])=>({id,name:s.name||'Boneyard',order:Number(s.sortOrder)||0}));
   const unscheduledGroups=[];
   for(const [sid,s] of yards){
-   const segmentGroups=[];let pending=[];
+   const segmentGroups=[],calendarId=productionData.calendars.find(c=>c.scope.boardId===bid&&c.scope.segmentId===sid)?.id||null;let pending=[];
    for(const [id,r] of sorted(s.stripMap)){
     const strip=convert(sid,id,r);
-    if(r.type==='day'){segmentGroups.push({kind:'UnscheduledDay',sourceIndex:segmentGroups.length,mmsxSegment:sid,mmsxDay:strip.sourceKey,ordinal:null,shootingDayNumber:Number(r.shootDay)||null,date:iso(r.date),attributes:{},strips:pending});pending=[]}
+    if(r.type==='day'){segmentGroups.push({kind:'UnscheduledDay',sourceIndex:segmentGroups.length,calendarId,mmsxSegment:sid,mmsxDay:strip.sourceKey,ordinal:null,shootingDayNumber:Number(r.shootDay)||null,date:iso(r.date),attributes:{},strips:pending});pending=[]}
     else pending.push(strip);
    }
-   segmentGroups.push({kind:'RemainingUnscheduledStrips',sourceIndex:segmentGroups.length,mmsxSegment:sid,attributes:{},date:null,strips:pending});
+   segmentGroups.push({kind:'RemainingUnscheduledStrips',sourceIndex:segmentGroups.length,calendarId,mmsxSegment:sid,attributes:{},date:null,strips:pending});
    unscheduledGroups.push(...segmentGroups);
    initialSegments.set(JSON.stringify([bid,sid]),signature(segmentGroups));
   }
@@ -51,7 +52,7 @@ export async function parseMmsx(bytes,fileName='imported.mmsx'){
    let boardName=normals.length===1?b.name:`${b.name} / ${s.name}`;if(boards.some(x=>x.name===boardName))boardName+=` [${sid}]`;
    initialSegments.set(JSON.stringify([bid,sid]),signature(scheduledGroups));
    const dates=scheduledGroups.map(g=>g.date).filter(Boolean);
-   boards.push({name:boardName,sourceBoardName:boardName,mmsxBoard:bid,mmsxSegment:sid,attributes:{Name:boardName,SortOrder:String(boards.length)},description:b.description||boardName,id:modelId('plan',bid,sid),parentBoardId:bid,segmentId:sid,calendarId:productionData.calendars.find(c=>c.scope.boardId===bid&&c.scope.segmentId===sid)?.id||null,calendarName:productionData.calendars.find(c=>c.scope.boardId===bid&&c.scope.segmentId===sid)?.name||'Calendario assente',scheduledGroups,unscheduledGroups,dateAudit:{firstDate:dates[0]||null,lastDate:dates.at(-1)||null,confidence:'stored'}});
+   boards.push({name:boardName,sourceBoardName:boardName,mmsxBoard:bid,mmsxSegment:sid,attributes:{Name:boardName,SortOrder:String(boards.length)},description:b.description||boardName,id:modelId('plan',bid,sid),parentBoardId:bid,parentBoardName:b.name,segmentId:sid,segmentName:s.name||'Default',segmentOrder:Number(s.sortOrder)||0,yardSegments,calendarId:productionData.calendars.find(c=>c.scope.boardId===bid&&c.scope.segmentId===sid)?.id||null,calendarName:productionData.calendars.find(c=>c.scope.boardId===bid&&c.scope.segmentId===sid)?.name||'Calendario assente',scheduledGroups,unscheduledGroups,dateAudit:{firstDate:dates[0]||null,lastDate:dates.at(-1)||null,confidence:'stored'}});
   }
  }
  if(!boards.length)throw Error('Nessun piano MMSX disponibile');
@@ -73,7 +74,13 @@ export function updatedMmsxRoot(project){
     if(Object.hasOwn(stripMap,origin.id))throw Error('Strip MMSX duplicata');
     const r=cloneExact(origin.record);r.sortOrder=order++;
     if(yard||group.kind!=='ScheduleDay'){delete r.date;delete r.shootDay;delete r.beforeShootDay}
-    else{if(!group.date)throw Error('Giornata MMSX senza data: impossibile ripianificare');r.date=compactDate(group.date);r.shootDay=group.shootingDayNumber;delete r.beforeShootDay}
+    else if(group.date){r.date=compactDate(group.date);r.shootDay=group.shootingDayNumber;delete r.beforeShootDay}
+    else{
+     const dayOrigin=records.get(group.mmsxDay)?.record;
+     if(origin.record.date||dayOrigin?.date)throw Error('Giornata MMSX senza data: impossibile eliminare una data salvata');
+     // Native undated boundaries (including PURGED) stay undated after a move.
+     delete r.date;delete r.shootDay;delete r.beforeShootDay;
+    }
     if(isDay)r.eighths=group.strips.reduce((n,s)=>n+(sceneMap.get(s.bdsId)?.pagesEighths||0),0);
     stripMap[origin.id]=r;
    }

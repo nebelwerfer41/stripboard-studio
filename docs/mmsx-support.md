@@ -4,7 +4,7 @@ L’integrazione del 6 ottobre 2026 aggiunge lettura e scrittura locale dei cont
 
 ## Utilizzo
 
-Avvia Stripboard Studio con il launcher o un server HTTP locale. Scegli **Importa .msd / .mmsx**, seleziona il piano/sub-board e usa **Visualizza Boneyard** per le strips non programmate. Selezione, trascinamento, F2, **Annulla** e **Ripeti** mantengono le interazioni della versione corrente.
+Avvia Stripboard Studio con il launcher o un server HTTP locale. Scegli **Importa .msd / .mmsx**, seleziona la board e usa **Sub-board** per scegliere i segmenti da mostrare, incluso il Boneyard condiviso. Più segmenti normali possono essere visibili insieme, con il Boneyard in coda; piccole etichette e margini li distinguono soltanto nell’interfaccia, senza aggiungerli alla stampa. Selezione, trascinamento, F2, **Annulla** e **Ripeti** mantengono le interazioni della versione corrente.
 
 **Salva .mmsx** produce un file `-edited.mmsx` mantenendo identità e metadati originali. Senza modifiche restituisce i byte importati. La creazione di una copia con nuova identità resta un’opzione esplicita del serializer, separata dal salvataggio ordinario. Il Boneyard è condiviso tra i sub-board dello stesso piano MMSX. L’esportazione aggiorna ordine, data, numero di giornata e totale degli ottavi dei segmenti modificati; verifica le identità per impedire strips perse o duplicate. I dati non interpretati e i numeri oltre la precisione JavaScript vengono conservati.
 
@@ -21,6 +21,7 @@ Sono richiesti CompressionStream/DecompressionStream gzip e le API crittografich
 ```sh
 node tests/mmsx.mjs
 node tests/mmsx-production.mjs
+node tests/board-segments.mjs
 node --test tests/mmsx-v3.mjs
 node --test tests/document-state.mjs tests/element-format.mjs tests/production-data.mjs tests/report-layout.mjs tests/strip-drag.mjs tests/strip-interaction.mjs
 ```
@@ -43,4 +44,6 @@ Alcuni file dichiarano dataFormat 3 ma includono già `sheetMap`, `segmentMap` e
 
 Il [contratto comune Flash](flash-common-model.md) consolida identità, scope, quantità, provenienza delle date e salvataggio conservativo. Eventi e indisponibilità resteranno alle date fisse anche nel futuro editing calendario, con segnalazione dei conflitti.
 
-La verifica del 7 ottobre sulla coppia reale edited2 conferma 146 schede, 8 calendari, 119 giornate, Camera Test con due elementi, Ernie 19–23 giugno inclusi i weekend e quantità 40 separata dal nome nella scena 102. I file privati non sono inclusi nel repository. Calendari/red flag restano intatti dopo riordino, salvataggio e riapertura; il no-op MMSX è binariamente identico. Eventi multi-day e più segmenti normali nello stesso board hanno solo test sintetici. La riapertura di questi export in Movie Magic e la verifica Safari/iPad restano da effettuare.
+La verifica del 7 ottobre sulla coppia reale edited2 conferma 146 schede, 8 calendari, 119 giornate, Camera Test con due elementi, Ernie 19–23 giugno inclusi i weekend e quantità 40 separata dal nome nella scena 102. I file privati non sono inclusi nel repository. Calendari/red flag restano intatti dopo riordino, salvataggio e riapertura; il no-op MMSX è binariamente identico. Gli eventi multi-day hanno solo test sintetici; più segmenti normali nello stesso board sono verificati anche sul campione reale PURGED. La riapertura di questi export in Movie Magic e la verifica Safari/iPad restano da effettuare.
+
+Il campione reale `PURGED.mmsx` verifica una board con due segmenti normali e un Boneyard condiviso. Il browser e i test del writer verificano trasferimenti diretti fra segmenti, selezioni miste, Undo/Redo dell’intera board e salvataggio/reimportazione senza perdita o duplicazione delle strip. `node tests/board-segments.mjs /percorso/PURGED.mmsx` esegue anche il controllo sul file reale.
