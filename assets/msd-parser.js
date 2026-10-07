@@ -1,3 +1,4 @@
+import {completeProjectModel} from './project-model.js';
 /* Movie Magic Scheduling 6 importer. Keeps the original EPSF bytes for conservative writes. */
 import {calendarDate,calendarDatesBetween,shootingDatesForCalendar} from './production-data.js';
 import {boardSignature} from './scheduling.js';
@@ -42,7 +43,9 @@ async function readContainer(buffer,fileName){
   if(data.length<716||!sameBytes(data,0,textBytes(FILE_MAGIC)))throw Error('Not a supported EPSF file');
   const mapOffset=view.getUint32(260),count=view.getUint32(264);
   if(!(count>0&&count<=1024&&mapOffset>=716&&mapOffset+count*332===data.length))throw Error('Invalid EPSF section map bounds');
-  if(cstring(data.subarray(64,128))!=='00.01.001'||cstring(data.subarray(192,256))!=='06.00.000')throw Error('Unsupported EPSF or schedule version');
+  const scheduleVersion=cstring(data.subarray(192,256));
+  if(cstring(data.subarray(64,128))!=='00.01.001'||!['06.00.000','04.00.000'].includes(scheduleVersion))throw Error('Unsupported EPSF or schedule version');
+  if(scheduleVersion==='04.00.000'&&(count!==11||cstring(data.subarray(268,332))!=='MMB10'))throw Error('Unsupported MSD 04 variant');
   const roots={},sourceXmlSections={},sectionRecords=[];let expected=716,totalXml=0;
   const mapMagic=textBytes(MAP_MAGIC),sectionMagic=textBytes(SECTION_MAGIC);
   for(let index=0;index<count;index++){
@@ -60,7 +63,7 @@ async function readContainer(buffer,fileName){
     sectionRecords.push({root:root.tagName,index,offset,length,mapOffset:entry});
   }
   if(expected!==mapOffset)throw Error('Gap before section map');
-  return {roots,sourceXmlSections,fileName,sourceDocument:{bytes:buffer.slice(0),sections:sectionRecords}};
+  return {roots,sourceXmlSections,fileName,sourceDocument:{bytes:buffer.slice(0),sections:sectionRecords,scheduleVersion}};
 }
 function isoDate(raw){
   const match=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(raw||'');if(!match)return null;
@@ -244,7 +247,7 @@ function buildProject(container){
   const production={};for(const child of children(roots.ProductionInfo))for(const prop of children(child,'Property')){
     production[attr(prop,'Name')]=attr(prop,'Value')??prop.textContent??'';
   }
-  const project={fileName,title:production.PictureTitle||fileName.replace(/\.msd$/i,''),production,
+  const project={format:'msd',fileName,title:production.PictureTitle||fileName.replace(/\.msd$/i,''),production,capabilities:{createBoards:true,calendarProjection:true},
     counts:{scenes:scenes.length,elements:elements.length,categories:categories.length,calendars:calendars.length,
       stripboards:boards.length,sceneElementAssociations:associationCount,linkedElements:linkedCount,
       redFlags:redFlags.length,scheduleDays:boards.reduce((n,b)=>n+b.scheduledGroups.filter(g=>g.kind==='ScheduleDay').length,0),
@@ -255,7 +258,7 @@ function buildProject(container){
     stripLayouts:parseLayouts(roots.StripBoardLayoutMgr,'strip'),reportLayouts:parseLayouts(roots.ReportLayoutMgr,'report'),
     colors:parseColors(roots.ColorSettings),issues,sourceXmlSections,sourceDocument};
   sourceDocument.boardSignature=boardSignature(project);
-  return project;
+  return completeProjectModel(project);
 }
 export async function parseMsd(buffer,fileName='imported.msd'){
   if(!(buffer instanceof ArrayBuffer))throw TypeError('Expected an ArrayBuffer');

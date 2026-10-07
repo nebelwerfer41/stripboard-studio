@@ -1,8 +1,10 @@
+import {completeProjectModel,modelId} from './project-model.js';
+import {mmsxProduction,mmsxDate} from './mmsx-production.js';
 import {normalizeMmsxV3,restoreMmsxV3} from './mmsx-v3.js';
-import {decodeMmsx,encodeMmsx,cloneExact} from './mmsx-codec.js';
+import {decodeMmsx,encodeMmsx,cloneExact,stringifyExact} from './mmsx-codec.js';
 import {resolveColor} from './mmsx-palette.js';
 const sorted=map=>Object.entries(map||{}).sort((a,b)=>Number(a[1].sortOrder||0)-Number(b[1].sortOrder||0)||a[0].localeCompare(b[0]));
-const iso=s=>/^\d{8}$/.test(s||'')?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6)}`:null;
+const iso=mmsxDate;
 const compactDate=s=>s?.replaceAll('-','');
 const signature=g=>JSON.stringify(g.map(x=>[x.mmsxSegment,x.mmsxDay,x.date,x.shootingDayNumber,x.strips.map(s=>s.sourceKey)]));
 function field(text,x,width){return {tag:'StaticText',a:{Text:text,WrapText:'1',BoundingRect:`${x},0,${width},0.48`},font:{Size:'10'},categories:[]}}
@@ -11,12 +13,13 @@ export async function parseMmsx(bytes,fileName='imported.mmsx'){
  const originalRoot=await decodeMmsx(bytes);
  if(originalRoot?.type!=='schedule'||![3,5].includes(originalRoot.dataFormat)||!originalRoot.contents?.breakdown||!originalRoot.contents.element||!originalRoot.contents.stripboard)throw Error('MMSX: supportati i piani con dataFormat 3 e 5');
  const root=originalRoot.dataFormat===3?normalizeMmsxV3(originalRoot):originalRoot,c=root.contents;
+ const productionData=mmsxProduction(root);
  const name=id=>c.element[id]?.name||'',scenes=[],seen=new Set();
  for(const [,b] of sorted(c.breakdown))for(const [id,s] of sorted(b.sheetMap)){
   if(seen.has(id))throw Error('Identificativo scena MMSX duplicato');seen.add(id);
-  const requirements=Object.create(null);for(const eid of Object.keys(s.elements||{})){const e=c.element[eid];if(e)(requirements[c.category[e.category_id]?.name||'Elementi']??=[]).push(e.name)}
+  const requirements=Object.create(null),elementRefs=[];for(const [eid,quantity] of Object.entries(s.elements||{})){const e=c.element[eid],category=c.category?.[e?.category_id]?.name||'Elementi';if(e)(requirements[category]??=[]).push(e.name);elementRefs.push({elementId:eid,name:e?.name||'',category,quantity:typeof quantity==='number'||quantity?.text?quantity:null,quantityOrigin:typeof quantity==='number'||quantity?.text?'stored':'unresolved',resolved:Boolean(e),source:quantity})}
   const rule=Object.values(c.rules||{}).find(r=>r.intExt===s.intExt&&r.dayNight===s.dayNight);
-  scenes.push({bdsId:id,scene:s.scenes||'',synopsis:s.synopsis||'',set:name(s.set),location:name(s.location),ie:name(s.intExt),dn:name(s.dayNight),scriptDay:name(s.scriptDay),unit:name(s.unit),sequence:name(s.sequence),comments:s.comments||'',pagesEighths:Number(s.eigths)||0,requirements,mmsxColors:{bg:resolveColor(s.backgroundColor)||resolveColor(rule?.backgroundColor)||'#FFFFFF',fg:resolveColor(s.color)||resolveColor(rule?.color)||'#333333'}});
+  scenes.push({bdsId:id,scene:s.scenes||'',synopsis:s.synopsis||'',set:name(s.set),location:name(s.location),ie:name(s.intExt),dn:name(s.dayNight),scriptDay:name(s.scriptDay),unit:name(s.unit),sequence:name(s.sequence),comments:s.comments||'',pagesEighths:Number(s.eigths)||0,requirements,elementRefs,mmsxColors:{bg:resolveColor(s.backgroundColor)||resolveColor(rule?.backgroundColor)||'#FFFFFF',fg:resolveColor(s.color)||resolveColor(rule?.color)||'#333333'}});
  }
  const boards=[],recordMaps=new Map(),initialSegments=new Map();
  for(const [bid,b] of sorted(c.stripboard)){
@@ -48,12 +51,12 @@ export async function parseMmsx(bytes,fileName='imported.mmsx'){
    let boardName=normals.length===1?b.name:`${b.name} / ${s.name}`;if(boards.some(x=>x.name===boardName))boardName+=` [${sid}]`;
    initialSegments.set(JSON.stringify([bid,sid]),signature(scheduledGroups));
    const dates=scheduledGroups.map(g=>g.date).filter(Boolean);
-   boards.push({name:boardName,sourceBoardName:boardName,mmsxBoard:bid,mmsxSegment:sid,attributes:{Name:boardName,SortOrder:String(boards.length)},description:b.description||boardName,calendarName:'Date originali MMSX',scheduledGroups,unscheduledGroups,dateAudit:{firstDate:dates[0]||null,lastDate:dates.at(-1)||null,confidence:'stored'}});
+   boards.push({name:boardName,sourceBoardName:boardName,mmsxBoard:bid,mmsxSegment:sid,attributes:{Name:boardName,SortOrder:String(boards.length)},description:b.description||boardName,id:modelId('plan',bid,sid),parentBoardId:bid,segmentId:sid,calendarId:productionData.calendars.find(c=>c.scope.boardId===bid&&c.scope.segmentId===sid)?.id||null,calendarName:productionData.calendars.find(c=>c.scope.boardId===bid&&c.scope.segmentId===sid)?.name||'Calendario assente',scheduledGroups,unscheduledGroups,dateAudit:{firstDate:dates[0]||null,lastDate:dates.at(-1)||null,confidence:'stored'}});
   }
  }
  if(!boards.length)throw Error('Nessun piano MMSX disponibile');
- const elements=sorted(c.element).map(([,e])=>({category:c.category[e.category_id]?.name||'Elementi',name:e.name,boardId:e.boardId,sortOrder:e.sortOrder,properties:{}}));
- return {format:'mmsx',fileName,title:root.productionInfo?.title||root.name||fileName,production:{},scenes,elements,categorySettings:sorted(c.category).map(([,v])=>({name:v.name,attributes:{SortOrder:String(v.sortOrder)}})),boards,activeBoard:boards[0].name,defaultCalendar:null,calendars:[],redFlags:[],redFlagNames:[],stripLayouts:[layout],reportLayouts:[],colors:{preferences:{Banner:{bg:'#663301',fg:'#FFFFFF'},DayStrip:{bg:'#333333',fg:'#FFFFFF'}}},counts:{scenes:scenes.length,elements:elements.length,stripboards:boards.length,scheduleDays:boards.reduce((n,b)=>n+b.scheduledGroups.filter(g=>g.kind==='ScheduleDay').length,0),unscheduledDays:boards.reduce((n,b)=>n+b.unscheduledGroups.filter(g=>g.kind==='UnscheduledDay').length,0)},mmsxSource:{root,originalRoot,recordMaps,initialSegments,boardCount:boards.length}};
+ const elements=sorted(c.element).map(([id,e])=>({id,category:c.category[e.category_id]?.name||'Elementi',name:e.name,boardId:e.boardId,sortOrder:e.sortOrder,properties:e.properties||{},source:e}));
+ return completeProjectModel({format:'mmsx',fileName,title:root.productionInfo?.title||root.name||fileName,...productionData,scenes,elements,categorySettings:sorted(c.category).map(([id,v])=>({id,name:v.name,attributes:{SortOrder:String(v.sortOrder)},properties:v.propertyDesc||{},source:v})),boards,activeBoard:boards[0].name,defaultCalendar:null,stripLayouts:[layout],reportLayouts:[],colors:{preferences:{Banner:{bg:'#663301',fg:'#FFFFFF'},DayStrip:{bg:'#333333',fg:'#FFFFFF'}}},counts:{scenes:scenes.length,elements:elements.length,stripboards:boards.length,scheduleDays:boards.reduce((n,b)=>n+b.scheduledGroups.filter(g=>g.kind==='ScheduleDay').length,0),unscheduledDays:boards.reduce((n,b)=>n+b.unscheduledGroups.filter(g=>g.kind==='UnscheduledDay').length,0)},mmsxSource:{root,originalRoot,recordMaps,initialSegments,boardCount:boards.length,bytes:new Uint8Array(bytes).slice()}});
 }
 export function updatedMmsxRoot(project){
  const source=project.mmsxSource;if(!source||project.boards.length!==source.boardCount)throw Error('Creazione di piani MMSX non disponibile');
@@ -86,8 +89,10 @@ export function updatedMmsxRoot(project){
  }
  return source.originalRoot?.dataFormat===3?restoreMmsxV3(source,root):root;
 }
-export async function serializeMmsx(project,fileName){
- const root=updatedMmsxRoot(project);root.id=crypto.randomUUID();root.name=fileName.replace(/\.mmsx$/i,'');root.changed=false;
- for(const k of ['nonce','fileName','shared','presence','user'])delete root[k];
+export async function serializeMmsx(project,fileName,{copy=false}={}){
+ const root=updatedMmsxRoot(project);
+ if(!copy&&stringifyExact(root)===stringifyExact(project.mmsxSource.originalRoot))return project.mmsxSource.bytes.slice();
+ if(copy){root.id=crypto.randomUUID();root.name=fileName.replace(/\.mmsx$/i,'');root.changed=false;
+ for(const k of ['nonce','fileName','shared','presence','user'])delete root[k]}
  return encodeMmsx(root);
 }

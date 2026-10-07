@@ -23,7 +23,8 @@ assert.deepEqual(edited.contents.breakdown,root.contents.breakdown);
 assert(moveBoardItems(p,{boardName:board.name,sourceKeys:[scene.sourceKey],to:{container:'scheduledGroups',groupIndex:1,stripIndex:0}}));
 edited=updatedMmsxRoot(p);assert.equal(edited.contents.stripboard[board.mmsxBoard].segmentMap[originalSegment].stripMap[stripID].date,board.scheduledGroups[1].date.replaceAll('-',''));
 const exported=await serializeMmsx(p,'local-copy.mmsx'),round=await decodeMmsx(exported.buffer);
-assert.deepEqual(round.contents,edited.contents);assert.notEqual(round.id,root.id);assert(!('fileName' in round));
+assert.deepEqual(round.contents,edited.contents);assert.equal(round.id,root.id);assert.equal(round.fileName,root.fileName);
+const copy=await decodeMmsx(await serializeMmsx(p,'copy.mmsx',{copy:true}));assert.notEqual(copy.id,root.id);assert(!('fileName' in copy));
 const reopened=await parseMmsx(exported.buffer,'local-copy.mmsx');assert.equal(reopened.scenes.length,p.scenes.length);
 restoreBoardOrder(board,before);assert.deepEqual(updatedMmsxRoot(p),root);
 // A Boneyard is shared by the sub-boards of the same original MMSX board.

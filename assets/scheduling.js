@@ -98,7 +98,9 @@ export function moveBoardItems(project,{boardName,sourceKeys,to}){
     group.ordinal=ordinal;
     group.shootingDayNumber=project.format==='mmsx'?(dayNumbers[index]??group.shootingDayNumber??ordinal):ordinal;
     group.date=dayDates[index]??group.date??dayDates.at(-1)??null;
+    group.calendarId=board.calendarId??group.calendarId;
   }
+  for(const group of board.unscheduledGroups)group.calendarId=project.calendars?.find(c=>c.scope?.boardId===board.parentBoardId&&c.scope?.segmentId===group.mmsxSegment)?.id??null;
   return true;
 }
 
@@ -112,7 +114,7 @@ export function moveDayBreak(project,{boardName,from,to}){
 export function snapshotBoardOrder(board){
   return ['scheduledGroups','unscheduledGroups'].map(container=>({container,
     groups:board[container].slice(),strips:board[container].map(group=>group.strips.slice()),
-    dayMeta:board[container].map(group=>({kind:group.kind,mmsxSegment:group.mmsxSegment,ordinal:group.ordinal,shootingDayNumber:group.shootingDayNumber,date:group.date}))}));
+    dayMeta:board[container].map(group=>({kind:group.kind,mmsxSegment:group.mmsxSegment,calendarId:group.calendarId,ordinal:group.ordinal,shootingDayNumber:group.shootingDayNumber,date:group.date}))}));
 }
 export function restoreBoardOrder(board,snapshot){
   for(const {container,groups,strips,dayMeta} of snapshot){
@@ -140,6 +142,8 @@ export function createStripboard(project,{name,sourceBoardName}){
   const board=structuredClone(source);
   const maxOrder=Math.max(-1,...project.boards.map(item=>Number(item.attributes.SortOrder)).filter(Number.isFinite));
   board.name=cleanName;board.attributes.Name=cleanName;board.attributes.SortOrder=String(maxOrder+1);
+  board.id=`plan:${crypto.randomUUID()}`;board.parentBoardId=board.id;board.segmentId=`segment:${crypto.randomUUID()}`;
+  for(const container of ['scheduledGroups','unscheduledGroups'])for(const [index,group] of board[container].entries())group.id=`group:${JSON.stringify([board.id,container,index])}`;
   board.sourceOrder=project.boards.length;board.identitySource='Name';
   board.description=cleanName;
   project.boards.push(board);

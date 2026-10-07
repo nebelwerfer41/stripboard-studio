@@ -6,7 +6,7 @@ import {moveBoardItems,dayBreakKey,snapshotBoardOrder,restoreBoardOrder,dragSumm
 import {resetDocumentState,documentIsDirty,markDocumentEdited,beginDocumentSave,finishDocumentSave} from './document-state.js';
 import {elementSumText,categoryElementsText,elementLabel,sortCategoryElements} from './element-format.js';
 import {expandReportBoxes} from './report-layout.js';
-import {redFlagsForStrip,redFlagsOnDate,calendarDate,boardWithCalendar,outsideCalendarActivity} from './production-data.js';
+import {redFlagsForStrip,redFlagsOnDate,calendarDate,boardWithCalendar,outsideCalendarActivity,findCalendar,eventsOnDate,intervalContains,intervalOverlaps} from './production-data.js';
 import {STRIP_GESTURE,selectStripState,clearStripState,movementIntent} from './strip-interaction.js';
 const $ = id => document.getElementById(id);
 const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
@@ -26,7 +26,7 @@ const safe = v => String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').r
 const sceneIndex = () => new Map(state.project.scenes.map(s=>[s.bdsId,s]));
 const selectedBoard = () => state.project.boards.find(b=>b.name===state.board) || state.project.boards[0];
 const displayedBoard = () => boardWithCalendar(state.project,state.board,state.calendar)||selectedBoard();
-const selectedProductionCalendar = () => state.project.calendars.find(c=>c.name===state.calendar)||state.project.calendars[0];
+const selectedProductionCalendar = () => findCalendar(state.project,state.calendar)||state.project.calendars[0];
 const selectedLayout = () => (state.mode==='board'?state.project.stripLayouts:state.project.reportLayouts).find(l=>l.name===state.layout);
 const groups = b => [...(b?.scheduledGroups||[]),...(state.unscheduled?b?.unscheduledGroups||[]:[])];
 const sceneList = b => groups(b).flatMap(g=>g.strips.filter(x=>x.kind==='scene').map(x=>state.sceneMap.get(x.bdsId)).filter(Boolean));
@@ -60,12 +60,12 @@ function setProject(data){
   resetDocumentState(state);
   const isMmsx=data.format==='mmsx';
   if(isMmsx)state.mode='board';
-  for(const id of ['reportNav','calendarNav','redFlagNav','newBoardButton'])$(id).disabled=isMmsx;
-  $('saveButton').textContent=isMmsx?'↓ Esporta copia .mmsx':'↓ Salva .msd';
+  for(const [id,key] of [['reportNav','reports'],['calendarNav','readCalendars'],['redFlagNav','readRedFlags'],['newBoardButton','createBoards']])$(id).disabled=!data.capabilities[key];
+  $('saveButton').textContent=isMmsx?'↓ Salva .mmsx':'↓ Salva .msd';
   state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;
   clearStripSelection();
-  state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;
-  state.calendar=selectedBoard()?.calendarName||data.defaultCalendar||data.calendars[0]?.name;
+  state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;state.dataScene=null;state.dataCategory='';state.dataElement=null;
+  state.calendar=selectedBoard()?.calendarId||findCalendar(data,data.defaultCalendar)?.id||data.calendars[0]?.id;
   state.calendarMonth=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso?.slice(0,7)||new Date().toISOString().slice(0,7);
   state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
   state.flagMonth=data.redFlags.map(f=>f.date).filter(Boolean).sort()[0]?.slice(0,7)||state.calendarMonth;
@@ -78,31 +78,31 @@ function setProject(data){
   $('sideProject').textContent=data.title;$('projectTitle').textContent=data.title;
   refreshBoardOptions();$('reportCount').textContent=data.reportLayouts.length;
   $('calendarCount').textContent=data.calendars.length;$('redFlagCount').textContent=data.redFlags.length;
-  $('calendarSelect').innerHTML=data.calendars.map(c=>`<option value="${safe(c.name)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
+  $('calendarSelect').innerHTML=data.calendars.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
   $('toggleUnscheduled').classList.remove('selected');$('toggleUnscheduled').textContent='Visualizza Boneyard';
   showStatus('');updateDocumentStatus();setMode(state.mode);
 }
 function setMode(mode){
-  if(state.project?.format==='mmsx')mode='board';
+  if(mode==='report'&&!state.project?.capabilities.reports)mode='board';
   state.mode=mode;
-  for(const [id,key] of [['boardNav','board'],['reportNav','report'],['calendarNav','calendar'],['redFlagNav','redflags']])$(id).classList.toggle('active',mode===key);
-  $('crumb').textContent={board:'STRIPBOARD',report:'REPORT',calendar:'PRODUCTION CALENDARS',redflags:'RED FLAG ENTRY'}[mode];
+  for(const [id,key] of [['boardNav','board'],['reportNav','report'],['calendarNav','calendar'],['redFlagNav','redflags'],['dataNav','data']])$(id).classList.toggle('active',mode===key);
+  $('crumb').textContent={board:'STRIPBOARD',report:'REPORT',calendar:'PRODUCTION CALENDARS',redflags:'RED FLAG ENTRY',data:'DETTAGLI PROGETTO ED ELEMENTI'}[mode];
   $('layoutLabel').textContent=mode==='board'?'LAYOUT STRIPBOARD':'MODELLO REPORT';
-  $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'PRODUCTION CALENDARS',redflags:'RED FLAG ENTRY'}[mode];
+  $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'PRODUCTION CALENDARS',redflags:'RED FLAG ENTRY',data:'DETTAGLI PROGETTO ED ELEMENTI'}[mode];
   $('search').placeholder=mode==='board'?'Cerca scena, set, testo…':'Cerca nei dati del report…';
   $('toggleUnscheduled').style.display=mode==='board'?'':'none';
   $('colorSwitch').style.display=mode==='board'?'':'none';
   $('printOptions').hidden=mode!=='board';
   $('reportOptions').hidden=mode!=='report';
   $('visibilityOptions').hidden=mode!=='board'&&mode!=='report';
-  $('boardControl').hidden=mode==='redflags';
-  $('layoutControl').hidden=mode==='calendar'||mode==='redflags';
-  $('calendarControl').hidden=state.project?.format==='mmsx'||(mode!=='board'&&mode!=='calendar');
-  $('panelTools').hidden=mode==='calendar'||mode==='redflags';
-  $('stats').hidden=mode==='calendar'||mode==='redflags';
+  $('boardControl').hidden=mode==='redflags'||mode==='data';
+  $('layoutControl').hidden=mode==='calendar'||mode==='redflags'||mode==='data';
+  $('calendarControl').hidden=(mode==='board'&&!state.project.capabilities.calendarProjection)||(mode!=='board'&&mode!=='calendar');
+  $('panelTools').hidden=mode==='calendar'||mode==='redflags'||mode==='data';
+  $('stats').hidden=mode==='calendar'||mode==='redflags'||mode==='data';
   $('controls').classList.toggle('minimal',mode==='redflags');
   const layouts=mode==='board'?state.project?.stripLayouts:state.project?.reportLayouts;
-  if(mode==='calendar'||mode==='redflags'){render();return}
+  if(mode==='calendar'||mode==='redflags'||mode==='data'){render();return}
   if(!layouts)return;
   if(!layouts.some(l=>l.name===state.layout)){
     const preferred=mode==='board'?layouts.find(l=>l.orientation==='HORIZONTAL' && l.name.startsWith('*Schedule'))||layouts.find(l=>l.orientation==='HORIZONTAL'):layouts.find(l=>l.name==='Flash Suite Export')||layouts.find(l=>l.sourceType==='STRIP_BOARD'&&l.recordType==='STRIP')||layouts[0];
@@ -113,13 +113,14 @@ function setMode(mode){
 }
 function render(){
   if(!state.project)return;
-  for(const [id,mode] of [['boardView','board'],['reportView','report'],['calendarView','calendar'],['redFlagView','redflags']])$(id).hidden=state.mode!==mode;
+  for(const [id,mode] of [['boardView','board'],['reportView','report'],['calendarView','calendar'],['redFlagView','redflags'],['dataView','data']])$(id).hidden=state.mode!==mode;
+  if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, riferimenti delle schede ed elementi · consultazione';renderProductionViewer();return}
   if(state.mode==='calendar'){
     $('viewTitle').textContent='Calendari di produzione';$('viewSubtitle').textContent='Pattern settimanali, eccezioni e giorni di ripresa del piano selezionato.';
     renderCalendarViewer();return;
   }
   if(state.mode==='redflags'){
-    $('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e tipi presenti nel file MSD · consultazione';
+    $('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e tipi presenti nel file · consultazione';
     renderRedFlagViewer();return;
   }
   const board=state.mode==='board'?displayedBoard():selectedBoard(),layout=selectedLayout();if(!board||!layout)return;
@@ -131,7 +132,7 @@ function render(){
 function renderStats(board){
   const dated=board.scheduledGroups.filter(g=>g.kind==='ScheduleDay');
   const used=board.scheduledGroups.flatMap(g=>g.strips).filter(s=>s.kind==='scene').length;
-  const vals=[['Giorni di riprese',dated.length],['Scene in piano',used],['Primo giorno',shortDate(board.dateAudit.firstDate)],['Ultimo giorno',shortDate(board.dateAudit.lastDate)]];
+  const vals=[['Giorni di riprese',dated.length],['Scene in piano',used],['Primo giorno',shortDate(dated.find(g=>g.date)?.date)],['Ultimo giorno',shortDate(dated.filter(g=>g.date).at(-1)?.date)]];
   $('stats').innerHTML=vals.map(([label,value])=>`<div class="stat"><span class="label">${label}</span><span class="value">${safe(value)}</span></div>`).join('');
 }
 function formatTemplate(t,ctx){
@@ -792,86 +793,120 @@ function monthGrid(month,selected,details){
 function specialLabel(day){
   if(!day?.specialDay)return day?.working===false?'Riposo settimanale':day?.working===true?'Giorno lavorativo':'Regola non risolta';
   const active=Object.entries(SPECIAL_NAMES).filter(([key])=>day.specialDay.attributes[key]==='1').map(([,name])=>name);
-  return active.join(' · ')||'Eccezione registrata';
+  return active.join(' · ')||`Eccezione non risolta: ${day.specialDay.type||'—'}`;
+}
+function dateRange(item){
+  const start=Object.hasOwn(item,'startDate')?item.startDate:item.date,end=Object.hasOwn(item,'endDate')?item.endDate:item.date;
+  if(!start||!end)return 'Intervallo non risolto';
+  return start&&end&&start!==end?`${shortDate(start)} → ${shortDate(end)}`:shortDate(start);
+}
+function table(headers,rows){return `<div class="flag-table-wrap"><table class="flag-table"><thead><tr>${headers.map(h=>`<th>${safe(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(value=>`<td>${safe(value)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${headers.length}">Nessun dato presente.</td></tr>`}</tbody></table></div>`}
+function valueText(value){return value?.text??(value==null?'—':typeof value==='object'?JSON.stringify(value):String(value))}
+function renderProductionViewer(){
+  const p=state.project,scenes=[...p.scenes].sort((a,b)=>Number(!a.scene)-Number(!b.scene)||collator.compare(a.scene||'',b.scene||''));
+  const scene=scenes.find(s=>s.bdsId===state.dataScene)||scenes[0];
+  const categories=[...new Set([...p.categorySettings.map(c=>c.name),...p.elements.map(e=>e.category)].filter(Boolean))].sort(collator.compare);
+  const elements=p.elements.filter(e=>!state.dataCategory||e.category===state.dataCategory).sort((a,b)=>collator.compare(a.name||'',b.name||''));
+  const element=elements.find(e=>e.id===state.dataElement)||elements.find(e=>e.name)||elements[0];
+  state.dataScene=scene?.bdsId??null;state.dataElement=element?.id??null;
+  const productionLabels={artDirector:'Scenografia',setDresser:'Arredamento set',timing:'Tempi',episode:'Episodio',miscOne:'Informazioni aggiuntive 1',miscTwo:'Informazioni aggiuntive 2',miscThree:'Informazioni aggiuntive 3',miscFour:'Informazioni aggiuntive 4',title:'Titolo',PictureTitle:'Titolo',company:'Società',director:'Regia',producer:'Produttore',upm:'Direttore di produzione',asstDirector:'Aiuto regia',scriptDated:'Data sceneggiatura',prodNo:'Numero produzione',preparer:'Preparato da'};
+  const category=p.categorySettings.find(c=>c.name===element?.category);
+  const properties=Object.entries(element?.properties||{}).map(([key,value])=>[category?.properties?.[key]?.name||key,valueText(value)]);
+  $('dataView').innerHTML=`<div class="viewer-intro"><p>Dati consultabili in sola lettura. Il nome di un elemento e la quantità richiesta dalla scheda sono distinti; una quantità assente non viene ricavata dal nome.</p></div>
+    <div class="production-cards"><div class="viewer-card"><h3>Produzione</h3>${table(['Campo','Valore'],Object.entries(p.production).map(([key,value])=>[productionLabels[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2'),valueText(value)]))}</div>
+    <div class="viewer-card"><h3>Quantità per scheda</h3><label class="viewer-label" for="dataSceneSelect">Scheda</label><select id="dataSceneSelect">${scenes.map(s=>`<option value="${safe(s.bdsId)}" ${s===scene?'selected':''}>${safe(s.scene||'Senza numero')} · ${safe(s.synopsis)}</option>`).join('')}</select>
+      ${table(['Categoria','Elemento','Quantità','Stato'],(scene?.elementRefs||[]).map(ref=>[ref.category,ref.name,valueText(ref.quantity),!ref.resolved?'Riferimento non risolto':ref.quantityOrigin==='stored'?'Quantità salvata':'Quantità non presente']))}</div>
+    <div class="viewer-card"><h3>Elementi e proprietà</h3><label class="viewer-label" for="dataCategorySelect">Categoria</label><select id="dataCategorySelect"><option value="">Tutte le categorie</option>${categories.map(name=>`<option value="${safe(name)}" ${name===state.dataCategory?'selected':''}>${safe(name)}</option>`).join('')}</select>
+      <label class="viewer-label" for="dataElementSelect">Elemento</label><select id="dataElementSelect" ${elements.length?'':'disabled'}>${elements.map(e=>`<option value="${safe(e.id)}" ${e===element?'selected':''}>${state.dataCategory?'':`${safe(e.category)} · `}${safe(e.name||'Senza nome')}</option>`).join('')||'<option>Nessun elemento in questa categoria</option>'}</select>${table(['Proprietà','Valore'],properties)}${element?.source?.notes?`<p>${safe(element.source.notes)}</p>`:''}</div></div>`;
 }
 function renderCalendarViewer(){
   const view=$('calendarView'),calendar=selectedProductionCalendar(),board=displayedBoard();
-  if(!calendar){view.innerHTML='<p class="viewer-empty">Nessun calendario nel file MSD.</p>';return}
+  if(!calendar){view.innerHTML='<p class="viewer-empty">Nessun calendario nel file.</p>';return}
   const month=state.calendarMonth||calendar.scheduleDates.ProductionStartDate?.iso?.slice(0,7)||new Date().toISOString().slice(0,7);
   const selected=state.calendarDate||`${month}-01`,day=calendarDate(calendar,selected);
-  const shootingGroups=board?.scheduledGroups.filter(group=>group.kind==='ScheduleDay'&&group.date===selected)||[];
+  const showBoard=state.project.capabilities.calendarProjection||board?.calendarId===calendar.id;
+  const shootingGroups=showBoard?board?.scheduledGroups.filter(group=>group.kind==='ScheduleDay'&&group.date===selected)||[]:[];
   const sceneIds=shootingGroups.flatMap(group=>group.strips.filter(strip=>strip.kind==='scene').map(strip=>strip.bdsId));
   const scenes=sceneIds.map(id=>state.sceneMap.get(id)).filter(Boolean);
   const selectedFlags=redFlagsOnDate(state.project,selected);
-  const list=state.project.calendars.map(item=>`<button type="button" class="calendar-choice ${item.name===calendar.name?'selected':''}" data-calendar-name="${safe(item.name)}">
+  const selectedEvents=eventsOnDate(state.project,calendar.id,selected);
+  const calendarEvents=(state.project.events||[]).filter(e=>e.calendarId===calendar.id);
+  const list=state.project.calendars.map(item=>`<button type="button" class="calendar-choice ${item.id===calendar.id?'selected':''}" data-calendar-name="${safe(item.id)}">
     <span class="choice-title">${safe(item.name)} ${item.name===state.project.defaultCalendar?'<small>PREDEFINITO</small>':''}</span>
-    <span>${shortDate(item.scheduleDates.ProductionPrepStartDate?.iso)} → ${shortDate(item.scheduleDates.ProductionWrapDate?.iso)}</span>
+    <span>Inizio riprese: ${shortDate(item.scheduleDates.ProductionStartDate?.iso)}${item.segmentType==='boneyard'?' · Boneyard':''}</span>
   </button>`).join('');
   const off=WEEK_DAYS.map(([key,name])=>`<span class="weekday-chip ${calendar.daysOff[key]==='1'?'off':''}">${name}</span>`).join('');
   const grid=monthGrid(month,selected,iso=>{
     const value=calendarDate(calendar,iso);
-    const groups=board?.scheduledGroups.filter(group=>group.kind==='ScheduleDay'&&group.date===iso)||[];
+    const groups=showBoard?board?.scheduledGroups.filter(group=>group.kind==='ScheduleDay'&&group.date===iso)||[]:[];
     const flags=redFlagsOnDate(state.project,iso);
+    const events=eventsOnDate(state.project,calendar.id,iso);
     const outside=outsideCalendarActivity(calendar,iso);
     return {className:`${value?.working===false?'nonworking':value?.working===null?'unresolved':'working'} ${value?.specialDay?'special':''} ${groups.length?'shooting':''} ${outside?'outside-activity':''}`,
-      meta:groups.length?`G ${groups.map(group=>group.shootingDayNumber).join(', ')}`:value?.specialDay?'★':flags.length?'⚑':'',
+      meta:[groups.length?`G ${groups.map(group=>group.shootingDayNumber).join(', ')}`:'',events.length?`◈ ${events.length}`:'',flags.length?'⚑':'',value?.specialDay?'★':''].filter(Boolean).join(' · '),
       title:`${fmtDate(iso)} · ${specialLabel(value)}${outside?' · Fuori dal periodo di attività':''}${groups.length?` · Giorno di ripresa ${groups.map(g=>g.shootingDayNumber).join(', ')}`:''}`};
   });
   const dates=DATE_FIELDS.map(([key,label])=>{
     const iso=calendar.scheduleDates[key]?.iso;
     return `<div class="date-fact"><span>${label}</span>${iso?`<button type="button" data-go-date="${iso}" title="Vai a ${safe(shortDate(iso))}">${shortDate(iso)} ↗</button>`:'<strong>—</strong>'}</div>`;
   }).join('');
-  view.innerHTML=`<div class="viewer-intro"><p>I calendari appartengono al progetto MSD. Cambiare calendario ricalcola solo le date mostrate per il piano <strong>${safe(board?.name||'—')}</strong>; scene e ordine restano gli stessi.</p></div>
+  const intro=state.project.capabilities.calendarProjection?`Cambiare calendario crea una proiezione delle date inferite del piano ${board?.name||'—'}. Il collegamento salvato resta invariato.`:'Ogni calendario appartiene al proprio segmento. Le riprese mostrano le date salvate: scegliere un altro calendario non le ricalcola. Preparazione, fine e wrap non sono presenti se il file non li specifica.';
+  const exceptions=calendar.specialDays.map(special=>{const value=calendarDate(calendar,special.date);return `<li>${special.date?`<button type="button" data-go-date="${safe(special.date)}">${safe(shortDate(special.date))}</button>`:safe(special.rawDate)} · ${safe(specialLabel(value))}</li>`}).join('');
+  const eventTable=table(['Evento','Tipo','Date','Elementi','Colore','Nota'],calendarEvents.map(e=>[e.name,e.type,dateRange(e),e.targets.map(t=>t.kind==='unresolved'?`Non risolto (${t.elementId})`:t.element||'Generale').join(', '),e.color,e.note]));
+  view.innerHTML=`<div class="viewer-intro"><p>${safe(intro)}</p></div>
     <div class="calendar-layout"><aside class="viewer-side"><h3>Calendari disponibili</h3><div class="calendar-choices">${list}</div>
-      <div class="viewer-card"><h3>${safe(calendar.name)}</h3><div class="date-facts">${dates}</div><h4>Giorni non lavorativi</h4><div class="weekday-chips">${off}</div></div></aside>
+      <div class="viewer-card"><h3>${safe(calendar.name)}</h3><div class="date-facts">${dates}</div><h4>Giorni non lavorativi</h4><div class="weekday-chips">${off}</div><h4>Tutte le eccezioni</h4><ul class="calendar-exceptions">${exceptions||'<li>Nessuna eccezione</li>'}</ul></div></aside>
       <div class="viewer-main"><div class="viewer-card"><div class="month-toolbar"><button type="button" data-month-step="-1" aria-label="Mese precedente">‹</button><h3>${safe(monthLabel(month))}</h3><button type="button" data-month-step="1" aria-label="Mese successivo">›</button><input id="calendarMonthInput" type="month" value="${month}" aria-label="Vai al mese"></div>${grid}
         <div class="calendar-legend"><span><i class="legend-dot work"></i> Lavorativo</span><span><i class="legend-dot off"></i> Non lavorativo</span><span><i class="legend-dot outside"></i> Fuori attività</span><span><i class="legend-dot special"></i> Eccezione</span><span><i class="legend-dot shoot"></i> Riprese del piano</span></div></div>
         <div class="viewer-card date-detail"><h3>${safe(fmtDate(selected))}</h3><p><strong>${safe(specialLabel(day))}</strong>${day?.working===null?' · Stato da verificare':''}</p>
           <div class="detail-pills"><span>${shootingGroups.length?`Giorno di ripresa ${shootingGroups.map(g=>g.shootingDayNumber).join(', ')}`:'Nessuna ripresa nel piano'}</span><span>${scenes.length} ${scenes.length===1?'scena':'scene'}</span><span>${selectedFlags.length} Red Flag nella data</span></div>
-          ${scenes.length?`<p class="scene-summary">${safe(scenes.slice(0,8).map(scene=>scene.scene||scene.bdsId).join(' · '))}${scenes.length>8?' · …':''}</p>`:''}</div></div></div>`;
+          ${shootingGroups.length&&day?.working!==true?'<p>Conflitto: riprese salvate su una data non lavorativa o con regola non risolta.</p>':''}
+          ${scenes.length?`<p class="scene-summary">${safe(scenes.map(scene=>scene.scene||scene.bdsId).join(' · '))}</p>`:''}
+          ${selectedFlags.map(f=>`<p>⚑ ${safe(f.name)} · ${safe(f.target.element|| (f.target.kind==='project'?'Generale':'Riferimento non risolto'))} · ${safe(f.note)}</p>`).join('')}
+          ${selectedEvents.map(e=>`<p>◈ ${safe(e.name)} · ${safe(dateRange(e))} · ${safe(e.targets.map(t=>t.element||t.kind).join(', '))}</p>`).join('')}</div>
+        <div class="viewer-card"><h3>Tutti gli eventi del calendario</h3>${eventTable}</div></div></div>`;
 }
 
 function flagMatches(flag,{includeDate=true}={}){
   if(state.flagCategory==='__general__'&&flag.target.kind!=='project')return false;
   if(state.flagCategory&&state.flagCategory!=='__general__'&&flag.target.category!==state.flagCategory)return false;
-  if(state.flagElement&&flag.target.element!==state.flagElement)return false;
+  if(state.flagElement&&flag.target.elementId!==state.flagElement)return false;
   if(state.flagName&&flag.name!==state.flagName)return false;
-  if(includeDate&&state.flagStart&&(!flag.date||flag.date<state.flagStart))return false;
-  if(includeDate&&state.flagEnd&&(!flag.date||flag.date>state.flagEnd))return false;
+  if(includeDate&&!intervalOverlaps(flag,state.flagStart,state.flagEnd))return false;
   return true;
 }
 function renderRedFlagViewer(){
   const view=$('redFlagView'),project=state.project,month=state.flagMonth||new Date().toISOString().slice(0,7);
   const categories=[...new Set([...project.elements.map(item=>item.category),...project.redFlags.map(flag=>flag.target.category)].filter(Boolean))].sort(collator.compare);
-  const elements=state.flagCategory&&state.flagCategory!=='__general__'?project.elements.filter(item=>item.category===state.flagCategory).map(item=>item.name).sort(collator.compare):[];
+  const elements=state.flagCategory&&state.flagCategory!=='__general__'?project.elements.filter(item=>item.category===state.flagCategory).sort((a,b)=>collator.compare(a.name,b.name)):[];
   const names=[...new Set([...project.redFlagNames.map(item=>item.name),...project.redFlags.map(flag=>flag.name)])].filter(Boolean);
   const filtered=project.redFlags.filter(flag=>flagMatches(flag)).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.sourceOrder-b.sourceOrder);
   if(!filtered.some(flag=>flag.id===state.flagSelectedId))state.flagSelectedId=filtered[0]?.id||null;
   const selected=filtered.find(flag=>flag.id===state.flagSelectedId);
   const categoryOptions=categories.map(name=>`<option value="${safe(name)}" ${state.flagCategory===name?'selected':''}>${safe(name)}</option>`).join('');
-  const elementOptions=elements.map(name=>`<option value="${safe(name)}" ${state.flagElement===name?'selected':''}>${safe(name)}</option>`).join('');
+  const elementOptions=elements.map(element=>`<option value="${safe(element.id)}" ${state.flagElement===element.id?'selected':''}>${safe(element.name)}</option>`).join('');
   const typeOptions=names.map(name=>`<option value="${safe(name)}" ${state.flagName===name?'selected':''}>${safe(name)}</option>`).join('');
-  const calendarOptions=project.calendars.map(item=>`<option value="${safe(item.name)}" ${state.flagCalendar===item.name?'selected':''}>${safe(item.name)}</option>`).join('');
-  const context=project.calendars.find(item=>item.name===state.flagCalendar);
+  const calendarOptions=project.calendars.map(item=>`<option value="${safe(item.id)}" ${state.flagCalendar===item.id?'selected':''}>${safe(item.name)}</option>`).join('');
+  const context=findCalendar(project,state.flagCalendar);
   const grid=monthGrid(month,state.flagStart&&state.flagStart===state.flagEnd?state.flagStart:null,iso=>{
-    const flags=project.redFlags.filter(flag=>flag.date===iso&&flagMatches(flag,{includeDate:false}));
+    const flags=project.redFlags.filter(flag=>intervalContains(flag,iso)&&flagMatches(flag,{includeDate:false}));
     const day=context?calendarDate(context,iso):null;
     const outside=context&&outsideCalendarActivity(context,iso);
     return {className:`${day?.working===false?'nonworking':''} ${flags.length?'has-flags':''} ${outside?'outside-activity':''}`,
       meta:flags.length?`⚑ ${flags.length}`:'',title:`${fmtDate(iso)} · ${flags.length} Red Flag${day?` · ${specialLabel(day)}`:''}${outside?' · Fuori dal periodo di attività':''}`};
   });
   const rows=filtered.map(flag=>`<tr class="${flag.id===selected?.id?'selected':''}" data-flag-id="${safe(flag.id)}" tabindex="0" aria-selected="${flag.id===selected?.id}">
-    <td>${shortDate(flag.date)}</td><td>${safe(flag.target.category||'—')}</td><td>${safe(flag.target.element||'—')}</td><td>${safe(flag.name||'—')}</td><td>${safe(flag.note||'')}</td></tr>`).join('');
-  view.innerHTML=`<div class="viewer-intro"><p>Red Flag Entry elenca le segnalazioni salvate nel file. I tipi disponibili provengono dal Red Flag Manager MSD. Questa vista è in sola lettura.</p></div>
+    <td>${safe(dateRange(flag))}</td><td>${safe(flag.target.category||'—')}</td><td>${safe(flag.target.element||'—')}</td><td>${safe(flag.name||'—')}</td><td>${safe(flag.note||'')}</td></tr>`).join('');
+  view.innerHTML=`<div class="viewer-intro"><p>Red Flag Entry elenca le segnalazioni salvate nel file. Gli intervalli comprendono tutti i giorni civili, inclusi i weekend. Questa vista è in sola lettura.</p></div>
     <div class="flag-filter-layout"><div class="viewer-card"><h3>1 · Elemento</h3><label class="viewer-label" for="rfCategory">Categoria</label><select id="rfCategory"><option value="">Tutte le categorie</option><option value="__general__" ${state.flagCategory==='__general__'?'selected':''}>Generali · senza elemento</option>${categoryOptions}</select>
       <label class="viewer-label" for="rfElement">Elemento</label><select id="rfElement" ${elements.length?'':'disabled'}><option value="">Tutti gli elementi</option>${elementOptions}</select></div>
       <div class="viewer-card"><h3>2 · Data o intervallo</h3><div class="month-toolbar"><button type="button" data-flag-month-step="-1" aria-label="Mese precedente">‹</button><strong>${safe(monthLabel(month))}</strong><button type="button" data-flag-month-step="1" aria-label="Mese successivo">›</button><input id="rfMonthInput" type="month" value="${month}" aria-label="Vai al mese"></div>${grid}
         <div class="date-range"><label>Dal <input id="rfFrom" type="date" value="${safe(state.flagStart)}"></label><label>Al <input id="rfTo" type="date" value="${safe(state.flagEnd)}"></label><button id="rfClearDates" type="button">Azzera</button></div>
         <label class="viewer-label" for="rfCalendar">Contesto calendario</label><select id="rfCalendar"><option value="">Solo Red Flags</option>${calendarOptions}</select></div>
-      <div class="viewer-card"><h3>3 · Tipo di Red Flag</h3><select id="rfType" size="7" aria-label="Tipo di Red Flag"><option value="" ${!state.flagName?'selected':''}>Tutti i tipi</option>${typeOptions}</select><p class="viewer-hint">Tipi definiti nel file MSD; nessuna modifica viene salvata.</p></div></div>
+      <div class="viewer-card"><h3>3 · Tipo di Red Flag</h3><select id="rfType" size="7" aria-label="Tipo di Red Flag"><option value="" ${!state.flagName?'selected':''}>Tutti i tipi</option>${typeOptions}</select><p class="viewer-hint">Tipi definiti nel file; nessuna modifica viene salvata.</p></div></div>
     <div class="viewer-card flag-results"><div class="results-heading"><h3>Red Flags nel file</h3><span>${filtered.length} di ${project.redFlags.length} voci</span></div>
       <div class="flag-table-wrap"><table class="flag-table"><thead><tr><th>Data</th><th>Categoria</th><th>Elemento</th><th>Tipo</th><th>Nota</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="no-results">Nessuna Red Flag per questi filtri.</td></tr>'}</tbody></table></div></div>
-    ${selected?`<div class="viewer-card flag-detail"><div><span class="detail-kicker">RED FLAG SELEZIONATA</span><h3>${safe(selected.name||'Red Flag')}</h3><p>${shortDate(selected.date)} · ${safe(selected.target.kind==='project'?'Intera giornata':`${selected.target.category}: ${selected.target.element}`)}</p></div><div><strong>Nota</strong><p>${safe(selected.note||'Nessuna nota')}</p><small>DOODStatus: ${safe(selected.doodStatus??'—')}</small></div></div>`:''}`;
+    ${selected?`<div class="viewer-card flag-detail"><div><span class="detail-kicker">RED FLAG SELEZIONATA</span><h3>${safe(selected.name||'Red Flag')}</h3><p>${safe(dateRange(selected))} · ${safe(selected.target.kind==='project'?'Intera giornata':selected.target.kind==='unresolved'?'Riferimento non risolto':`${selected.target.category}: ${selected.target.element}`)}</p></div><div><strong>Nota</strong><p>${safe(selected.note||'Nessuna nota')}</p><small>Tipo originale: ${safe(selected.type||selected.name||'—')} · Colore: ${safe(selected.color||'—')} · ${selected.targetResolved?'Riferimento risolto':'Riferimento non risolto'}${selected.doodStatus!=null?` · DOODStatus: ${safe(selected.doodStatus)}`:''}</small></div></div>`:''}`;
 }
 
 $('projectSelect').addEventListener('change',async e=>{
@@ -887,7 +922,7 @@ $('boardSelect').addEventListener('change',e=>{
   clearStripSelection();
   const changed=state.project.activeBoard!==e.target.value;
   state.board=e.target.value;state.project.activeBoard=state.board;
-  state.calendar=selectedBoard()?.calendarName||state.project.defaultCalendar;
+  state.calendar=selectedBoard()?.calendarId||findCalendar(state.project,state.project.defaultCalendar)?.id;
   $('calendarSelect').value=state.calendar;
   state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
   state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);
@@ -903,7 +938,7 @@ $('newBoardForm').addEventListener('submit',event=>{
   try{
     const board=createStripboard(state.project,{name:$('newBoardName').value,sourceBoardName:state.board});
     clearStripSelection();
-    state.board=board.name;state.calendar=board.calendarName;state.printHeader=board.attributes.HideStripBoardHeader!=='1';
+    state.board=board.name;state.calendar=board.calendarId;state.printHeader=board.attributes.HideStripBoardHeader!=='1';
     $('calendarSelect').value=state.calendar;syncPrintOptions();refreshBoardOptions();showStatus('');$('newBoardDialog').close();setMode('board');edited();
   }catch(error){showStatus(error.message)}
 });
@@ -1015,7 +1050,7 @@ $('saveButton').addEventListener('click',async()=>{
   updateDocumentStatus();showStatus('');
   try{
     const isMmsx=project.format==='mmsx',extension=isMmsx?'.mmsx':'.msd';
-    const fileName=isMmsx?project.fileName.replace(/\.mmsx$/i,'')+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID().slice(0,8)+'.mmsx':project.fileName.replace(/\.msd$/i,'')+'-edited.msd';
+    const fileName=isMmsx?project.fileName.replace(/\.mmsx$/i,'')+'-edited.mmsx':project.fileName.replace(/\.msd$/i,'')+'-edited.msd';
     // Open the picker during the user gesture, before asynchronous compression.
     const handle=window.showSaveFilePicker?await window.showSaveFilePicker({suggestedName:fileName,types:[{description:'Movie Magic Scheduling',accept:{'application/octet-stream':[extension]}}]}):null;
     const bytes=isMmsx?await serializeMmsx(project,fileName):serializeMsd(project);
@@ -1042,6 +1077,13 @@ $('boardNav').addEventListener('click',()=>setMode('board'));
 $('reportNav').addEventListener('click',()=>setMode('report'));
 $('calendarNav').addEventListener('click',()=>setMode('calendar'));
 $('redFlagNav').addEventListener('click',()=>setMode('redflags'));
+$('dataNav').addEventListener('click',()=>setMode('data'));
+$('dataView').addEventListener('change',event=>{
+  if(event.target.id==='dataSceneSelect')state.dataScene=event.target.value;
+  if(event.target.id==='dataCategorySelect'){state.dataCategory=event.target.value;state.dataElement=null}
+  if(event.target.id==='dataElementSelect')state.dataElement=event.target.value;
+  render();
+});
 $('calendarView').addEventListener('click',event=>{
   const go=event.target.closest('[data-go-date]');
   if(go){state.calendarDate=go.dataset.goDate;state.calendarMonth=state.calendarDate.slice(0,7);render();return}

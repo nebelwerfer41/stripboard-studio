@@ -1,0 +1,37 @@
+<!doctype html><html lang="it"><meta charset="utf-8"><title>MSD: conservazione delle varianti</title>
+<body><h1>MSD: conservazione prima e dopo un riordino</h1><p>Il campione incluso viene verificato automaticamente. Per una variante diversa seleziona un MSD locale; il file non viene modificato o caricato su un server.</p><input id="sample" type="file" accept=".msd"><pre id="result">In corso…</pre>
+<script type="module">
+import {parseMsd} from '../assets/msd-parser.js';
+import {serializeMsd} from '../assets/msd-writer.js';
+import {moveBoardItems,snapshotBoardOrder,restoreBoardOrder} from '../assets/scheduling.js';
+const same=(a,b)=>{a=new Uint8Array(a);b=new Uint8Array(b);return a.length===b.length&&a.every((value,index)=>value===b[index])};
+async function verify(buffer,name){
+ const lines=[];document.body.dataset.passed='running';
+ const check=(label,ok)=>{if(!ok)throw Error(label);lines.push(`✓ ${label}`)};
+ try{
+  const p=await parseMsd(buffer,name);lines.push(`${name}: ${p.sourceDocument.scheduleVersion}, ${p.sourceDocument.sections.length} sezioni, ${p.scenes.length} schede`);
+  check('Salvataggio senza edit identico byte per byte',same(serializeMsd(p),buffer));
+  check('ID scheda univoci, indipendenti dai numeri scena',new Set(p.scenes.map(s=>s.id)).size===p.scenes.length);
+  check('Calendari collegati per ID',p.boards.every(b=>p.calendars.some(c=>c.id===b.calendarId)));
+  const board=p.boards.find(b=>b.scheduledGroups.some(g=>g.strips.some(s=>s.kind==='scene'))&&b.unscheduledGroups.length);
+  check('Piano con scena e Boneyard disponibile',Boolean(board));
+  const before=snapshotBoardOrder(board),strip=board.scheduledGroups.flatMap(g=>g.strips).find(s=>s.kind==='scene');
+  moveBoardItems(p,{boardName:board.name,sourceKeys:[strip.sourceKey],to:{container:'unscheduledGroups',groupIndex:0,stripIndex:0}});
+  const saved=serializeMsd(p),round=await parseMsd(saved,'roundtrip.msd');
+  check('Variante e numero sezioni preservati',round.sourceDocument.scheduleVersion===p.sourceDocument.scheduleVersion&&round.sourceDocument.sections.length===p.sourceDocument.sections.length);
+  for(const section of p.sourceDocument.sections)if(section.root!=='StripBoardMgr'){
+   const reopened=round.sourceDocument.sections.find(s=>s.root===section.root);
+   check(`${section.root}: byte originali preservati`,Boolean(reopened)&&same(buffer.slice(section.offset,section.offset+section.length),saved.slice(reopened.offset,reopened.offset+reopened.length)));
+  }
+  check('Scena spostata presente alla riapertura',round.boards.find(b=>b.name===board.name).unscheduledGroups.flatMap(g=>g.strips).some(s=>s.bdsId===strip.bdsId));
+  restoreBoardOrder(board,before);check('Undo ripristina il file binario originale',same(serializeMsd(p),buffer));
+  // Refuse an unobserved 04 variant even when its section count is otherwise valid.
+  const invalid=buffer.slice(0),bytes=new Uint8Array(invalid);bytes.fill(0,192,256);bytes.set(new TextEncoder().encode('04.00.000'),192);bytes.fill(0,268,332);bytes.set(new TextEncoder().encode('UNKNOWN'),268);
+  let refused=false;try{await parseMsd(invalid)}catch{refused=true}check('Variante 04 non verificata respinta',refused);
+  lines.push('TUTTI I CONTROLLI SUPERATI');document.body.dataset.passed='true';
+ }catch(error){lines.push(`ERRORE: ${error.message}`);document.body.dataset.passed='false'}
+ document.querySelector('#result').textContent=lines.join('\n');
+}
+document.querySelector('#sample').addEventListener('change',async event=>{const file=event.target.files[0];if(file)await verify(await file.arrayBuffer(),file.name)});
+await verify(await (await fetch('../samples/Wonderful Life Demo.msd')).arrayBuffer(),'Wonderful Life Demo.msd');
+</script></body></html>

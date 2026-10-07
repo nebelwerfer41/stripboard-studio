@@ -1,3 +1,5 @@
+> Aggiornamento del 7 ottobre 2026: queste note descrivono l’importazione MSD iniziale. Il [contratto comune Flash](flash-common-model.md) amplia i selettori con ID, intervalli e riferimenti alle giornate ricostruiti dai gruppi correnti. Gli eventi MMSX restano separati dalle Red Flags. La variante osservata MSD 04/MMB10 con 11 sezioni è ora accettata mantenendo i controlli del contenitore.
+
 # MSD: Production Calendars e Red Flags
 
 Queste note descrivono i record osservati in `samples/Wonderful Life Demo.msd` (Movie Magic Scheduling 6, EPSF `06.00.000`). Il secondo file `../Wonderful Life Demo esempio.msd` contiene gli stessi tipi di record con ordine diverso. Non è stato possibile confrontare la resa con un'installazione di Movie Magic Scheduling. La vista **Calendari** di Stripboard Studio usa il modello normalizzato; non è un editor MSD.

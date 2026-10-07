@@ -1354,3 +1354,10 @@ footer a:hover {
   .date-range { grid-template-columns: 1fr 1fr }
   .date-range button { grid-column: 1 / -1 }
 }
+
+/* Read-only production data and complete calendar exception list. */
+.production-cards{display:grid;gap:16px}
+.calendar-exceptions{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px;font-size:12px;line-height:1.5}
+.calendar-exceptions button{border:0;background:transparent;color:#168878;cursor:pointer;font:inherit;padding:0;text-align:left;font-weight:700}
+.calendar-exceptions button:hover{text-decoration:underline}
+.calendar-exceptions button:focus-visible{outline:2px solid #168878;outline-offset:3px}

@@ -2,7 +2,9 @@
 
 > **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
-# Stripboard Studio v1.4
+> **Flash common model:** calendars, calendar events, red flag intervals, production data and per-sheet quantities are now available for read-only inspection. Imported projects save in their original format; native MMSX dates are never recalculated on import or calendar selection. See [the common contract and save strategy](docs/flash-common-model.md).
+
+# Stripboard Studio v1.6
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). The Calendars and Red Flag Entry views display these records without changing the file.
 

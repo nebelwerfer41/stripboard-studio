@@ -21,7 +21,7 @@ for(const fixture of fixtures){
     const board=project.boards.find(x=>x.name===project.activeBoard);
     lines.push(`\n${fixture.file}`);
     check('titolo',project.title,fixture.title);
-    check('conteggi',project.counts,fixture.counts);
+    check('conteggi',project.counts,{...fixture.counts,events:0});
     check('layout', [project.stripLayouts.length,project.reportLayouts.length],fixture.layouts);
     check('layout stripboard con campi Red Flag',project.stripLayouts.filter(layout=>layout.fields.some(field=>field.tag==='BDSRedFlagField')).length,6);
     check('due campi Red Flag in Horizontal B',project.stripLayouts.find(layout=>layout.name==='Horizontal B').fields.filter(field=>field.tag==='BDSRedFlagField').length,2);

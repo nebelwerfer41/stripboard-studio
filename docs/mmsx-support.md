@@ -6,13 +6,13 @@ L’integrazione del 6 ottobre 2026 aggiunge lettura e scrittura locale dei cont
 
 Avvia Stripboard Studio con il launcher o un server HTTP locale. Scegli **Importa .msd / .mmsx**, seleziona il piano/sub-board e usa **Visualizza Boneyard** per le strips non programmate. Selezione, trascinamento, F2, **Annulla** e **Ripeti** mantengono le interazioni della versione corrente.
 
-**Esporta copia .mmsx** genera un nome univoco e una nuova identità, rimuovendo i metadati di condivisione e il percorso originale. Il Boneyard è condiviso tra i sub-board dello stesso piano MMSX. L’esportazione aggiorna ordine, data, numero di giornata e totale degli ottavi dei segmenti modificati; verifica le identità per impedire strips perse o duplicate. I dati non interpretati e i numeri oltre la precisione JavaScript vengono conservati.
+**Salva .mmsx** produce un file `-edited.mmsx` mantenendo identità e metadati originali. Senza modifiche restituisce i byte importati. La creazione di una copia con nuova identità resta un’opzione esplicita del serializer, separata dal salvataggio ordinario. Il Boneyard è condiviso tra i sub-board dello stesso piano MMSX. L’esportazione aggiorna ordine, data, numero di giornata e totale degli ottavi dei segmenti modificati; verifica le identità per impedire strips perse o duplicate. I dati non interpretati e i numeri oltre la precisione JavaScript vengono conservati.
 
-Esporta prima di chiudere: non è presente salvataggio automatico della bozza. Su iPad conserva il download in **Sul mio iPad**. Non è disponibile conversione tra MSD e MMSX.
+Salva prima di chiudere: non è presente salvataggio automatico della bozza. Su iPad conserva il download in **Sul mio iPad**. Non è disponibile conversione tra MSD e MMSX.
 
 ## Limiti
 
-La vista compatta mostra scene, banner, giornate e colori; non riproduce i layout proprietari MMSX. Report, calendari, red flag, creazione di piani e modifica delle schede sono disabilitati per MMSX, con i dati originali conservati nell’esportazione. Le date e i numeri di giornata sono quelli memorizzati nel file. Banner e fine giornata, inclusi quelli già nel Boneyard, sono selezionabili e spostabili in entrambe le direzioni, anche in selezioni miste. Shift+clic seleziona un intervallo di strip visibili; Ctrl/⌘-Shift+clic lo aggiunge alla selezione.
+La vista compatta mostra scene, banner, giornate e colori; non riproduce i layout proprietari MMSX. Calendari, eventi, red flag (anche su intervallo), produzione, quantità per scheda e proprietà degli elementi sono consultabili in sola lettura. I calendari mantengono lo scope del segmento, incluso il Boneyard. Cambiare calendario non ricalcola le date native. Report, creazione di piani e modifica delle schede restano disabilitati per MMSX; i layout originali sono conservati. Le date e i numeri di giornata sono quelli memorizzati nel file. Banner e fine giornata, inclusi quelli già nel Boneyard, sono selezionabili e spostabili in entrambe le direzioni, anche in selezioni miste. Shift+clic seleziona un intervallo di strip visibili; Ctrl/⌘-Shift+clic lo aggiunge alla selezione.
 
 Sono richiesti CompressionStream/DecompressionStream gzip e le API crittografiche del browser, disponibili su HTTPS o localhost. Limiti: 64 MB per il contenitore e 128 MB dopo decompressione. Il supporto è limitato a dataFormat 3 e 5.
 
@@ -20,6 +20,7 @@ Sono richiesti CompressionStream/DecompressionStream gzip e le API crittografich
 
 ```sh
 node tests/mmsx.mjs
+node tests/mmsx-production.mjs
 node --test tests/mmsx-v3.mjs
 node --test tests/document-state.mjs tests/element-format.mjs tests/production-data.mjs tests/report-layout.mjs tests/strip-drag.mjs tests/strip-interaction.mjs
 ```
@@ -37,3 +38,9 @@ I 32 test Node preesistenti e tutti i controlli del round-trip MSD in `tests/rou
 Il formato 3 usa array ordinati di schede, segmenti e strips. L’adattatore li espone al modello corrente senza migrare il documento: l’esportazione mantiene dataFormat 3 e modifica solo gli array dei segmenti interessati. Verificati importazione, spostamento, esportazione/reimportazione e annullamento anche su un piano reale formato 3; il file originale non viene modificato.
 
 Alcuni file dichiarano dataFormat 3 ma includono già `sheetMap`, `segmentMap` e `stripMap`, insieme ad array di compatibilità contenenti «This schedule requires MMS 10.10 or newer». Quando presenti, le mappe sono autorevoli: il parser le legge e il writer aggiorna soltanto le mappe modificate, mantenendo gli array segnaposto originali. Verificati importazione completa, spostamento, esportazione/reimportazione e annullamento su questo schema ibrido.
+
+## Contratto comune e prima fase di consultazione
+
+Il [contratto comune Flash](flash-common-model.md) consolida identità, scope, quantità, provenienza delle date e salvataggio conservativo. Eventi e indisponibilità resteranno alle date fisse anche nel futuro editing calendario, con segnalazione dei conflitti.
+
+La verifica del 7 ottobre sulla coppia reale edited2 conferma 146 schede, 8 calendari, 119 giornate, Camera Test con due elementi, Ernie 19–23 giugno inclusi i weekend e quantità 40 separata dal nome nella scena 102. I file privati non sono inclusi nel repository. Calendari/red flag restano intatti dopo riordino, salvataggio e riapertura; il no-op MMSX è binariamente identico. Eventi multi-day e più segmenti normali nello stesso board hanno solo test sintetici. La riapertura di questi export in Movie Magic e la verifica Safari/iPad restano da effettuare.
