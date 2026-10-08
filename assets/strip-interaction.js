@@ -4,7 +4,7 @@ export const STRIP_GESTURE={
   autoscrollEdgePx:42,scrollbarGuardPx:14,postDragClickMs:700
 };
 
-export function selectStripState(state,key,{toggle=false,range=false,orderedKeys=[],isSceneKey}={}){
+export function selectStripState(state,key,{toggle=false,range=false,orderedKeys=[],isSceneKey,sceneIdForKey}={}){
   const previousActive=state.activeStripId;
   const anchorIndex=orderedKeys.indexOf(state.selectionAnchorId),keyIndex=orderedKeys.indexOf(key);
   if(range&&anchorIndex>=0&&keyIndex>=0){
@@ -21,12 +21,13 @@ export function selectStripState(state,key,{toggle=false,range=false,orderedKeys
   else if(!state.activeStripId||!state.selectedStripIds.has(state.activeStripId))
     state.activeStripId=[...state.selectedStripIds].reverse().find(isSceneKey)||null;
   if(!state.selectedStripIds.size)state.touchMultiSelect=false;
+  if(sceneIdForKey)state.activeSceneId=state.activeStripId?sceneIdForKey(state.activeStripId):null;
   return previousActive;
 }
 
 export function clearStripState(state){
   const previousActive=state.activeStripId;
-  state.selectedStripIds.clear();state.selectionAnchorId=null;state.activeStripId=null;state.draggedStripIds.clear();state.touchMultiSelect=false;
+  state.selectedStripIds.clear();state.selectionAnchorId=null;state.activeStripId=null;state.activeSceneId=null;state.draggedStripIds.clear();state.touchMultiSelect=false;
   return previousActive;
 }
 

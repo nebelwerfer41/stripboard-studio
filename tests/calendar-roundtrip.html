@@ -1,0 +1,43 @@
+<!doctype html><html lang="it"><meta charset="utf-8"><title>Calendar MSD round-trip</title><body><h1>Calendar MSD round-trip</h1><label>Campione reale opzionale <input id="file" type="file" accept=".msd"></label><pre id="result">In corso…</pre><script type="module">
+import {parseMsd} from '../assets/msd-parser.js';
+import {serializeMsd} from '../assets/msd-writer.js';
+import {editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction} from '../assets/calendar-commands.js';
+import {calendarDate,boardWithCalendar} from '../assets/production-data.js';
+const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const bytesEqual=(a,b)=>a.byteLength===b.byteLength&&new Uint8Array(a).every((v,i)=>v===new Uint8Array(b)[i]);
+const order=p=>p.boards.map(b=>b.scheduledGroups.map(g=>g.strips.map(s=>s.sourceKey)));
+const dates=p=>p.boards.map(b=>b.scheduledGroups.map(g=>g.date));
+async function run(bytes,name){
+ const lines=[];let failures=0;const check=(label,ok)=>{lines.push(`${ok?'✓':'✗'} ${label}`);if(!ok)failures++};
+ try{
+ const p=await parseMsd(bytes,name),b=p.boards.find(b=>b.scheduledGroups.some(g=>g.kind==='ScheduleDay')),id=b.calendarId,c=p.calendars.find(c=>c.id===id),initial=snapshotProduction(p),originalDates=dates(p),originalOrder=order(p);
+ check('no-op binariamente identico',bytesEqual(bytes,serializeMsd(p)));
+ boardWithCalendar(p,b.name,p.calendars.find(x=>x.id!==id)?.id);calendarDate(c,'2030-01-01');check('consultazione senza mutazione',bytesEqual(bytes,serializeMsd(p)));
+ editCalendar(p,{calendarId:id,weekday:'Mon',off:c.daysOff.Mon!=='1'});
+ check('regole separate dalle date',equal(dates(p),originalDates));
+ const ruleBytes=serializeMsd(p),ruleOpen=await parseMsd(ruleBytes,'rules.msd');
+ check('regole e date conservate dopo riapertura',ruleOpen.calendars.find(c=>c.id===id).daysOff.Mon===c.daysOff.Mon&&equal(dates(ruleOpen),originalDates));
+ check('date inferite conservate con estensione esplicita',ruleOpen.boards.find(x=>x.name===b.name).scheduledGroups.filter(g=>g.kind==='ScheduleDay').every(g=>g.dateLocked&&g.dateOrigin==='inferred'));
+ const iso=c.scheduleDates.ProductionStartDate.iso;
+ for(const type of ['workday','offday','holiday','travel']){
+  editCalendar(p,{calendarId:id,date:iso,type});const opened=await parseMsd(serializeMsd(p),'exception.msd'),status=calendarDate(opened.calendars.find(c=>c.id===id),iso);
+  check(`eccezione ${type} salvata`,status.working===(type==='workday')&&status.specialDay.attributes[{workday:'ExceptionWorkday',offday:'Off',holiday:'Holiday',travel:'CompanyTravel'}[type]]==='1');
+ }
+ editCalendar(p,{calendarId:id,date:iso,type:null});check('rimozione eccezione salvata',!(await parseMsd(serializeMsd(p))).calendars.find(c=>c.id===id).specialDays.some(s=>s.date===iso));
+ editCalendar(p,{calendarId:id,weekday:'Fri',off:true});editCalendar(p,{calendarId:id,startDate:'2008-06-20'});
+ const rules=snapshotProduction(p),preview=previewReschedule(p,id);check('anteprima esplicita include tutti i piani condivisi',preview.length===p.boards.filter(b=>b.calendarId===id).length);
+ rescheduleCalendar(p,id,preview);check('ordine strip e confini preservati',equal(order(p),originalOrder));check('primo giorno ancora anche se non lavorativo',preview.filter(x=>x.changes.length).every(x=>x.changes[0]?.to==='2008-06-20'&&x.anchorConflict));
+ const replan=snapshotProduction(p),saved=serializeMsd(p),reopened=await parseMsd(saved,'saved.msd');
+ check('date ripianificate persistenti',equal(dates(reopened),dates(p)));check('inizio riprese persistente',reopened.calendars.find(c=>c.id===id).scheduleDates.ProductionStartDate.iso==='2008-06-20');
+ check('save dopo riapertura no-op identico',bytesEqual(saved,serializeMsd(reopened)));
+ const sectionBytes=(p,bytes,section)=>new Uint8Array(bytes).slice(section.offset,section.offset+section.length);
+ for(const section of p.sourceDocument.sections.filter(s=>!['StripBoardMgr','CalendarMgr'].includes(s.root))){const after=reopened.sourceDocument.sections.find(s=>s.root===section.root);check(`sezione ${section.root} identica`,bytesEqual(sectionBytes(p,bytes,section),sectionBytes(reopened,saved,after)))}
+ check('eventi e red flags fissi',equal(p.redFlags.map(f=>[f.id,f.startDate,f.endDate]),reopened.redFlags.map(f=>[f.id,f.startDate,f.endDate])));
+ restoreProduction(p,rules);check('Undo ripianificazione ripristina date',equal(dates(p),originalDates));restoreProduction(p,replan);check('Redo ripristina date ripianificate',equal(dates(p),dates(reopened)));
+ restoreProduction(p,initial);check('Undo completo restituisce byte originali',bytesEqual(bytes,serializeMsd(p)));
+ }catch(error){failures++;lines.push(`✗ ${error.stack}`)}
+ document.querySelector('#result').textContent=lines.join('\n')+`\n${failures?'ERRORI: '+failures:'TUTTI I CONTROLLI SUPERATI'}`;document.body.dataset.passed=String(!failures);
+}
+document.querySelector('#file').addEventListener('change',async e=>{const file=e.target.files[0];if(file){delete document.body.dataset.passed;await run(await file.arrayBuffer(),file.name)}});
+await run(await (await fetch('../samples/Wonderful%20Life%20Demo.msd')).arrayBuffer(),'MSD 06 reale incluso');
+</script></body></html>

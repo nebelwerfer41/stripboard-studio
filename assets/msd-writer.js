@@ -1,5 +1,6 @@
-/* Conservative EPSF/MSD 6 writer: replace only StripBoardMgr, copy all other sections. */
+/* Conservative EPSF/MSD writer: patch StripBoardMgr/CalendarMgr only when changed. */
 import {boardSignature} from './scheduling.js';
+import {calendarsSignature,FLASH_DATE_NS,CALENDAR_DAYS} from './calendar-commands.js';
 
 const encoder=new TextEncoder();
 const child=(node,name)=>[...(node?.children||[])].find(item=>item.tagName===name)||null;
@@ -22,10 +23,10 @@ function concat(chunks){
   let offset=0;for(const chunk of chunks){result.set(chunk,offset);offset+=chunk.length}return result;
 }
 
-function parseSource(xml){
+function parseSource(xml,rootName='StripBoardMgr'){
   if(/<!\s*(DOCTYPE|ENTITY)\b/i.test(xml))throw Error('DTD/entities non supportate');
   const doc=new DOMParser().parseFromString(xml,'application/xml');
-  if(doc.querySelector('parsererror')||doc.documentElement.tagName!=='StripBoardMgr')throw Error('StripBoardMgr XML non valido');
+  if(doc.querySelector('parsererror')||doc.documentElement.tagName!==rootName)throw Error(`${rootName} XML non valido`);
   return doc;
 }
 
@@ -57,6 +58,13 @@ function patchGroups(node,board,original){
       if(sourceGroup)usedGroups.add(sourceGroup);
       const target=node.ownerDocument.createElement(group.kind);
       if(sourceGroup)for(const attribute of sourceGroup.attributes)target.setAttribute(attribute.name,attribute.value);
+      if(group.kind==='ScheduleDay'&&group.dateLocked){
+        target.setAttributeNS('http://www.w3.org/2000/xmlns/','xmlns:flash',FLASH_DATE_NS);
+        target.setAttributeNS(FLASH_DATE_NS,'flash:date',group.date??(group.dateOrigin==='unresolved'?group.rawCalendarDate:'')??'');
+        target.setAttributeNS(FLASH_DATE_NS,'flash:dateOrigin',group.dateOrigin||'inferred');
+      }else{
+        target.removeAttributeNS(FLASH_DATE_NS,'date');target.removeAttributeNS(FLASH_DATE_NS,'dateOrigin');
+      }
       const desired=group.strips.map(strip=>{
         const key=strip.sourceKey;
         if(!sources.has(key)||used.has(key))throw Error('Riferimento strip mancante o ripetuto');
@@ -113,20 +121,57 @@ function patchManager(project){
   return encoder.encode(prefix+new XMLSerializer().serializeToString(root));
 }
 
+function patchCalendars(project){
+  const xml=project.sourceXmlSections.CalendarMgr,doc=parseSource(xml,'CalendarMgr');
+  const list=child(doc.documentElement,'Calendars');
+  const format=iso=>{const [y,m,d]=iso.split('-');return `${m}/${d}/${y}`};
+  const ensure=(node,name)=>{let target=child(node,name);if(!target){target=doc.createElement(name);node.appendChild(target)}return target};
+  for(const c of project.calendars){
+    if(calendarsSignature({calendars:[c]})===project.sourceDocument.calendarSignatures.get(c.name))continue;
+    const node=[...list.children].find(n=>n.getAttribute('Name')===c.sourceRef.name);
+    if(!node)throw Error('Origine calendario MSD non trovata');
+    const days=ensure(node,'DaysOff');
+    for(const key of CALENDAR_DAYS)if(c.daysOff[key]!== (days.hasAttribute(key)?days.getAttribute(key):undefined)){
+      if(!['0','1'].includes(c.daysOff[key]))throw Error('Pattern MSD non risolto');days.setAttribute(key,c.daysOff[key]);
+    }
+    const start=c.scheduleDates.ProductionStartDate;
+    if(start?.origin==='edited'){
+      const dates=ensure(node,'ScheduleDates');let target=[...dates.children].find(n=>n.getAttribute('Name')==='ProductionStartDate');
+      if(!target){target=doc.createElement('ScheduleDate');target.setAttribute('Name','ProductionStartDate');dates.appendChild(target)}
+      target.setAttribute('Date',format(start.iso));
+    }
+    const specials=ensure(node,'SpecialDays'),original=[...specials.children].filter(n=>n.tagName==='SpecialDay');
+    const existing=new Map(original.map(n=>[n.getAttribute('Date'),n]));
+    const wanted=new Set();
+    for(const s of c.specialDays){
+      const key=existing.has(s.rawDate)?s.rawDate:s.date?format(s.date):s.rawDate;
+      let target=existing.get(key);
+      if(!target){target=doc.createElement('SpecialDay');specials.appendChild(target)}
+      wanted.add(target);
+      for(const [key,value] of Object.entries(s.attributes))target.setAttribute(key,value);
+      target.setAttribute('Date',key);
+    }
+    for(const target of original)if(!wanted.has(target))target.remove();
+  }
+  const prefix=/^(<\?xml[^>]*\?>\s*)/.exec(xml)?.[0]||'';
+  return encoder.encode(prefix+new XMLSerializer().serializeToString(doc.documentElement));
+}
 export function serializeMsd(project){
   const source=project?.sourceDocument;
   if(!source?.bytes||!source?.sections)throw Error('Documento MSD originale non disponibile');
-  if(boardSignature(project)===source.boardSignature)return source.bytes.slice(0);
+  const boardChanged=boardSignature(project)!==source.boardSignature,calendarChanged=calendarsSignature(project)!==source.calendarsSignature;
+  if(!boardChanged&&!calendarChanged)return source.bytes.slice(0);
   const oldBytes=new Uint8Array(source.bytes),oldView=new DataView(source.bytes);
-  const targetSection=source.sections.find(section=>section.root==='StripBoardMgr');
-  if(!targetSection)throw Error('Sezione stripboard assente');
-  const xmlBytes=patchManager(project),compressed=storedDeflate(xmlBytes);
-  const changed=concat([oldBytes.slice(targetSection.offset,targetSection.offset+68),compressed]);
+  const replacements=new Map();
+  for(const [root,changed,patch] of [['StripBoardMgr',boardChanged,patchManager],['CalendarMgr',calendarChanged,patchCalendars]])if(changed){
+    const section=source.sections.find(s=>s.root===root);if(!section)throw Error(`Sezione ${root} assente`);
+    replacements.set(section,concat([oldBytes.slice(section.offset,section.offset+68),storedDeflate(patch(project))]));
+  }
   const body=[];let offset=716;
   const map=oldBytes.slice(oldView.getUint32(260));
   const mapView=new DataView(map.buffer);
   for(const section of source.sections){
-    const block=section===targetSection?changed:oldBytes.slice(section.offset,section.offset+section.length);
+    const block=replacements.get(section)||oldBytes.slice(section.offset,section.offset+section.length);
     body.push(block);mapView.setUint32(section.index*332+68,offset);mapView.setUint32(section.index*332+72,block.length);
     offset+=block.length;
   }

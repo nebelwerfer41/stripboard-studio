@@ -15,7 +15,7 @@
       <div class="side-label navigation-label">NAVIGAZIONE</div>
       <button class="nav active" id="boardNav" type="button"><span>▤</span> Stripboard <em id="boardCount">—</em></button>
       <button class="nav" id="reportNav" type="button"><span>▧</span> Report <em id="reportCount">—</em></button>
-      <button class="nav" id="calendarNav" type="button"><span>▦</span> Calendari <em id="calendarCount">—</em></button>
+      <button class="nav" id="calendarNav" type="button"><span>▦</span> Calendar <em id="calendarCount">—</em></button>
       <button class="nav" id="redFlagNav" type="button"><span>⚑</span> Red Flag Entry <em id="redFlagCount">—</em></button>
       <button class="nav" id="dataNav" type="button"><span>≡</span> Dettagli progetto ed elementi</button>
       <div class="side-bottom">
@@ -26,7 +26,7 @@
     <main class="main">
       <header class="topbar">
         <div class="breadcrumb">WORKSPACE <span>/</span> <b id="crumb">STRIPBOARD</b></div>
-        <div class="top-actions"><span class="version-badge">v1.7</span><span class="local-badge">● &nbsp; Locale</span><label class="upload"><input id="fileInput" type="file" accept=".msd,.mmsx">＋ &nbsp; Importa .msd / .mmsx</label></div>
+        <div class="top-actions"><span class="version-badge">v1.8</span><span class="local-badge">● &nbsp; Locale</span><label class="upload"><input id="fileInput" type="file" accept=".msd,.mmsx">＋ &nbsp; Importa .msd / .mmsx</label></div>
       </header>
       <div class="page">
         <div class="eyebrow">MOVIE MAGIC SCHEDULING · STRIPBOARD STUDIO</div>
@@ -36,7 +36,7 @@
           <div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div>
           <div class="control" id="boardControl"><label for="boardSelect">PIANO DI LAVORAZIONE</label><div class="board-choice"><select id="boardSelect"></select><button id="newBoardButton" type="button" title="Crea un nuovo piano da quello corrente">＋</button></div></div>
           <div class="control" id="layoutControl"><label for="layoutSelect" id="layoutLabel">LAYOUT STRIPBOARD</label><select id="layoutSelect"></select></div>
-          <div class="control" id="calendarControl"><label for="calendarSelect">CALENDARIO DEL PIANO</label><select id="calendarSelect"></select></div>
+          <div class="control" id="calendarControl"><label for="calendarSelect">CALENDARIO CONSULTATO</label><select id="calendarSelect"></select></div>
         </section>
         <div class="options-row">
           <section class="print-options" id="printOptions" aria-label="Opzioni di visualizzazione e stampa stripboard">
@@ -54,18 +54,24 @@
         <section class="stats" id="stats" aria-label="Riepilogo del piano"></section>
         <section class="content-panel">
           <div class="panel-header"><div><div class="section-kicker" id="sectionKicker">PIANO DI LAVORAZIONE</div><h2 id="viewTitle">Stripboard</h2><p id="viewSubtitle"></p></div><div class="panel-tools" id="panelTools"><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="Cerca scena, set, testo…"></label><button id="undoMoveButton" class="subtle-button" type="button" disabled title="Annulla l’ultimo spostamento">↶ Annulla</button><button id="redoMoveButton" class="subtle-button" type="button" disabled title="Ripristina l’ultimo spostamento annullato">↷ Ripeti</button><div class="subboard-picker"><button id="toggleUnscheduled" class="subtle-button" type="button" aria-expanded="false" aria-controls="subboardMenu">Sub-board ▾</button><div id="subboardMenu" class="subboard-menu" role="group" aria-label="Sub-board da mostrare" hidden></div></div></div></div>
+          <div class="workspace-toolbar" id="workspaceToolbar"><button type="button" id="previewButton" aria-expanded="false">Anteprima Spoglio</button><label>Affiancamento <select id="workspaceLayout"><option value="single">Vista singola</option><option value="board-breakdown">Stripboard + Spoglio</option><option value="calendar-breakdown">Calendar + Spoglio</option><option value="calendar-board">Calendar + Stripboard</option></select></label><span id="splitHint"></span></div>
+          <div id="workspaceViews" class="workspace-views">
           <div id="boardView" class="view"></div>
           <div id="reportView" class="view" hidden></div>
           <div id="calendarView" class="view" hidden></div>
           <div id="redFlagView" class="view" hidden></div>
           <div id="dataView" class="view" hidden></div>
+          <div id="workspaceSplitter" class="workspace-splitter" role="separator" aria-label="Ridimensiona pannelli" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="55" tabindex="0" hidden></div>
+          <aside id="breakdownPreview" class="view breakdown-preview" aria-label="Anteprima Spoglio" hidden></aside>
+          </div>
         </section>
-        <footer>Stripboard Studio v1.7 <span>·</span> Crediti: <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41 su GitHub</a></footer>
+        <footer>Stripboard Studio v1.8 <span>·</span> Crediti: <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41 su GitHub</a></footer>
       </div>
     </main>
   </div>
   <dialog id="moveDialog" aria-labelledby="moveTitle"><form method="dialog" id="moveForm"><h2 id="moveTitle">Sposta strip</h2><p id="moveSource"></p><label for="moveGroup">Destinazione</label><select id="moveGroup"></select><label for="movePosition">Posizione</label><select id="movePosition"></select><div class="dialog-actions"><button value="cancel" type="submit">Annulla</button><button value="move" type="submit">Sposta</button></div></form></dialog>
   <dialog id="newBoardDialog" aria-labelledby="newBoardTitle"><form method="dialog" id="newBoardForm"><h2 id="newBoardTitle">Nuova stripboard</h2><p>Il nuovo piano copia l’ordine corrente e usa gli stessi riferimenti alle scene.</p><label for="newBoardName">Nome del piano</label><input id="newBoardName" type="text" maxlength="128" required><div class="dialog-actions"><button value="cancel" type="submit">Annulla</button><button value="create" type="submit">Crea piano</button></div></form></dialog>
+  <dialog id="rescheduleDialog" aria-labelledby="rescheduleTitle"><form method="dialog" id="rescheduleForm"><h2 id="rescheduleTitle">Ripianifica il calendario</h2><div id="rescheduleEffects"></div><p>Il primo giorno resta l’ancora. Ordine delle strip, confini e numeri di giornata sono preservati. Eventi e Red Flags restano alle date civili fisse; i conflitti saranno aggiornati.</p><div class="dialog-actions"><button value="cancel" type="submit">Annulla</button><button value="apply" type="submit">Applica ripianificazione</button></div></form></dialog>
   <script type="module" src="assets/app.js"></script>
 </body>
 </html>

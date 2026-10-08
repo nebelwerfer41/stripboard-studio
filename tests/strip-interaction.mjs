@@ -63,3 +63,10 @@ test('Ctrl/Command plus Shift adds a range while a missing or hidden anchor fall
   assert.equal(model.selectionAnchorId,'106');
   clearStripState(model);range(model,'107');assert.deepEqual([...model.selectedStripIds],['107']);
 });
+
+test('active scene identity is distinct from occurrence and follows multi-selection fallback',()=>{
+ const model=state(),ids={a:'scene-A',b:'scene-A',c:'scene-B'},choose=(key,toggle=false)=>selectStripState(model,key,{toggle,isSceneKey:k=>Boolean(ids[k]),sceneIdForKey:k=>ids[k]});
+ choose('a');assert.equal(model.activeSceneId,'scene-A');choose('b',true);assert.equal(model.activeStripId,'b');assert.equal(model.activeSceneId,'scene-A');
+ choose('c',true);assert.equal(model.activeSceneId,'scene-B');choose('c',true);assert.equal(model.activeSceneId,'scene-A');
+ clearStripState(model);assert.equal(model.activeSceneId,null);
+});

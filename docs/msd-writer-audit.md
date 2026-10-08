@@ -1,3 +1,5 @@
+> **v1.8 — 8 ottobre 2026:** Calendar ora consente editing delle regole e ripianificazione esplicita con Undo/Redo e salvataggio. Le restrizioni di sola consultazione riportate sotto descrivono la fase precedente. [Estensioni dei writer, Anteprima Spoglio, prove reali/sintetiche e limiti](calendar-workspace.md).
+
 # Audit MSD 6 per l'editing strutturale
 
 Audit effettuato sui due MSD 6 disponibili (`samples/Wonderful Life Demo.msd` e `../Wonderful Life Demo esempio.msd`). La compatibilità con altre versioni e l'apertura in Movie Magic Scheduling restano da verificare su un'installazione del programma.

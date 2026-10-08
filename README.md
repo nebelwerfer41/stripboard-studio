@@ -2,11 +2,11 @@
 
 > **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
-> **Flash common model:** calendars, calendar events, red flag intervals, production data and per-sheet quantities are now available for read-only inspection. Imported projects save in their original format; native MMSX dates are never recalculated on import or calendar selection. MMSX boards retain their sub-board hierarchy: use the Sub-board menu to show normal segments and the shared Boneyard together. Segment labels and spacing appear only in the editing UI. See [the common contract and save strategy](docs/flash-common-model.md).
+> **Flash common model:** Calendar now combines the monthly plan and calendar rule editing; Anteprima Spoglio follows the active scene. Events, red flags, production data and per-sheet quantities remain inspectable. Imported projects save in their original format; native MMSX dates are never recalculated on import or calendar selection. MMSX boards retain their sub-board hierarchy: use the Sub-board menu to show normal segments and the shared Boneyard together. Segment labels and spacing appear only in the editing UI. See [the common contract and save strategy](docs/flash-common-model.md).
 
-# Stripboard Studio v1.7
+# Stripboard Studio v1.8
 
-Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). The Calendars and Red Flag Entry views display these records without changing the file.
+Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
 The editor’s format audit and conservative writing strategy are described in [docs/msd-writer-audit.md](docs/msd-writer-audit.md).
 
@@ -40,7 +40,8 @@ Control names below are given in English; some labels in the application are cur
 - **＋** beside the schedule creates a stripboard by copying the current order. The new schedule uses the same scene references and can be edited independently. Its unique name provides the identity expected by the observed format. The selector changes the current schedule and the exported `ActiveStripBoard` value.
 - **Save .msd** creates a new `-edited.msd` file. The unsaved-changes indicator tracks document revisions; edits remain available if saving fails. If the browser does not provide a file picker with a confirmed save result, a download starts and the state becomes saved when the browser accepts the download.
 - The calendar selector beside the layout displays the same schedule with dates inferred from the selected calendar, without changing the file’s `CalendarName` reference.
-- The **Calendars** view lists MSD calendars, non-working days, production dates, exceptions, and a monthly grid containing the schedule’s shooting days.
+- **Calendar** combines a dense monthly plan with recurring days off, per-date exceptions, production start and explicit rescheduling. Scene strips and banners remain in plan order; rules and rescheduling have separate Undo/Redo transactions.
+- **Anteprima Spoglio** follows the active scene from Calendar or Stripboard, including template categories and elements shown by ID (when available) and name. Quantities and properties remain available in project details. Optional resizable pairs are available only above 1200 CSS px; smaller viewports use a drawer.
 - The **Red Flag Entry** view includes filters for category, element, type, and date range, along with a monthly grid, list, and flag details. Types come from `RedFlagMgr`; managing and editing flags remain future work.
 - Display scenes, banners, days, dates, and the unscheduled queue, with search and controls for hiding banners and day breaks.
 - Banners and day breaks are drawn as strips with the same width as scene strips.
@@ -51,11 +52,11 @@ Control names below are given in English; some labels in the application are cur
 - Print stripboards with paper size, orientation, margins, and scaling controlled by the browser’s print dialog. The application retains options for the header and starting each day on a new page.
 - Import other local `.msd` files compatible with the sample format.
 
-Day dates are derived from calendars by the included parser and marked as estimates. Selecting another calendar changes only the reading projection: strips, scenes, and schedule order remain intact. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
+Day dates are derived from calendars by the included parser and marked as estimates. In Stripboard, selecting another calendar changes only the reading projection; Calendar shows the dates actually associated with the selected calendar: strips, scenes, and schedule order remain intact. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
 
 ## MSD writer and integrity
 
-Saving without edits returns the original bytes. After an edit, the writer rebuilds only the `StripBoardMgr` XML section using the original strip nodes, then updates its offset and length in the EPSF section map. The sample’s other twelve sections are copied byte for byte, including Calendars, Red Flags, breakdowns, templates, reports, layouts, metadata, and uninterpreted properties. The modified section uses uncompressed raw DEFLATE blocks, so the saved file may be larger, while the other sections remain unchanged. The writer rejects an edit if an original strip would be lost or duplicated.
+Saving without edits returns the original bytes. After a strip edit, the writer rebuilds only `StripBoardMgr` using original nodes. Calendar edits additionally patch `CalendarMgr`; the EPSF offsets and lengths are updated. Other sections remain byte-identical. Studio namespace attributes preserve MSD dates until explicit rescheduling, because MSD has no native per-day dates. These dates round-trip in Studio; preservation in Movie Magic has not been verified. See [the calendar writer extension](docs/calendar-workspace.md). The modified section uses uncompressed raw DEFLATE blocks, so the saved file may be larger, while the other sections remain unchanged. The writer rejects an edit if an original strip would be lost or duplicated.
 
 In the sample, strip order follows the children of `ScheduleDay`, `RemainingScheduledStrips`, and `RemainingUnscheduledStrips`/`UnscheduledDay`. Day breaks are generated by the layout and have no record of their own. Moving them redistributes strips between `ScheduleDay` and `UnscheduledDay` groups, preserving attributes and identity, including transfers into and out of the Boneyard. Schedule order and `SortOrder` are separate: they differ in the sample, and Movie Magic Scheduling 6.02.413 displayed physical schedule order in its menu. The samples contain no numeric schedule ID, checksum, or direct reference from Red Flags to schedules. The writer does not assign new scene or schedule IDs.
 

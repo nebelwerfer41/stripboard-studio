@@ -35,7 +35,7 @@ Le date sono civili ISO `YYYY-MM-DD`, senza conversioni di fuso. Gli intervalli 
 ## Date e calendari
 
 - MMSX: date delle giornate native (`stored`). Selezionare un calendario non genera altre date. Un'incoerenza rispetto alle regole è segnalata nella consultazione.
-- MSD: date di ripresa inferite (`inferred`) con l'algoritmo esistente. Il selettore del calendario conserva la proiezione di lettura già disponibile, senza modificare `CalendarName` esportato.
+- MSD: date di ripresa inferite (`inferred`) con l'algoritmo esistente. La Stripboard conserva la proiezione di lettura legacy, senza modificare `CalendarName` esportato. Calendar visualizza i gruppi effettivamente associati al calendario consultato; non proietta giornate di calendari diversi.
 - Le regole MMSX usano bit lunedì=0 … domenica=6. `offday`, `travel`, `holiday`, `workday` hanno traduzione esplicita. Il lavorativo forzato prevale sul riposo settimanale. Combinazioni MSD conflittuali restano non risolte.
 - Start riprese, prep, end e wrap sono informazioni diverse. Non vengono sintetizzati prep/end/wrap MMSX né dedotti dall'ultima giornata. Senza prep nativo, una data prima di `prodStart` non è classificata automaticamente fuori attività.
 - Le date prep/end/wrap lette da MSD sono valori presenti in quell'MSD; la sola importazione non può dimostrare se un altro programma li abbia derivati. La coppia analizzata dimostra tale derivazione per il campione, senza legittimare una regola universale per qualsiasi MSD.
@@ -44,13 +44,13 @@ Le date sono civili ISO `YYYY-MM-DD`, senza conversioni di fuso. Gli intervalli 
 
 **Salva** mantiene il formato importato e la sua variante: MSD 06 o variante osservata 04/MMB10/11 sezioni; MMSX 3, 5 o 3 ibrido. Senza modifiche restituisce i byte originali. Dopo modifiche strip, i writer aggiornano solo la struttura già autorizzata e preservano il resto. Per MMSX, il salvataggio ordinario conserva identità e metadati della radice; la precedente semantica di copia con nuova identità rimane un'opzione esplicita del serializer (`copy:true`), non il comportamento del pulsante Salva.
 
-Il writer MSD conserva tutte le sezioni diverse da `StripBoardMgr` byte per byte. MMSX conserva semanticamente JSON e numeri opachi; una nuova compressione/cifratura dopo un edit non promette identità binaria. I writer rifiutano perdita o duplicazione delle strip come già avviene nell'editor.
+Il writer MSD conserva tutte le sezioni diverse da `StripBoardMgr` byte per byte per le operazioni strutturali. Dalla v1.8 un edit calendario può aggiornare anche `CalendarMgr`; le sezioni estranee restano identiche. Le date MSD conservate fino alla ripianificazione usano un namespace Studio esplicito, non date native Movie Magic ([dettagli e limite di interoperabilità](calendar-workspace.md)). MMSX conserva semanticamente JSON e numeri opachi; una nuova compressione/cifratura dopo un edit non promette identità binaria. I writer rifiutano perdita o duplicazione delle strip come già avviene nell'editor.
 
 Il futuro formato nativo Flash avrà schema versionato, ID propri e capacità di editing indipendenti dagli adattatori. Estensione e contenitore non sono decisi in questa fase. La conversione MSD↔MMSX o verso Flash sarà un comando distinto con riepilogo delle perdite prima dell'esportazione. Non viene implementata qui: eventi multi-elemento, red flag generiche/intervalli, quantità, scope, colori e calendari non usati dimostrano che non è un semplice cambio di estensione.
 
-## Editing calendario futuro: decisione confermata dall'utente
+## Editing calendario: politica e implementazione v1.8
 
-Il primo giorno di riprese sarà l'ancora. Uno specifico comando di ripianificazione applicherà settimana ed eccezioni alle giornate successive mantenendo ordine delle strip e confini delle giornate. La transazione dovrà includere Undo/Redo, validazione e aggiornamento mirato nel formato sorgente. Nessun ricalcolo viene introdotto all'importazione.
+Il primo giorno di riprese sarà l'ancora. Uno specifico comando di ripianificazione applicherà settimana ed eccezioni alle giornate successive mantenendo ordine delle strip e confini delle giornate. La transazione include Undo/Redo, validazione e aggiornamento mirato nel formato sorgente. La v1.8 separa `editCalendar` da `previewReschedule` / `rescheduleCalendar`; [implementazione e verifica](calendar-workspace.md). Nessun ricalcolo viene introdotto all'importazione.
 
 **Eventi e indisponibilità restano alle date civili fisse, con conflitti segnalati.** Questa politica è stata confermata il 7 ottobre 2026. Non si spostano automaticamente insieme alle riprese. La prima fase ne consente solo la consultazione: nessun comando di slittamento o editing dei nuovi dati.
 
@@ -84,3 +84,7 @@ Le posizioni di editing includono il piano/segmento proprietario. Trascinamento 
 Verificato su `PURGED.mmsx`: una board `Default`, segmenti `Default`, `Boneyard`, `Sub-board 2`, quattro schede e quattro strip scena distinte nell’unione dei segmenti. Nessun dato del campione privato viene incluso nel repository. Test riproducibile: `node tests/board-segments.mjs '/percorso/PURGED.mmsx'`. La suite senza argomenti usa solo dati sintetici e copre anche MMSX 3 e 3 ibrido. Nel browser sono verificati visibilità, stampa, trascinamento diretto, F2, Undo/Redo e il ciclo completo salva→riapri. Rimane da verificare la riapertura di questi export in Movie Magic.
 
 Nella versione 1.7, il Boneyard è presentato in coda, senza modificare il suo `sortOrder` originale. Il menu è contenuto nel pannello anche su viewport stretti. La checkbox «Bianco e nero» è affiancata alle opzioni di visualizzazione e stampa: quando attiva, scene, banner e fine giornata usano fondo bianco e testo nero; disattivandola si ripristinano i colori del file, senza modificare il documento. Badge e azioni della barra superiore possono disporsi su righe separate su schermi piccoli.
+
+## Fase Calendar e Spoglio, 8 ottobre 2026
+
+La v1.8 abilita `editCalendars` negli adattatori MSD/MMSX. La consultazione non modifica neppure `ActiveStripBoard`. La selezione condivisa include `activeSceneId`, `activeStripId` e multiselezione di source keys. Categorie e quantità alimentano la preview senza schema di categorie hardcoded. Gli affiancamenti sono espliciti oltre 1200 CSS px; sotto o alla soglia lo spoglio è un drawer. [Componenti, comandi, writer, test e limiti](calendar-workspace.md). Le restrizioni di sola consultazione delle sezioni storiche si riferiscono alla fase precedente.

@@ -140,7 +140,7 @@ export function moveDayBreak(project,{boardName,from,to}){
 export function snapshotBoardOrder(board){
   return ['scheduledGroups','unscheduledGroups'].map(container=>({container,
     groups:board[container].slice(),strips:board[container].map(group=>group.strips.slice()),
-    dayMeta:board[container].map(group=>({kind:group.kind,mmsxSegment:group.mmsxSegment,calendarId:group.calendarId,ordinal:group.ordinal,shootingDayNumber:group.shootingDayNumber,date:group.date}))}));
+    dayMeta:board[container].map(group=>({kind:group.kind,mmsxSegment:group.mmsxSegment,calendarId:group.calendarId,ordinal:group.ordinal,shootingDayNumber:group.shootingDayNumber,date:group.date,dateOrigin:group.dateOrigin,dateLocked:group.dateLocked}))}));
 }
 export function restoreBoardOrder(board,snapshot){
   for(const {container,groups,strips,dayMeta} of snapshot){
@@ -198,7 +198,7 @@ export function sourceContainer(position){return CONTAINERS[position.container]|
 export function boardSignature(project){
   return JSON.stringify({activeBoard:project.activeBoard,boards:project.boards.map(board=>({
     name:board.name,sourceBoardName:board.sourceBoardName,description:board.description,attributes:board.attributes,
-    scheduledGroups:board.scheduledGroups.map(group=>[group.kind,group.sourceIndex,group.attributes,group.strips.map(strip=>strip.sourceKey)]),
+    scheduledGroups:board.scheduledGroups.map(group=>[group.kind,group.sourceIndex,group.attributes,group.date,group.dateOrigin,group.dateLocked,group.strips.map(strip=>strip.sourceKey)]),
     unscheduledGroups:board.unscheduledGroups.map(group=>[group.kind,group.sourceIndex,group.attributes,group.strips.map(strip=>strip.sourceKey)])
   }))});
 }

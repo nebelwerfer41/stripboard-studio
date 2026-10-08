@@ -1,3 +1,5 @@
+> **v1.8 — 8 ottobre 2026:** Calendar ora consente editing delle regole e ripianificazione esplicita con Undo/Redo e salvataggio. Le restrizioni di sola consultazione riportate sotto descrivono la fase precedente. [Estensioni dei writer, Anteprima Spoglio, prove reali/sintetiche e limiti](calendar-workspace.md).
+
 # Supporto MMSX
 
 L’integrazione del 6 ottobre 2026 aggiunge lettura e scrittura locale dei contenitori MMS2/MMSX con `dataFormat: 3` e `dataFormat: 5`. Il formato viene riconosciuto dalla firma del contenuto. I file MSD continuano a usare il parser e il writer originali.

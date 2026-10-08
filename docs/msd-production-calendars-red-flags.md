@@ -1,3 +1,5 @@
+> **v1.8 — 8 ottobre 2026:** Calendar ora consente editing delle regole e ripianificazione esplicita con Undo/Redo e salvataggio. Le restrizioni di sola consultazione riportate sotto descrivono la fase precedente. [Estensioni dei writer, Anteprima Spoglio, prove reali/sintetiche e limiti](calendar-workspace.md).
+
 > Aggiornamento del 7 ottobre 2026: queste note descrivono l’importazione MSD iniziale. Il [contratto comune Flash](flash-common-model.md) amplia i selettori con ID, intervalli e riferimenti alle giornate ricostruiti dai gruppi correnti. Gli eventi MMSX restano separati dalle Red Flags. La variante osservata MSD 04/MMB10 con 11 sezioni è ora accettata mantenendo i controlli del contenitore.
 
 # MSD: Production Calendars e Red Flags

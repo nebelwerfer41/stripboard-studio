@@ -30,6 +30,8 @@ export function restoreMmsxV3(source,updated){
    const list=originalRecords.get(strip.id)||[];list.push(strip);originalRecords.set(strip.id,list);
   }
   for(const [sid,segment] of segments(board)){
+   const updatedSegment=updated.contents.stripboard[bid].segmentMap[sid];
+   if(stringifyExact(segment.calendar)!==stringifyExact(updatedSegment.calendar))segment.calendar=cloneExact(updatedSegment.calendar);
    const before=source.root.contents.stripboard[bid].segmentMap[sid].stripMap;
    const after=updated.contents.stripboard[bid].segmentMap[sid].stripMap;
    if(stringifyExact(before)===stringifyExact(after))continue;

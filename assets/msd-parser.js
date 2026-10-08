@@ -1,7 +1,8 @@
 import {completeProjectModel} from './project-model.js';
 /* Movie Magic Scheduling 6 importer. Keeps the original EPSF bytes for conservative writes. */
-import {calendarDate,calendarDatesBetween,shootingDatesForCalendar} from './production-data.js';
+import {calendarDate,calendarDatesBetween,shootingDatesForCalendar,validDate} from './production-data.js';
 import {boardSignature} from './scheduling.js';
+import {calendarsSignature,FLASH_DATE_NS} from './calendar-commands.js';
 const encoder=new TextEncoder();
 const decoder=new TextDecoder('utf-8',{fatal:true});
 const FILE_MAGIC='/********* EPSF FILE ********/ ';
@@ -130,7 +131,7 @@ function compactStrip(node){
   const strip={kind,bdsId:kind==='scene'?attr(node,'BDSID'):null,text:kind==='banner'?attr(node,'Text'):null};
   if(kind==='banner'){
     const attributes=attrs(node);
-    strip.attributes=attributes;strip.style={fontColor:rgbColor(attributes.FontColor),fontSize:attributes.FontSize??null,
+    strip.attributes=attributes;strip.estimateTimeA=attributes.EstimateTimeA??null;strip.style={fontColor:rgbColor(attributes.FontColor),fontSize:attributes.FontSize??null,
       fontStyle:attributes.FontStyle??null,fontName:attributes.FontName??null,customized:attributes.IsCustomized==='1'};
   }
   return strip;
@@ -163,7 +164,7 @@ function buildProject(container){
     if(!roots[name])throw Error(`Missing required manager section: ${name}`);
   }
   const issues={};
-  const categorySettings=paths(roots.CategoryMgr,['CategoryList','Category']).map(x=>({name:attr(x,'Name'),attributes:attrs(x)}));
+  const categorySettings=paths(roots.CategoryMgr,['CategoryList','Category']).map((x,i)=>({id:`category:${i}`,name:attr(x,'Name'),attributes:attrs(x),color:rgbColor(attr(x,'Color'))})).sort((a,b)=>(Number(a.attributes.SortOrder)||0)-(Number(b.attributes.SortOrder)||0));
   const categories=categorySettings.map(x=>x.name);
   const categorySet=new Set(categories);
   const elements=paths(roots.ElementMgr,['Elements','Element']).map(node=>{
@@ -205,14 +206,18 @@ function buildProject(container){
     const groups=(containerName)=>{
       const parent=path(node,[containerName]);if(!parent){issue(issues,'MISSING_STRIP_CONTAINER');return []}
       return [...parent.children].map((group,groupIndex)=>{
-        const kind=group.tagName,date=kind==='ScheduleDay'&&containerName==='ScheduledStrips'?dates[ordinal++]:null;
+        const kind=group.tagName,inferred=kind==='ScheduleDay'&&containerName==='ScheduledStrips'?dates[ordinal++]:null;
+        const locked=kind==='ScheduleDay'&&group.hasAttributeNS(FLASH_DATE_NS,'date');
+        const rawCalendarDate=locked?group.getAttributeNS(FLASH_DATE_NS,'date'):null;
+        const date=locked?(validDate(rawCalendarDate)?rawCalendarDate:null):inferred;
+        if(locked&&rawCalendarDate&&!validDate(rawCalendarDate))issue(issues,'INVALID_STUDIO_DATE');
         if(!['ScheduleDay','RemainingScheduledStrips','UnscheduledDay','RemainingUnscheduledStrips'].includes(kind))issue(issues,'UNKNOWN_STRIP_GROUP');
         const strips=[...group.children].map((stripNode,stripIndex)=>({
           ...compactStrip(stripNode),sourceKey:JSON.stringify([name,containerName,groupIndex,stripIndex])}));
         for(const strip of strips){if(strip.kind==='unknown')issue(issues,'UNKNOWN_STRIP_TYPE')}
         const shootingDayNumber=kind==='ScheduleDay'&&containerName==='ScheduledStrips'?ordinal:null;
         return {kind,sourceIndex:groupIndex,sourceContainer:containerName,ordinal:shootingDayNumber,shootingDayNumber,date,calendarName:shootingDayNumber?calendarName:null,
-          attributes:attrs(group),strips};
+          dateLocked:locked||undefined,rawCalendarDate,dateOrigin:locked&&rawCalendarDate&&!validDate(rawCalendarDate)?'unresolved':locked?(group.getAttributeNS(FLASH_DATE_NS,'dateOrigin')||'inferred'):'inferred',attributes:attrs(group),strips};
       });
     };
     const scheduledGroups=groups('ScheduledStrips'),unscheduledGroups=groups('UnscheduledStrips');
@@ -247,7 +252,7 @@ function buildProject(container){
   const production={};for(const child of children(roots.ProductionInfo))for(const prop of children(child,'Property')){
     production[attr(prop,'Name')]=attr(prop,'Value')??prop.textContent??'';
   }
-  const project={format:'msd',fileName,title:production.PictureTitle||fileName.replace(/\.msd$/i,''),production,capabilities:{createBoards:true,calendarProjection:true},
+  const project={format:'msd',fileName,title:production.PictureTitle||fileName.replace(/\.msd$/i,''),production,capabilities:{createBoards:true,calendarProjection:true,editCalendars:true},
     counts:{scenes:scenes.length,elements:elements.length,categories:categories.length,calendars:calendars.length,
       stripboards:boards.length,sceneElementAssociations:associationCount,linkedElements:linkedCount,
       redFlags:redFlags.length,scheduleDays:boards.reduce((n,b)=>n+b.scheduledGroups.filter(g=>g.kind==='ScheduleDay').length,0),
@@ -257,8 +262,10 @@ function buildProject(container){
     scenes,elements:elements.map(({linkedElements,...rest})=>rest),categorySettings,boards,
     stripLayouts:parseLayouts(roots.StripBoardLayoutMgr,'strip'),reportLayouts:parseLayouts(roots.ReportLayoutMgr,'report'),
     colors:parseColors(roots.ColorSettings),issues,sourceXmlSections,sourceDocument};
-  sourceDocument.boardSignature=boardSignature(project);
-  return completeProjectModel(project);
+  completeProjectModel(project);
+  sourceDocument.boardSignature=boardSignature(project);sourceDocument.calendarsSignature=calendarsSignature(project);
+  sourceDocument.calendarSignatures=new Map(project.calendars.map(c=>[c.name,calendarsSignature({calendars:[c]})]));
+  return project;
 }
 export async function parseMsd(buffer,fileName='imported.msd'){
   if(!(buffer instanceof ArrayBuffer))throw TypeError('Expected an ArrayBuffer');
