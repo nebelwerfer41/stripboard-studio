@@ -42,7 +42,7 @@ export function moveStrips(project,{boardName,sourceKeys,to}){
   return changed;
 }
 
-export function dayBreakKey(boardName,group){return `dayBreak:${JSON.stringify(group.mmsxDay?[group.mmsxDay]:[boardName,[group.sourceContainer||'ScheduledStrips',group.sourceIndex]])}`}
+export function dayBreakKey(boardName,group){return `dayBreak:${JSON.stringify(group.mmsxDay?[group.mmsxDay]:[boardName,group.created?group.id:[group.sourceContainer||'ScheduledStrips',group.sourceIndex]])}`}
 export function isDayBreakKey(key){return typeof key==='string'&&key.startsWith('dayBreak:')}
 
 // Day breaks are group boundaries in both containers. Move a flat sequence,

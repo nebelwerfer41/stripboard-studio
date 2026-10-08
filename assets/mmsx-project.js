@@ -90,7 +90,7 @@ export function updatedMmsxRoot(project){
    if(signature(groups)===source.initialSegments.get(key))continue;
    const stripMap=Object.create(null);let order=0;
    function append(key,group,isDay=false){
-    const origin=records.get(key);if(!origin)throw Error('Strip MMSX sconosciuta');
+    const origin=records.get(key)||(isDay&&group.created===true&&group.createdDayId&&key===group.mmsxDay?{id:group.createdDayId,record:{id:group.createdDayId,type:'day'}}:null);if(!origin)throw Error('Strip MMSX sconosciuta');
     if(Object.hasOwn(stripMap,origin.id))throw Error('Strip MMSX duplicata');
     const r=cloneExact(origin.record);r.sortOrder=order++;
     if(yard||group.kind!=='ScheduleDay'){delete r.date;delete r.shootDay;delete r.beforeShootDay}
@@ -111,6 +111,7 @@ export function updatedMmsxRoot(project){
  // Compare every original strip identity across all segments: no drop or duplication.
  for(const [bid,records] of source.recordMaps){
   const expected=new Map();for(const {id} of records.values())expected.set(id,(expected.get(id)||0)+1);
+  for(const g of new Set(project.boards.filter(b=>b.mmsxBoard===bid).flatMap(b=>[...b.scheduledGroups,...b.unscheduledGroups])))if(g.createdDayId){if(expected.has(g.createdDayId))throw Error('Identificativo nuova giornata duplicato');expected.set(g.createdDayId,1)}
   const actual=new Map();for(const s of Object.values(root.contents.stripboard[bid].segmentMap))if(['normal','boneyard'].includes(s.type))for(const id of Object.keys(s.stripMap))actual.set(id,(actual.get(id)||0)+1);
   if(actual.size!==expected.size||[...expected].some(([id,count])=>actual.get(id)!==count))throw Error('Esportazione interrotta: strip perse o duplicate');
  }

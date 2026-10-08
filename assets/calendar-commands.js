@@ -1,6 +1,6 @@
 /* Calendar transactions share the same model and history as strip scheduling. */
 import {findCalendar,calendarDate,validDate} from './production-data.js';
-import {snapshotBoardOrder,restoreBoardOrder} from './scheduling.js';
+import {snapshotBoardOrder,restoreBoardOrder,snapshotBoardFamily,restoreBoardFamily,moveBoardItems} from './scheduling.js';
 import {ExactNumber} from './mmsx-codec.js';
 export const CALENDAR_DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 export const SPECIAL_TYPES={workday:'ExceptionWorkday',offday:'Off',holiday:'Holiday',travel:'CompanyTravel'};
@@ -85,4 +85,36 @@ export function rescheduleCalendar(project,calendarId,expected=null){
     if(planChanged)b.dateAudit={...b.dateAudit,firstDate:plan.changes[0]?.to??null,lastDate:plan.changes.at(-1)?.to??null};
   }
   return changed;
+}
+
+// Dropping on a civil date creates a boundary only when that segment has no day there.
+// Original dates are locked in MSD, whose native dates would otherwise shift on reopen.
+export function moveCalendarItems(project,{boardName,sourceKeys,to}){
+  if(!project.capabilities.editStrips)throw Error('Spostamento strip non supportato');
+  const board=project.boards.find(b=>b.name===boardName),target=project.boards.find(b=>b.name===to.boardName);
+  if(!board||!target||target!==board&&(project.format!=='mmsx'||target.parentBoardId!==board.parentBoardId))throw Error('Destinazione fuori dalla board corrente');
+  if(!validDate(to.date)||target.calendarId!==to.calendarId||!findCalendar(project,to.calendarId))throw Error('Data o calendario di destinazione non valido');
+  const existing=target.scheduledGroups.findIndex(g=>g.kind==='ScheduleDay'&&g.date===to.date);
+  if(existing>=0)return moveBoardItems(project,{boardName,sourceKeys,to:{boardName:target.name,container:'scheduledGroups',groupIndex:existing,stripIndex:target.scheduledGroups[existing].strips.length}});
+  const before=snapshotBoardFamily(project,boardName);
+  try{
+    // Validate the selection before introducing a new boundary. Day breaks are moved in Stripboard.
+    const keys=new Set(sourceKeys),family=project.boards.filter(b=>b===board||project.format==='mmsx'&&b.parentBoardId===board.parentBoardId);
+    const strips=family.flatMap(b=>[...b.scheduledGroups,...b.unscheduledGroups].flatMap(g=>g.strips));
+    const identities=new Set(strips.filter(s=>keys.has(s.sourceKey)).map(s=>s.sourceKey));
+    if(!keys.size||keys.size!==sourceKeys.length||identities.size!==keys.size)throw Error('Seleziona scene o banner per spostarli su una nuova data');
+    const id=crypto.randomUUID(),number=Math.max(0,...target.scheduledGroups.map(g=>g.shootingDayNumber||0))+1;
+    const group={id:`group:${id}`,created:true,kind:'ScheduleDay',attributes:{},strips:[],
+      calendarId:target.calendarId,mmsxSegment:target.mmsxSegment,ordinal:number,shootingDayNumber:number,date:to.date,dateOrigin:'rescheduled',dateLocked:true};
+    if(project.format==='mmsx'){group.createdDayId=id;group.mmsxDay=JSON.stringify([target.mmsxBoard,target.mmsxSegment,id])}
+    let index=target.scheduledGroups.findIndex(g=>g.kind==='ScheduleDay'&&g.date>to.date||g.kind==='RemainingScheduledStrips');
+    if(index<0)index=target.scheduledGroups.length;
+    target.scheduledGroups.splice(index,0,group);
+    if(project.format==='msd'){
+      let ordinal=0;for(const g of target.scheduledGroups)if(g.kind==='ScheduleDay'){g.dateLocked=true;g.ordinal=g.shootingDayNumber=++ordinal}
+    }
+    const changed=moveBoardItems(project,{boardName,sourceKeys,to:{boardName:target.name,container:'scheduledGroups',groupIndex:index,stripIndex:0}});
+    if(!changed)restoreBoardFamily(project,before);
+    return changed;
+  }catch(error){restoreBoardFamily(project,before);throw error}
 }

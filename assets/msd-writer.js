@@ -54,7 +54,7 @@ function patchGroups(node,board,original){
       const sourceGroup=group.sourceIndex===undefined?null:groups(original,group.sourceContainer||xmlName)[group.sourceIndex];
       const boundary=['ScheduleDay','UnscheduledDay'].includes(group.kind);
       if(sourceGroup&&(usedGroups.has(sourceGroup)||!(group.kind===sourceGroup.tagName||boundary&&['ScheduleDay','UnscheduledDay'].includes(sourceGroup.tagName))))throw Error('Tipo di gruppo MSD modificato');
-      if(!sourceGroup&&boundary)throw Error('Origine day break MSD mancante');
+      if(!sourceGroup&&boundary&&!(group.created===true&&group.id&&group.dateLocked))throw Error('Origine day break MSD mancante');
       if(sourceGroup)usedGroups.add(sourceGroup);
       const target=node.ownerDocument.createElement(group.kind);
       if(sourceGroup)for(const attribute of sourceGroup.attributes)target.setAttribute(attribute.name,attribute.value);

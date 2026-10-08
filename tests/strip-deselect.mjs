@@ -12,8 +12,8 @@ function fixture(){
   const view={contains:target=>target.inside,offsetWidth:500,clientWidth:500,offsetHeight:300,clientHeight:300,
     scrollWidth:500,scrollHeight:300,scrollTop:0,getBoundingClientRect:()=>({left:100,top:200,right:600,bottom:500})};
   const context=vm.createContext({state,STRIP_GESTURE,movementIntent,performance,
-    document:{addEventListener:listen,documentElement:{clientWidth:1000,clientHeight:800},body:{classList:{remove(){}}}},
-    window:{addEventListener:listen},$:()=>view,isMac:false,
+    document:{querySelector:()=>null,elementFromPoint:()=>null,addEventListener:listen,documentElement:{clientWidth:1000,clientHeight:800},body:{hasPointerCapture:()=>false,classList:{remove(){}}}},
+    window:{addEventListener:listen},$:id=>id==='calendarView'?{hidden:true,contains:()=>false}:view,isMac:false,
     starts,moves,applyBoardMove:(intent,to)=>moves.push({intent,to}),showStatus(){},positionDrag(){},
     clearStripSelection:()=>state.selectedStripIds.clear(),clearTimeout,setTimeout,cancelAnimationFrame(){},
     selectItem:key=>{state.selectedStripIds.clear();state.selectedStripIds.add(key)},

@@ -4,7 +4,7 @@
 
 > **Flash common model:** Calendar now combines the monthly plan and calendar rule editing; Anteprima Spoglio follows the active scene. Events, red flags, production data and per-sheet quantities remain inspectable. Imported projects save in their original format; native MMSX dates are never recalculated on import or calendar selection. MMSX boards retain their sub-board hierarchy: use the Sub-board menu to show normal segments and the shared Boneyard together. Segment labels and spacing appear only in the editing UI. See [the common contract and save strategy](docs/flash-common-model.md).
 
-# Stripboard Studio v1.8
+# Stripboard Studio v1.9
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
@@ -34,14 +34,16 @@ The browser must support `DecompressionStream('deflate-raw')`, `DOMParser`, `XML
 
 Control names below are given in English; some labels in the application are currently in Italian.
 
-- Select a project, shooting schedule, and stripboard layout saved in the `.msd` file.
+- Select a project, shooting schedule, and an imported stripboard layout, or choose **Compatto**, **Dettagliato** or **Produzione** under **Visualizzazione**. Standard layouts let you select scene fields and project categories; Calendar has its own **Strip** menu with independent layout and field preferences. Display changes leave the imported file untouched.
 - Click or tap a scene to select and activate it. Shift-click selects the range from the initial strip, including banners and day breaks; Ctrl/⌘-Shift-click adds that range to the selection. Ctrl/⌘-click adds or removes items. On touch devices, hold a strip to enter multi-selection mode, then tap to add or remove items. Esc or a click in empty space clears the selection. Drag a strip directly; on touch devices, dragging begins after a long press and deliberate movement. If the strip is already selected, the whole group moves while preserving its relative order. The preview shows the scene count, total page eighths, and other items, with a line marking the insertion point. Banners and day breaks can be dragged in the same way, including into and out of the Boneyard. F2 offers the same destinations.
 - **Undo** (Ctrl/⌘-Z) restores the order before the last operation; **Redo** (Ctrl/⌘-Shift-Z) reapplies the undone reorder. From the keyboard, Enter or Space selects a strip and F2 opens the day and position picker. The “At the end” position in a `ScheduleDay` is before the layout-generated day break.
 - **＋** beside the schedule creates a stripboard by copying the current order. The new schedule uses the same scene references and can be edited independently. Its unique name provides the identity expected by the observed format. The selector changes the current schedule and the exported `ActiveStripBoard` value.
 - **Save .msd** creates a new `-edited.msd` file. The unsaved-changes indicator tracks document revisions; edits remain available if saving fails. If the browser does not provide a file picker with a confirmed save result, a download starts and the state becomes saved when the browser accepts the download.
 - The calendar selector beside the layout displays the same schedule with dates inferred from the selected calendar, without changing the file’s `CalendarName` reference.
-- **Calendar** combines a dense monthly plan with recurring days off, per-date exceptions, production start and explicit rescheduling. Scene strips and banners remain in plan order; rules and rescheduling have separate Undo/Redo transactions.
-- **Anteprima Spoglio** follows the active scene from Calendar or Stripboard, including template categories and elements shown by ID (when available) and name. Quantities and properties remain available in project details. Optional resizable pairs are available only above 1200 CSS px; smaller viewports use a drawer.
+- **Calendar** combines a dense monthly plan with recurring days off, per-date exceptions, production start and explicit rescheduling. Drag scene strips or banners to reorder them within a day, move them to another date, or move between Calendar and Stripboard. An empty date creates a shooting day in the associated visible segment. Undo/Redo covers every move. With one view visible, hold the dragged strip over the other top navigation tab for half a second to reveal it; touch uses a long press before dragging.
+- The top navigation gives direct access to Stripboard, Calendar, Spoglio, Report, Red Flags and project details. Click the project title to switch projects; **Visualizzazione** contains layout, color, visibility and print settings. Compact controls leave more space for the active view, which scrolls independently.
+- **Spoglio** follows the active scene from Calendar or Stripboard, including template categories and elements shown by ID (when available) and name. Its scene selector and previous/next buttons also allow direct browsing in plan order. Quantities and properties remain available in project details. Optional resizable pairs are available only above 1200 CSS px, with each pane limited to 25–75% of the usable width; smaller viewports use one full-width view.
+- Phones show readable scene rows and a compact Calendar agenda of shooting days, events and the selected date. **Mostra mese** restores the monthly grid. These display preferences do not change the file or the schedule. Print uses the selected source or standard layout; phone summaries preserve source geometry for printing.
 - The **Red Flag Entry** view includes filters for category, element, type, and date range, along with a monthly grid, list, and flag details. Types come from `RedFlagMgr`; managing and editing flags remain future work.
 - Display scenes, banners, days, dates, and the unscheduled queue, with search and controls for hiding banners and day breaks.
 - Banners and day breaks are drawn as strips with the same width as scene strips.
@@ -87,3 +89,16 @@ Credits: [nebelwerfer41 on GitHub](https://github.com/nebelwerfer41).
 ## License
 
 [MIT](LICENSE). Copies and derivative works must retain the copyright notice and license text. Dependencies and third-party materials retain their own licenses.
+
+## v1.9 verification
+
+`node --test tests/*.mjs` covers display fields and native MMSX day creation in formats 5, 3 and hybrid, including conservation and Undo/Redo. `tests/calendar-roundtrip.html` also verifies new civil-date drops and reopening in the included MSD sample. Browser suites require Playwright, a local server and optionally `CHROME_PATH`:
+
+```sh
+CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-calendar-density.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-responsive.cjs
+CHROME_PATH=/usr/bin/chromium SYNTHETIC_MMSX=/path/to/fixture.mmsx node tests/browser-strip-layouts-drag.cjs
+```
+
+The last suite checks independent field settings without file changes, calendar reorder, both cross-pane directions, blank-date save/reopen, cancellation, Undo/Redo, tablet/phone navigation during drag and native phone touch multiselection. MMSX uses the synthetic fixture described in [the calendar documentation](docs/calendar-workspace.md); MSD uses the included real sample.

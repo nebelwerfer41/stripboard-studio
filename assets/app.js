@@ -9,17 +9,18 @@ import {elementSumText,categoryElementsText,elementLabel,sortCategoryElements} f
 import {expandReportBoxes} from './report-layout.js';
 import {redFlagsForStrip,redFlagsOnDate,calendarDate,boardWithCalendar,outsideCalendarActivity,findCalendar,eventsOnDate,intervalContains,intervalOverlaps} from './production-data.js';
 import {STRIP_GESTURE,selectStripState,clearStripState,movementIntent} from './strip-interaction.js';
-import {editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction} from './calendar-commands.js';
+import {moveCalendarItems,editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction} from './calendar-commands.js';
 import {canSplit} from './calendar-selectors.js';
 import {calendarMarkup,breakdownMarkup,CALENDAR_VISIBILITY} from './workspace-views.js';
+import {STANDARD_PRESETS,standardLayout,presetFields,selectedFields,fieldsMarkup,fieldsPickerMarkup} from './strip-display.js';
 const $ = id => document.getElementById(id);
 const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
 const state = {project:null, mode:'board', board:null, calendar:null, calendarMonth:null, calendarDate:null,
   flagMonth:null,flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null,
-  layout:null, query:'', unscheduled:false,segmentVisibility:new Map(),showColors:true, hideBanners:false, hideDayBreaks:false,
+  layout:null,boardLayoutChoice:null,boardFields:null,calendarPreset:'compact',calendarFields:null,calendarStripMenuOpen:false,query:'', unscheduled:false,segmentVisibility:new Map(),showColors:true, hideBanners:false, hideDayBreaks:false,
   allReport:false, importedSource:null, printHeader:true,reportOptions:new Map(),
   revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],redoHistory:[],
-  activeSceneId:null,layoutChoice:'single',previewOpen:false,splitRatio:55,hideEmptyCategories:true,editPlanId:null,calendarRulesOpen:false,calendarStartDrafts:new Map(),calendarGoDraft:null,calendarMonthDraft:null,calendarMenuOpen:false,calendarDetailOpen:false,calendarExtended:false,calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true])),
+  activeSceneId:null,layoutChoice:'single',previewOpen:false,breakdownReturnMode:'board',splitRatio:55,hideEmptyCategories:true,editPlanId:null,calendarRulesOpen:false,calendarStartDrafts:new Map(),calendarGoDraft:null,calendarMonthDraft:null,calendarMenuOpen:false,calendarDetailOpen:false,calendarExtended:false,calendarAgenda:true,calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true])),
   selectedStripIds:new Set(),selectionAnchorId:null,activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
 const SCREEN_PX_PER_INCH=76;
 const collator = new Intl.Collator('it',{numeric:true,sensitivity:'base'});
@@ -53,7 +54,17 @@ function syncSegmentControls(){
 function closeSegmentMenu(){$('subboardMenu').hidden=true;$('toggleUnscheduled').setAttribute('aria-expanded','false')}
 const displayedBoard = () => boardWithCalendar(state.project,state.board,state.calendar)||selectedBoard();
 const selectedProductionCalendar = () => findCalendar(state.project,state.calendar)||state.project.calendars[0];
-const selectedLayout = () => (state.mode==='board'?state.project.stripLayouts:state.project.reportLayouts).find(l=>l.name===state.layout);
+const selectedBoardLayout=()=>state.boardLayoutChoice?.startsWith('studio:')?standardLayout(state.boardLayoutChoice.slice(7)):state.project.stripLayouts.find(l=>l.name===state.boardLayoutChoice)||state.project.stripLayouts[0];
+const selectedLayout = () => state.mode==='board'?selectedBoardLayout():state.project.reportLayouts.find(l=>l.name===state.layout);
+function syncBoardDisplay(){
+  const layout=selectedBoardLayout();
+  if(state.mode==='board'){
+    $('layoutSelect').innerHTML=`<optgroup label="Layout standard">${Object.entries(STANDARD_PRESETS).map(([id,p])=>`<option value="studio:${id}">Standard · ${p.label}</option>`).join('')}${state.boardLayoutChoice==='studio:custom'?'<option value="studio:custom">Standard · Personalizzato</option>':''}</optgroup><optgroup label="Layout del file">${state.project.stripLayouts.map(l=>`<option value="${safe(l.name)}">${safe(l.name)}</option>`).join('')}</optgroup>`;
+    $('layoutSelect').value=layout.name;state.layout=layout.name;
+  }
+  $('boardFieldPicker').hidden=state.mode!=='board'||!layout.standard;
+  if(layout.standard)$('boardFieldPicker').innerHTML=fieldsPickerMarkup(state.project,state.boardFields||presetFields(state.project,layout.preset),{target:'board',safe});
+}
 const groups = b => [...(b?.scheduledGroups||[]),...(state.unscheduled?b?.unscheduledGroups||[]:[])];
 const sceneList = b => groups(b).flatMap(g=>g.strips.filter(x=>x.kind==='scene').map(x=>state.sceneMap.get(x.bdsId)).filter(Boolean));
 const searchText = (s,x) => [s?.scene,s?.set,s?.location,s?.synopsis,s?.scriptDay,x?.text].join(' ').toLocaleLowerCase();
@@ -85,6 +96,7 @@ async function loadSample(id){
   catch(e){showStatus(e.message);$('projectTitle').textContent=state.project?.title||'Importa un progetto .msd'}
 }
 function setProject(data){
+  document.querySelector('.project-heading').open=false;
   resetDocumentState(state);
   const isMmsx=data.format==='mmsx';
   if(isMmsx)state.mode='board';
@@ -93,6 +105,7 @@ function setProject(data){
   state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;state.activeSceneId=null;state.editPlanId=null;state.calendarStartDrafts.clear();state.calendarGoDraft=null;state.calendarMonthDraft=null;state.layoutChoice='single';state.previewOpen=false;
   clearStripSelection();
   state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;state.dataScene=null;state.dataCategory='';state.dataElement=null;
+  state.boardLayoutChoice=null;state.boardFields=null;state.calendarPreset=state.calendarExtended?'detailed':'compact';state.calendarFields=presetFields(data,state.calendarPreset,{calendar:true});
   state.calendar=selectedBoard()?.calendarId||findCalendar(data,data.defaultCalendar)?.id||data.calendars[0]?.id;
   state.calendarMonth=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso?.slice(0,7)||new Date().toISOString().slice(0,7);
   state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
@@ -103,7 +116,7 @@ function setProject(data){
   state.unscheduled=false;state.segmentVisibility.clear();closeSegmentMenu();state.allReport=false;state.query='';$('search').value='';
   state.hideBanners=false;state.hideDayBreaks=false;$('hideBanners').checked=false;$('hideDayBreaks').checked=false;
   state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
-  $('sideProject').textContent=data.title;$('projectTitle').textContent=data.title;
+  $('projectTitle').textContent=data.title;
   refreshBoardOptions();$('reportCount').textContent=data.reportLayouts.length;
   $('calendarCount').textContent=data.calendars.length;$('redFlagCount').textContent=data.redFlags.length;
   $('calendarSelect').innerHTML=data.calendars.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
@@ -113,27 +126,43 @@ function setProject(data){
 function setMode(mode){
   closeSegmentMenu();
   if(mode==='report'&&!state.project?.capabilities.reports)mode='board';
+  if(mode==='breakdown'&&['board','calendar'].includes(state.mode))state.breakdownReturnMode=state.mode;
+  if(state.mode==='breakdown'&&mode!=='breakdown')state.previewOpen=state.layoutChoice.endsWith('-breakdown');
+  if(['board','calendar'].includes(mode)&&!canSplit(window.innerWidth)){
+    state.previewOpen=false;
+    if(state.layoutChoice.endsWith('-breakdown'))state.layoutChoice='single';
+  }
   state.mode=mode;
+  document.body.dataset.view=mode;
   if(['board','calendar'].includes(mode)&&state.layoutChoice.endsWith('-breakdown'))state.layoutChoice=`${mode}-breakdown`;
-  for(const [id,key] of [['boardNav','board'],['reportNav','report'],['calendarNav','calendar'],['redFlagNav','redflags'],['dataNav','data']])$(id).classList.toggle('active',mode===key);
-  $('crumb').textContent={board:'STRIPBOARD',report:'REPORT',calendar:'CALENDAR',redflags:'RED FLAG ENTRY',data:'DETTAGLI PROGETTO ED ELEMENTI'}[mode];
+  for(const [id,key] of [['boardNav','board'],['calendarNav','calendar'],['breakdownNav','breakdown'],['reportNav','report'],['redFlagNav','redflags'],['dataNav','data']]){
+    $(id).classList.toggle('active',mode===key);
+    if(mode===key)$(id).setAttribute('aria-current','page');else $(id).removeAttribute('aria-current');
+  }
   $('layoutLabel').textContent=mode==='board'?'LAYOUT STRIPBOARD':'MODELLO REPORT';
-  $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'CALENDAR',redflags:'RED FLAG ENTRY',data:'DETTAGLI PROGETTO ED ELEMENTI'}[mode];
+  $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'CALENDAR',breakdown:'SPOGLIO',redflags:'RED FLAG ENTRY',data:'DETTAGLI PROGETTO ED ELEMENTI'}[mode];
   $('search').placeholder=mode==='board'?'Cerca scena, set, testo…':'Cerca nei dati del report…';
   $('toggleUnscheduled').style.display=mode==='board'||mode==='calendar'?'':'none';
   $('colorSwitch').style.display=mode==='board'?'':'none';
   $('printOptions').hidden=mode!=='board';
   $('reportOptions').hidden=mode!=='report';
   $('visibilityOptions').hidden=mode!=='board'&&mode!=='report';
-  $('boardControl').hidden=mode==='redflags'||mode==='data';
-  $('layoutControl').hidden=mode==='calendar'||mode==='redflags'||mode==='data';
+  $('displayOptions').hidden=mode!=='board'&&mode!=='report';
+  $('displayOptions').open=false;
+  $('boardFieldPicker').hidden=mode!=='board';
+  $('boardControl').hidden=mode==='redflags'||mode==='data'||mode==='breakdown';
+  $('layoutControl').hidden=mode==='calendar'||mode==='redflags'||mode==='data'||mode==='breakdown';
   $('calendarControl').hidden=(mode==='board'&&!state.project.capabilities.calendarProjection)||(mode!=='board'&&mode!=='calendar');
-  $('panelTools').hidden=mode==='redflags'||mode==='data';$('search').hidden=mode==='calendar';
-  $('stats').hidden=mode==='calendar'||mode==='redflags'||mode==='data';
+  $('panelTools').hidden=mode==='redflags'||mode==='data'||mode==='breakdown';$('search').hidden=mode==='calendar';
+  $('stats').hidden=mode==='calendar'||mode==='redflags'||mode==='data'||mode==='breakdown';
   $('controls').classList.toggle('minimal',mode==='redflags');
   const layouts=mode==='board'?state.project?.stripLayouts:state.project?.reportLayouts;
-  if(mode==='calendar'||mode==='redflags'||mode==='data'){render();return}
+  if(mode==='calendar'||mode==='redflags'||mode==='data'||mode==='breakdown'){render();return}
   if(!layouts)return;
+  if(mode==='board'){
+    state.boardLayoutChoice??=(layouts.find(l=>l.orientation==='HORIZONTAL'&&l.name.startsWith('*Schedule'))||layouts.find(l=>l.orientation==='HORIZONTAL')||layouts[0])?.name;
+    syncBoardDisplay();render();return;
+  }
   if(!layouts.some(l=>l.name===state.layout)){
     const preferred=mode==='board'?layouts.find(l=>l.orientation==='HORIZONTAL' && l.name.startsWith('*Schedule'))||layouts.find(l=>l.orientation==='HORIZONTAL'):layouts.find(l=>l.name==='Flash Suite Export')||layouts.find(l=>l.sourceType==='STRIP_BOARD'&&l.recordType==='STRIP')||layouts[0];
     state.layout=preferred?.name;
@@ -146,38 +175,49 @@ function render(){
   const savedScroll=Object.fromEntries(['boardView','calendarView','breakdownPreview'].map(id=>[id,[$(id).scrollTop,$(id).scrollLeft]]));
   const primary=['board','calendar'].includes(state.mode),wide=canSplit(window.innerWidth);
   const split=primary&&wide&&state.layoutChoice!=='single';
-  const boardVisible=state.mode==='board'||split&&state.layoutChoice==='calendar-board';
-  const calendarVisible=state.mode==='calendar'||split&&state.layoutChoice==='calendar-board';
-  const breakdownVisible=primary&&state.previewOpen;
+  const breakdownVisible=state.mode==='breakdown'||primary&&state.previewOpen;
+  const previewOnly=breakdownVisible&&!split;
+  document.body.dataset.printView=previewOnly?'breakdown':state.mode;
+  document.querySelector('.page').classList.toggle('breakdown-focus',previewOnly);
+  const boardVisible=!previewOnly&&(state.mode==='board'||split&&state.layoutChoice==='calendar-board');
+  const calendarVisible=!previewOnly&&(state.mode==='calendar'||split&&state.layoutChoice==='calendar-board');
   for(const [id,visible] of [['boardView',boardVisible],['calendarView',calendarVisible],['breakdownPreview',breakdownVisible],['reportView',state.mode==='report'],['redFlagView',state.mode==='redflags'],['dataView',state.mode==='data']])$(id).hidden=!visible;
   $('workspaceToolbar').hidden=!primary;
   $('workspaceLayout').disabled=!wide;$('workspaceLayout').value=state.layoutChoice;
-  $('splitHint').textContent=wide?'':'Affiancamento disponibile oltre 1200 px';
+  $('workspaceLayoutControl').hidden=!wide;
+  $('splitHint').textContent='Drag tra le schede';
   $('workspaceSplitter').hidden=!split;
   $('workspaceViews').classList.toggle('split',split);
   $('workspaceViews').classList.toggle('calendar-first',split&&state.layoutChoice==='calendar-board');
-  $('workspaceViews').style.setProperty('--split-ratio',`${state.splitRatio}%`);
-  $('breakdownPreview').classList.toggle('drawer',breakdownVisible&&!split);
+  $('workspaceViews').classList.toggle('preview-only',previewOnly);
+  $('workspaceViews').style.setProperty('--split-ratio',String(state.splitRatio/100));
   $('previewButton').setAttribute('aria-expanded',String(breakdownVisible));
+  $('previewButton').textContent=previewOnly?`← Torna a ${state.mode==='calendar'?'Calendar':'Stripboard'}`:breakdownVisible?'Chiudi Spoglio':'Anteprima Spoglio';
+  for(const [id,key] of [['boardNav','board'],['calendarNav','calendar'],['breakdownNav','breakdown']]){
+    const active=key==='breakdown'?previewOnly:state.mode===key&&!previewOnly;
+    $(id).classList.toggle('active',active);
+    if(active)$(id).setAttribute('aria-current','page');else $(id).removeAttribute('aria-current');
+  }
   if(breakdownVisible)renderBreakdown();
   $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
+  if(state.mode==='breakdown'){$('viewTitle').textContent='Spoglio';$('viewSubtitle').textContent='Scheda scena e fabbisogni di produzione';return}
   if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, riferimenti delle schede ed elementi · consultazione';renderProductionViewer();return}
   if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e tipi presenti nel file · consultazione';renderRedFlagViewer();return}
   if(calendarVisible)renderCalendarViewer();
   if(boardVisible){
-    const layout=state.project.stripLayouts.find(l=>l.name===state.layout)||state.project.stripLayouts[0];
-    renderBoard(displayedBoard(),layout);
+    renderBoard(displayedBoard(),selectedBoardLayout());
   }
   for(const [id,[top,left]] of Object.entries(savedScroll)){$(id).scrollTop=top;$(id).scrollLeft=left}
   if(state.mode==='calendar'){$('viewTitle').textContent='Calendar';$('viewSubtitle').textContent='Piano, date e regole di produzione · scene e banner in ordine';return}
   const board=state.mode==='board'?displayedBoard():selectedBoard(),layout=selectedLayout();if(!board||!layout)return;
   $('viewTitle').textContent=state.mode==='board'?selectedBoardGroup()?.name||board.name:layout.name;
-  $('viewSubtitle').textContent=state.mode==='board'?`Sub-board: ${selectedBoardGroup().segments.filter(s=>visibleSegmentIds().has(s.id)).map(s=>s.name).join(', ')||'nessuna'} · Calendario: ${board.calendarName}${board.sourceCalendarName?` · Proiezione di lettura; nel file: ${board.sourceCalendarName}`:''} · Layout: ${layout.name} · Clic: seleziona · ⌘/Ctrl: multi · Drag: riordina`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':'per scena'}`;
+  $('viewSubtitle').textContent=state.mode==='board'?`${selectedBoardGroup().segments.filter(s=>visibleSegmentIds().has(s.id)).map(s=>s.name).join(', ')||'Nessuna sub-board'}${board.sourceCalendarName?` · Proiezione di lettura; nel file: ${board.sourceCalendarName}`:''}`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':'per scena'}`;
+  $('viewSubtitle').title=$('viewSubtitle').textContent;
   renderStats(board);
   if(state.mode==='report')renderReport(board,layout);
 }
 function renderBreakdown(){
-  $('breakdownPreview').innerHTML=breakdownMarkup(state.project,state,{safe,shortDate,pages,valueText});
+  $('breakdownPreview').innerHTML=breakdownMarkup(state.project,state,{safe,shortDate,pages,valueText,sceneOrder:breakdownSceneOrder()});
 }
 function renderStats(board){
   const scheduled=state.mode==='board'?displayedEntries().filter(entry=>entry.container==='scheduledGroups').map(entry=>entry.group):board.scheduledGroups;
@@ -400,6 +440,16 @@ function flagIcon(flags){
   return icon;
 }
 function makeStrip(scene,layout,metrics,group){
+  if(layout.standard){
+    const outer=document.createElement('div');outer.className='strip-outer standard-outer';
+    const strip=document.createElement('div');strip.className='strip-layout standard-strip';
+    const colors=sceneColors(scene),flags=group?.date?redFlagsForStrip(state.project,scene.bdsId,group.date):[];
+    if(state.showColors&&colors?.bg){strip.style.backgroundColor=colors.bg;strip.style.color=colors.fg||'#1d2731'}
+    const fields=selectedFields(state.project,state.boardFields||presetFields(state.project,layout.preset));
+    strip.innerHTML=fieldsMarkup(fields,scene,{project:state.project,group,pages,shortDate,flags,safe});
+    for(const [index,field] of fields.entries())strip.children[index].style.setProperty('--field-weight',field.weight);
+    outer.append(strip);return outer;
+  }
   const {scale,geo,width,height}=metrics;
   const outer=document.createElement('div');outer.className='strip-outer';
   const strip=document.createElement('div');strip.className='strip-layout';
@@ -409,12 +459,17 @@ function makeStrip(scene,layout,metrics,group){
   strip.appendChild(createShapes(layout.fields,{scene,group,flags},scale,'strip-field',geo));addLines(strip,layout.fields,geo,scale,'strip-field');
   if(flags.length&&!layout.fields.some(field=>field.tag==='BDSRedFlagField'))strip.append(flagIcon(flags));
   strip.title=`Scena ${scene.scene||'—'} · ${scene.set||''} · ${scene.synopsis||''}`;
-  outer.append(strip);return outer;
+  const mobile=document.createElement('div');mobile.className='strip-mobile-summary';
+  const colors=sceneColors(scene);
+  if(state.showColors&&colors?.bg){mobile.style.backgroundColor=colors.bg;mobile.style.color=colors.fg||'#1d2731'}
+  mobile.innerHTML=`<span class="mobile-scene-number">${safe(scene.scene||'—')}</span><span class="mobile-scene-set">${safe(scene.set||'Senza set')}</span><span class="mobile-scene-meta">${safe([scene.ie,scene.dn,pages(scene.pagesEighths)].filter(Boolean).join(' · '))}${flags.length?' ⚑':''}</span><span class="mobile-scene-synopsis">${safe(scene.synopsis||scene.location||'—')}</span>`;
+  outer.append(strip,mobile);return outer;
 }
 function makeSpecialStrip(kind,text,layout,metrics,style={}){
   const outer=document.createElement('div');outer.className='strip-outer special-outer';
   const strip=document.createElement('div');strip.className=`strip-layout strip-special ${kind==='banner'?'banner-strip':'day-break-strip'}`;
-  strip.style.width=metrics.width+'px';strip.style.height=metrics.height+'px';
+  if(layout.standard)outer.classList.add('standard-outer');
+  else{strip.style.width=metrics.width+'px';strip.style.height=metrics.height+'px'}
   const prefs=state.project.colors?.preferences?.[kind==='banner'?'Banner':'DayStrip'];
   if(state.showColors){
     if(style.backgroundColor||prefs?.bg)strip.style.backgroundColor=style.backgroundColor||prefs.bg;
@@ -450,13 +505,14 @@ function movePositionFrom(element){return {boardName:element.dataset.boardName||
 function boardAt(position){return state.project.boards.find(b=>b.name===(position.boardName||state.board))}
 function stripAt(position){return boardAt(position)?.[position.container]?.[position.groupIndex]?.strips[position.stripIndex]}
 function itemKey(element){
+  if(element.dataset.stripKey)return element.dataset.stripKey;
   const position=movePositionFrom(element),group=boardAt(position)?.[position.container]?.[position.groupIndex];
   if(!group)return null;
   return element.dataset.itemKind==='dayBreak'?dayBreakKey(position.boardName,group):stripAt(position)?.sourceKey;
 }
 function isSceneKey(key){return entriesForBoard(state.project,state.board)
   .some(({group})=>group.strips.some(strip=>strip.kind==='scene'&&strip.sourceKey===key))}
-// Future scene detail can follow active changes and open only on stripopenrequest (never on drag).
+// Shared scene details follow selection; dragging never opens another view.
 function selectionChanged(previousActive,reason='selection',open=false){
   const occurrence=entriesForBoard(state.project,state.board).flatMap(e=>e.group.strips).find(strip=>strip.sourceKey===state.activeStripId&&strip.kind==='scene');
   state.activeSceneId=occurrence?state.sceneMap.get(occurrence.bdsId)?.id??null:null;
@@ -476,11 +532,11 @@ function syncStripSelection(){
     outer.classList.toggle('strip-active',state.activeStripId===key);
     outer.setAttribute('aria-pressed',String(selected));
   }
-  for(const strip of $('calendarView').querySelectorAll('[data-scene-strip]')){const key=strip.dataset.sceneStrip;strip.classList.toggle('selected',state.selectedStripIds.has(key));strip.classList.toggle('active',state.activeStripId===key);strip.setAttribute('aria-pressed',String(state.selectedStripIds.has(key)))}
+  for(const strip of $('calendarView').querySelectorAll('[data-strip-key]')){const key=strip.dataset.stripKey;strip.classList.toggle('selected',state.selectedStripIds.has(key));strip.classList.toggle('active',state.activeStripId===key);strip.setAttribute('aria-pressed',String(state.selectedStripIds.has(key)))}
 }
 function selectItem(key,{toggle=false,range=false,reason='selection',open=false}={}){
   if(!key)return;
-  selectionChanged(selectStripState(state,key,{toggle,range,isSceneKey,sceneIdForKey:key=>{const strip=entriesForBoard(state.project,state.board).flatMap(e=>e.group.strips).find(s=>s.sourceKey===key);return state.sceneMap.get(strip?.bdsId)?.id??null},orderedKeys:reason==='calendar'?[...$('calendarView').querySelectorAll('.operational-grid [data-scene-strip]')].map(el=>el.dataset.sceneStrip):[...$('boardView').querySelectorAll('.strip-outer[data-strip-index]')].map(itemKey)}),reason,open);
+  selectionChanged(selectStripState(state,key,{toggle,range,isSceneKey,sceneIdForKey:key=>{const strip=entriesForBoard(state.project,state.board).flatMap(e=>e.group.strips).find(s=>s.sourceKey===key);return state.sceneMap.get(strip?.bdsId)?.id??null},orderedKeys:reason.startsWith('calendar')?[...$('calendarView').querySelectorAll('.operational-grid [data-strip-key]')].map(el=>el.dataset.stripKey):[...$('boardView').querySelectorAll('.strip-outer[data-strip-index]')].map(itemKey)}),reason,open);
 }
 function openMoveDialog(intent){
   const board=boardAt(intent.from),group=board?.[intent.from.container]?.[intent.from.groupIndex],
@@ -509,7 +565,9 @@ function refreshMovePositions(){
 }
 function fitBoardPreview(){
   const view=$('boardView');
-  if(view.hidden||view.classList.contains('is-vertical')||!view.classList.contains('print-fit'))return;
+  if(view.hidden)return;
+  view.classList.toggle('compact-board',view.getBoundingClientRect().width<=620);
+  if(view.classList.contains('is-standard')||view.classList.contains('is-vertical')||!view.classList.contains('print-fit'))return;
   const styles=getComputedStyle(view);
   const available=view.clientWidth-parseFloat(styles.paddingLeft)-parseFloat(styles.paddingRight);
   const width=parseFloat(view.style.getPropertyValue('--print-board-width'));
@@ -530,7 +588,7 @@ function renderBoard(board,layout){
   $('undoMoveButton').disabled=!state.orderHistory.length;
   $('redoMoveButton').disabled=!state.redoHistory.length;
   const vertical=layout.orientation==='VERTICAL';
-  view.classList.toggle('is-vertical',vertical);
+  view.classList.toggle('is-vertical',vertical);view.classList.toggle('is-standard',!!layout.standard);
   const metrics=stripMetrics(layout);
   const printHeading=document.createElement('div');printHeading.className='print-heading';
   printHeading.textContent=`${state.project.title} · ${selectedBoardGroup()?.name||board.name}`;
@@ -573,11 +631,13 @@ function renderBoard(board,layout){
     section.append(day);shown++;
   }
   const printStrips=[...view.querySelectorAll('.strip-layout')];
-  const printWidths=vertical?[...view.querySelectorAll('.vertical-grid')].map(grid=>grid.scrollWidth):
-    printStrips.map(strip=>strip.offsetWidth);
-  view.classList.toggle('print-fit',printStrips.length>0);
+  // Source dimensions stay available when phone rows hide the original layout on screen.
+  const sourceWidth=strip=>parseFloat(strip.style.width)||strip.offsetWidth;
+  const printWidths=vertical?[...view.querySelectorAll('.vertical-grid')].map(grid=>[...grid.querySelectorAll('.strip-layout')].reduce((width,strip)=>width+sourceWidth(strip),0)):
+    printStrips.map(sourceWidth);
+  view.classList.toggle('print-fit',!layout.standard&&printStrips.length>0);
   view.style.setProperty('--print-board-width',`${Math.max(1,...printWidths)}px`);
-  view.style.setProperty('--print-strip-height',`${Math.max(1,...printStrips.map(strip=>strip.offsetHeight))}px`);
+  view.style.setProperty('--print-strip-height',`${Math.max(1,...printStrips.map(strip=>parseFloat(strip.style.height)||strip.offsetHeight))}px`);
   if(!shown){const el=document.createElement('div');el.className='empty';el.textContent=visibleSegmentIds().size?'Nessun risultato per questa ricerca.':'Scegli le sub-board da mostrare.';view.append(el)}
   fitBoardPreview();syncStripSelection();
 }
@@ -586,13 +646,13 @@ function pointerDistance(rect,x,y){
   const dx=Math.max(rect.left-x,0,x-rect.right),dy=Math.max(rect.top-y,0,y-rect.bottom);
   return dx*dx+dy*dy;
 }
-function dropPosition(x,y){
-  const view=$('boardView'),bounds=view.getBoundingClientRect();
+function boardDropPosition(x,y){
+  const view=$('boardView');if(view.hidden)return null;const bounds=view.getBoundingClientRect();
   if(x<bounds.left||x>bounds.right||y<bounds.top||y>bounds.bottom)return null;
   const days=[...view.querySelectorAll('.day')];
   const day=days.sort((a,b)=>pointerDistance(a.getBoundingClientRect(),x,y)-pointerDistance(b.getBoundingClientRect(),x,y))[0];
   if(!day)return null;
-  const wrap=day.firstElementChild,vertical=$('boardView').classList.contains('is-vertical');
+  const wrap=day.firstElementChild,vertical=$('boardView').classList.contains('is-vertical')&&!$('boardView').classList.contains('compact-board');
   const position={boardName:day.dataset.boardName,container:day.dataset.container,groupIndex:Number(day.dataset.groupIndex),stripIndex:0};
   const group=boardAt(position)?.[position.container]?.[position.groupIndex];
   if(!group)return null;
@@ -615,6 +675,33 @@ function dropPosition(x,y){
   }
   return {position,anchor,after,wrap,vertical};
 }
+function calendarDropPosition(x,y){
+  if($('calendarView').hidden)return null;
+  const element=document.elementFromPoint(x,y),cell=element?.closest('[data-calendar-cell]');
+  if(!cell||!$('calendarView').contains(cell))return null;
+  const groups=[...cell.querySelectorAll('.calendar-shooting-day')];
+  const node=element.closest('.calendar-shooting-day')||groups.sort((a,b)=>pointerDistance(a.getBoundingClientRect(),x,y)-pointerDistance(b.getBoundingClientRect(),x,y))[0];
+  if(node){
+    const position={boardName:node.dataset.boardName,container:node.dataset.container,groupIndex:Number(node.dataset.groupIndex),stripIndex:0};
+    const group=boardAt(position)?.[position.container]?.[position.groupIndex];if(!group)return null;
+    const strips=[...node.querySelectorAll('[data-strip-index]')];let anchor=null,after=false;
+    for(const strip of strips){const rect=strip.getBoundingClientRect();if(y<(rect.top+rect.bottom)/2){position.stripIndex=Number(strip.dataset.stripIndex);anchor=strip;break}}
+    if(!anchor){position.stripIndex=group.strips.length;anchor=strips.at(-1)||null;after=!!anchor}
+    return {position,anchor,after,wrap:node,vertical:false,cell};
+  }
+  const source=boardAt(stripPointer?.intent?.from),candidates=entriesForBoard(state.project,state.board,visibleSegmentIds()).map(e=>e.board).filter(b=>b.calendarId===state.calendar);
+  const target=candidates.find(b=>b===source)||candidates.find(b=>b.id===state.editPlanId)||candidates[0];
+  if(!target)return null;
+  return {position:{boardName:target.name,date:cell.dataset.calendarCell,calendarId:state.calendar},wrap:cell.querySelector('.cell-content'),anchor:null,after:false,vertical:false,cell};
+}
+function dropPosition(x,y){return calendarDropPosition(x,y)||boardDropPosition(x,y)}
+function dragViewHover(x,y){
+  const pointer=stripPointer;if(!pointer?.active||!$('boardView').hidden&&!$('calendarView').hidden)return;
+  const nav=document.elementFromPoint(x,y)?.closest('#boardNav,#calendarNav'),mode=nav?.id==='boardNav'?'board':nav?.id==='calendarNav'?'calendar':null;
+  if(!mode||mode===state.mode){pointer.hoverMode=null;return}
+  if(pointer.hoverMode!==mode){pointer.hoverMode=mode;pointer.hoverSince=performance.now();return}
+  if(performance.now()-pointer.hoverSince>=500){pointer.hoverMode=null;state.previewOpen=false;setMode(mode)}
+}
 function showDropPosition(slot){
   const marker=stripPointer?.marker;if(!marker)return;
   const rect=(slot.anchor||slot.wrap).getBoundingClientRect();
@@ -635,14 +722,18 @@ function positionDrag(x,y){
   const left=Math.max(12,Math.min(x+18,window.innerWidth-preview.offsetWidth-12));
   const top=Math.max(12,Math.min(touch?y-preview.offsetHeight-48:y+18,window.innerHeight-preview.offsetHeight-12));
   preview.style.transform=`translate(${left}px, ${top}px)`;
+  dragViewHover(x,y);
+  document.querySelector('.calendar-drop-target')?.classList.remove('calendar-drop-target');
   stripPointer.slot=dropPosition(x,y);
+  stripPointer.slot?.cell?.classList.add('calendar-drop-target');
   stripPointer.marker.hidden=!stripPointer.slot;
   if(stripPointer.slot)showDropPosition(stripPointer.slot);
 }
 function dragAutoscroll(){
   if(!stripPointer?.active)return;
   const edge=STRIP_GESTURE.autoscrollEdgePx,{x,y}=stripPointer;
-  const view=$('boardView'),rect=view.getBoundingClientRect();
+  const under=document.elementFromPoint(x,y);
+  const view=under?.closest('#calendarView')||under?.closest('#boardView')||($(state.mode==='calendar'?'calendarView':'boardView')),rect=view.getBoundingClientRect();
   const top=Math.max(0,rect.top),bottom=Math.min(window.innerHeight,rect.bottom);
   if(view.scrollHeight>view.clientHeight+1&&x>=rect.left&&x<=rect.right){
     if(y>=top-edge&&y<top+edge)view.scrollTop-=Math.ceil((top+edge-y)/5);
@@ -656,14 +747,14 @@ function dragAutoscroll(){
     let dx=0;
     if(x>=left&&x<left+edge)dx=-Math.ceil((left+edge-x)/5);
     else if(x<=right&&x>right-edge)dx=Math.ceil((x-(right-edge))/5);
-    if(dx){if(view.scrollWidth>view.clientWidth+1)view.scrollLeft+=dx;else window.scrollBy(dx,0)}
+    if(dx){const scroller=under?.closest('.calendar-grid-scroll')||view;if(scroller.scrollWidth>scroller.clientWidth+1)scroller.scrollLeft+=dx;}
   }
   positionDrag(x,y);
   stripPointer.frame=requestAnimationFrame(dragAutoscroll);
 }
 function startStripDrag(event){
   const pointer=stripPointer;
-  if(pointer.range||!pointer.wasSelected)selectItem(pointer.key,{toggle:pointer.toggle,range:pointer.range,reason:'drag'});
+  if(pointer.range||!pointer.wasSelected)selectItem(pointer.key,{toggle:pointer.toggle,range:pointer.range,reason:pointer.origin==='calendar'?'calendar-drag':'drag'});
   const intent={from:pointer.from,fromKind:pointer.fromKind,sourceKeys:[...state.selectedStripIds]};
   pointer.intent=intent;state.draggedStripIds=new Set(intent.sourceKeys);
   pointer.preview=document.createElement('div');pointer.preview.className='strip-drag-preview';
@@ -676,7 +767,7 @@ function startStripDrag(event){
   pointer.marker=document.createElement('div');pointer.marker.className='strip-drop-indicator';
   document.body.append(pointer.preview,pointer.marker);
   pointer.active=true;
-  $('boardView').setPointerCapture(event.pointerId);
+  document.body.setPointerCapture(event.pointerId);
   document.body.classList.add('strip-dragging');
   positionDrag(event.clientX,event.clientY);
   pointer.frame=requestAnimationFrame(dragAutoscroll);
@@ -686,6 +777,8 @@ function endStripDrag(event,cancel=false){
   stripPointer=null;clearTimeout(pointer.longPressTimer);
   if(pointer.frame)cancelAnimationFrame(pointer.frame);
   pointer.preview?.remove();pointer.marker?.remove();
+  document.querySelector('.calendar-drop-target')?.classList.remove('calendar-drop-target');
+  if(document.body.hasPointerCapture(pointer.pointerId))document.body.releasePointerCapture(pointer.pointerId);
   pointer.outer?.classList.remove('strip-long-press');
   document.body.classList.remove('strip-dragging');
   if(pointer.active){
@@ -699,10 +792,10 @@ function endStripDrag(event,cancel=false){
       if(!pointer.longPress){
         if(pointer.pointerType==='touch'){
           const toggle=state.touchMultiSelect;
-          selectItem(pointer.key,{toggle,reason:'tap',open:!toggle});
+          selectItem(pointer.key,{toggle,reason:pointer.origin==='calendar'?'calendar-tap':'tap',open:!toggle});
         }else{
           state.touchMultiSelect=false;
-          selectItem(pointer.key,{toggle:pointer.toggle,range:pointer.range,reason:'click',open:!pointer.toggle&&!pointer.range});
+          selectItem(pointer.key,{toggle:pointer.toggle,range:pointer.range,reason:pointer.origin==='calendar'?'calendar-click':'click',open:!pointer.toggle&&!pointer.range});
         }
       }
     }else if(pointer.empty&&isEmptyBoardPoint(event))clearStripSelection();
@@ -711,7 +804,8 @@ function endStripDrag(event,cancel=false){
 }
 function applyBoardMove(intent,to){
   const before=snapshotBoardFamily(state.project,state.board);
-  const changed=moveBoardItems(state.project,{boardName:intent.from.boardName||state.board,sourceKeys:intent.sourceKeys,to});
+  const command=to.date?moveCalendarItems:moveBoardItems;
+  const changed=command(state.project,{boardName:intent.from.boardName||state.board,sourceKeys:intent.sourceKeys,to});
   if(changed){
     state.orderHistory.push({boardName:state.board,before});
     state.redoHistory=[];
@@ -895,6 +989,16 @@ function renderCalendarViewer(){
   const next=view.querySelector('.calendar-grid-scroll');if(next){next.scrollTop=top;next.scrollLeft=left}
 }
 
+function flagMatches(flag,{includeDate=true}={}){
+  if(state.flagCategory==='__general__'&&flag.target.kind!=='project')return false;
+  if(state.flagCategory&&state.flagCategory!=='__general__'&&flag.target.category!==state.flagCategory)return false;
+  if(state.flagElement){
+    const element=state.project.elements.find(item=>item.id===state.flagElement);
+    if(!element||flag.target.elementId!==element.id&&(flag.target.category!==element.category||flag.target.element!==element.name))return false;
+  }
+  if(state.flagName&&flag.name!==state.flagName)return false;
+  return !includeDate||intervalOverlaps(flag,state.flagStart,state.flagEnd);
+}
 function renderRedFlagViewer(){
   const view=$('redFlagView'),project=state.project,month=state.flagMonth||new Date().toISOString().slice(0,7);
   const categories=[...new Set([...project.elements.map(item=>item.category),...project.redFlags.map(flag=>flag.target.category)].filter(Boolean))].sort(collator.compare);
@@ -964,7 +1068,8 @@ $('newBoardForm').addEventListener('submit',event=>{
 });
 const isMac=/Mac|iPhone|iPad|iPod/i.test(navigator.userAgentData?.platform||navigator.platform||'');
 function isToggleGesture(event){return isMac?event.metaKey:event.ctrlKey}
-const stripInteractionControls='button,a,input,select,textarea,label,dialog,[contenteditable]:not([contenteditable="false"]),[role="button"]:not(.strip-outer)';
+const stripInteractionControls='button,a,input,select,textarea,label,summary,dialog,[contenteditable]:not([contenteditable="false"]),[role="button"]:not(.strip-outer)';
+function scheduleInteractionEnabled(){return ['board','calendar'].includes(state.mode)&&(!$('boardView').hidden||!$('calendarView').hidden)}
 function boardInteractionEnabled(){return ['board','calendar'].includes(state.mode)&&!$('boardView').hidden}
 function isEmptyBoardPoint(event){
   const view=$('boardView');
@@ -1001,12 +1106,14 @@ $('boardView').addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('pointerdown',event=>{
-  if(!boardInteractionEnabled()||event.button!==0||stripPointer||event.target.closest(stripInteractionControls))return;
-  const outer=$('boardView').contains(event.target)?event.target.closest('.strip-outer[data-strip-index]'):null;
+  if(!scheduleInteractionEnabled()||event.button!==0||stripPointer)return;
+  const calendar=$('calendarView').contains(event.target)?event.target.closest('[data-strip-key]'):null;
+  if(!calendar&&event.target.closest(stripInteractionControls))return;
+  const outer=calendar||($('boardView').contains(event.target)?event.target.closest('.strip-outer[data-strip-index]'):null);
   const empty=!outer&&isEmptyBoardPoint(event);
   if(!outer&&!empty)return;
   const from=outer&&movePositionFrom(outer);
-  stripPointer={pointerId:event.pointerId,pointerType:event.pointerType,outer,empty,
+  stripPointer={pointerId:event.pointerId,pointerType:event.pointerType,origin:calendar?'calendar':'board',outer,empty,
     key:outer&&itemKey(outer),from,fromKind:outer&&(outer.dataset.itemKind||stripAt(from)?.kind),
     wasSelected:!!outer&&state.selectedStripIds.has(itemKey(outer)),
     toggle:isToggleGesture(event),range:event.shiftKey,startX:event.clientX,startY:event.clientY,active:false,longPress:false,scrolling:false};
@@ -1016,7 +1123,7 @@ document.addEventListener('pointerdown',event=>{
       if(stripPointer!==pointer||pointer.scrolling)return;
       pointer.longPress=true;pointer.dragStartX=pointer.lastX??pointer.startX;pointer.dragStartY=pointer.lastY??pointer.startY;
       pointer.outer.classList.add('strip-long-press');
-      if(!state.selectedStripIds.has(pointer.key))selectItem(pointer.key,{toggle:state.touchMultiSelect,reason:'longpress'});
+      if(!state.selectedStripIds.has(pointer.key))selectItem(pointer.key,{toggle:state.touchMultiSelect,reason:pointer.origin==='calendar'?'calendar-longpress':'longpress'});
       state.touchMultiSelect=true;
     },STRIP_GESTURE.longPressMs);
   }
@@ -1056,7 +1163,7 @@ $('moveDialog').addEventListener('close',()=>{state.moveIntent=null});
 $('undoMoveButton').addEventListener('click',undoBoardMove);
 $('redoMoveButton').addEventListener('click',redoBoardMove);
 document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'&&boardInteractionEnabled()&&!event.target.closest('dialog')){
+  if(event.key==='Escape'&&scheduleInteractionEnabled()&&!event.target.closest('dialog')){
     closeSegmentMenu();
     if(stripPointer)endStripDrag(event,true);
     clearStripSelection();
@@ -1089,7 +1196,27 @@ $('saveButton').addEventListener('click',async()=>{
   finally{updateDocumentStatus()}
 });
 window.addEventListener('beforeunload',event=>{if(isDirty()){event.preventDefault();event.returnValue=''}});
-$('layoutSelect').addEventListener('change',e=>{state.layout=e.target.value;state.allReport=false;render()});
+$('layoutSelect').addEventListener('change',e=>{
+  if(state.mode==='board'){
+    state.boardLayoutChoice=e.target.value;
+    if(e.target.value.startsWith('studio:'))state.boardFields=presetFields(state.project,e.target.value.slice(7));
+    syncBoardDisplay();
+  }else state.layout=e.target.value;
+  state.allReport=false;render();
+});
+document.addEventListener('change',event=>{
+  const input=event.target;if(!input.hasAttribute('data-strip-field-option'))return;
+  const calendar=input.dataset.fieldTarget==='calendar',property=calendar?'calendarFields':'boardFields';
+  const chosen=state[property]||presetFields(state.project,calendar?state.calendarPreset:selectedBoardLayout().preset,{calendar});
+  const keys=input.checked?[...chosen,input.dataset.stripFieldOption]:chosen.filter(key=>key!==input.dataset.stripFieldOption);
+  if(!keys.length)return;
+  state[property]=[...new Set(keys)];
+  if(calendar){state.calendarPreset='custom';state.calendarStripMenuOpen=true}
+  else{state.boardLayoutChoice='studio:custom';syncBoardDisplay()}
+  render();
+  const picker=calendar?$('calendarView'):$('boardFieldPicker');
+  [...picker.querySelectorAll('[data-strip-field-option]')].find(el=>el.dataset.stripFieldOption===input.dataset.stripFieldOption)?.focus();
+});
 $('calendarSelect').addEventListener('change',e=>{
   state.calendar=e.target.value;
   state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
@@ -1099,6 +1226,7 @@ $('calendarSelect').addEventListener('change',e=>{
 $('boardNav').addEventListener('click',()=>setMode('board'));
 $('reportNav').addEventListener('click',()=>setMode('report'));
 $('calendarNav').addEventListener('click',()=>setMode('calendar'));
+$('breakdownNav').addEventListener('click',()=>{if(!state.activeSceneId)selectBreakdownScene(breakdownSceneOrder()[0]?.bdsId);setMode('breakdown')});
 $('redFlagNav').addEventListener('click',()=>setMode('redflags'));
 $('dataNav').addEventListener('click',()=>setMode('data'));
 $('dataView').addEventListener('change',event=>{
@@ -1108,8 +1236,12 @@ $('dataView').addEventListener('change',event=>{
   render();
 });
 $('calendarView').addEventListener('click',event=>{
-  const strip=event.target.closest('[data-scene-strip]');
-  if(strip){selectItem(strip.dataset.sceneStrip,{toggle:isToggleGesture(event),range:event.shiftKey,reason:'calendar'});return}
+  if(event.target.closest('#calendarAgendaToggle')){state.calendarAgenda=!state.calendarAgenda;renderCalendarViewer();$('calendarAgendaToggle').focus();return}
+  const strip=event.target.closest('[data-strip-key]');
+  if(strip){
+    if(event.detail!==0){if(performance.now()-lastDragAt<STRIP_GESTURE.postDragClickMs)event.preventDefault();return}
+    selectItem(strip.dataset.stripKey,{toggle:isToggleGesture(event),range:event.shiftKey,reason:'calendar'});return;
+  }
   const all=event.target.closest('[data-calendar-all]');
   if(all){state.calendarVisibility=Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,all.dataset.calendarAll==='true']));state.calendarMenuOpen=true;render();return}
   if(event.target.closest('#calendarRulesToggle')){state.calendarRulesOpen=!state.calendarRulesOpen;render();return}
@@ -1127,10 +1259,19 @@ $('calendarView').addEventListener('click',event=>{
   const date=event.target.closest('[data-date]');
   if(date){state.calendarDate=date.dataset.date;render()}
 });
+$('calendarView').addEventListener('keydown',event=>{
+  const strip=event.target.closest('[data-strip-key]');if(!strip||event.target!==strip)return;
+  if(event.key==='F2'){
+    event.preventDefault();const key=itemKey(strip),from=movePositionFrom(strip);
+    if(!state.selectedStripIds.has(key))selectItem(key,{reason:'calendar'});
+    openMoveDialog({from,fromKind:strip.dataset.itemKind,sourceKeys:[...state.selectedStripIds]});
+  }
+});
 $('calendarView').addEventListener('input',event=>{const target=event.target;if(target.id==='calendarStartDate')state.calendarStartDrafts.set(editingCalendar()?.id,target.value);if(target.id==='calendarGoDate')state.calendarGoDraft=target.value;if(target.id==='calendarMonthInput')state.calendarMonthDraft=target.value});
 $('calendarView').addEventListener('change',event=>{
   const target=event.target;
-  if(target.hasAttribute('data-calendar-extended')){state.calendarExtended=target.checked;state.calendarMenuOpen=true;render();return}
+  if(target.id==='calendarStripPreset'){state.calendarPreset=target.value;state.calendarFields=presetFields(state.project,target.value,{calendar:true});state.calendarExtended=target.value!=='compact';state.calendarStripMenuOpen=true;render();return}
+  if(target.hasAttribute('data-calendar-extended')){state.calendarExtended=target.checked;state.calendarPreset=target.checked?'detailed':'compact';state.calendarFields=presetFields(state.project,state.calendarPreset,{calendar:true});state.calendarMenuOpen=true;render();return}
   if(target.dataset.calendarOption){state.calendarVisibility[target.dataset.calendarOption]=target.checked;state.calendarMenuOpen=true;render();return}
   if(target.dataset.calendarWeekday){applyCalendarCommand(()=>editCalendar(state.project,{calendarId:editingCalendar()?.id,weekday:target.dataset.calendarWeekday,off:target.checked}));return}
   if(target.id==='calendarEditPlan'){state.editPlanId=target.value;render();return}
@@ -1177,7 +1318,11 @@ $('subboardMenu').addEventListener('change',event=>{
   const ids=visibleSegmentIds();if(event.target.checked)ids.add(id);else ids.delete(id);
   clearStripSelection();render();
 });
-document.addEventListener('click',event=>{if(!event.target.closest('.subboard-picker'))closeSegmentMenu()});
+document.addEventListener('click',event=>{
+  if(!event.target.closest('.subboard-picker'))closeSegmentMenu();
+  if(!event.target.closest('.display-options'))$('displayOptions').open=false;
+  if(!event.target.closest('.project-heading'))document.querySelector('.project-heading').open=false;
+});
 $('blackWhite').addEventListener('change',e=>{state.showColors=!e.target.checked;render()});
 $('hideBanners').addEventListener('change',e=>{state.hideBanners=e.target.checked;render()});
 $('hideDayBreaks').addEventListener('change',e=>{state.hideDayBreaks=e.target.checked;render()});
@@ -1211,6 +1356,7 @@ $('rescheduleForm').addEventListener('submit',event=>{
 });
 $('calendarView').addEventListener('toggle',event=>{
   if(event.target.matches('.calendar-view-menu'))state.calendarMenuOpen=event.target.open;
+  if(event.target.matches('.calendar-strip-menu'))state.calendarStripMenuOpen=event.target.open;
   if(event.target.matches('.calendar-selected-detail'))state.calendarDetailOpen=event.target.open;
 },true);
 $('workspaceLayout').addEventListener('change',event=>{
@@ -1218,23 +1364,47 @@ $('workspaceLayout').addEventListener('change',event=>{
   state.layoutChoice=event.target.value;state.previewOpen=state.layoutChoice.endsWith('-breakdown');
   if(state.layoutChoice!=='single')setMode(state.layoutChoice.startsWith('calendar')?'calendar':'board');else render();
 });
-function closeBreakdown(){state.previewOpen=false;if(state.layoutChoice.endsWith('-breakdown'))state.layoutChoice='single';render()}
+function closeBreakdown(){
+  state.previewOpen=false;if(state.layoutChoice.endsWith('-breakdown'))state.layoutChoice='single';
+  if(state.mode==='breakdown')setMode(state.breakdownReturnMode);else render();
+  $('previewButton').focus();
+}
 $('previewButton').addEventListener('click',()=>{
   if(state.previewOpen){closeBreakdown();return}
   state.previewOpen=true;if(canSplit(window.innerWidth))state.layoutChoice=`${state.mode}-breakdown`;render();
 });
-$('breakdownPreview').addEventListener('click',event=>{if(event.target.closest('#closeBreakdown'))closeBreakdown()});
-$('breakdownPreview').addEventListener('change',event=>{if(event.target.id==='hideEmptyCategories'){state.hideEmptyCategories=event.target.checked;renderBreakdown()}});
+$('breakdownPreview').addEventListener('click',event=>{
+  if(event.target.closest('#closeBreakdown'))closeBreakdown();
+  const step=event.target.closest('[data-breakdown-step]');
+  if(step){const scenes=breakdownSceneOrder(),index=scenes.findIndex(s=>s.id===state.activeSceneId);selectBreakdownScene(scenes[index+Number(step.dataset.breakdownStep)]?.bdsId);$('breakdownPreview').querySelector(`[data-breakdown-step="${step.dataset.breakdownStep}"]`)?.focus()}
+});
+function breakdownSceneOrder(){
+  const ids=new Set(displayedEntries().flatMap(e=>e.group.strips.filter(s=>s.kind==='scene').map(s=>s.bdsId)));
+  return [...ids].map(id=>state.sceneMap.get(id)).filter(Boolean).concat(state.project.scenes.filter(s=>!ids.has(s.bdsId)));
+}
+function selectBreakdownScene(id){
+  if(!id||!state.sceneMap.has(id))return;
+  state.activeSceneId=state.sceneMap.get(id).id;
+  state.activeStripId=displayedEntries().flatMap(e=>e.group.strips).find(s=>s.kind==='scene'&&s.bdsId===id)?.sourceKey||null;
+  renderBreakdown();
+  syncStripSelection();
+}
+$('breakdownPreview').addEventListener('change',event=>{
+  if(event.target.id==='hideEmptyCategories'){state.hideEmptyCategories=event.target.checked;renderBreakdown();$('hideEmptyCategories').focus()}
+  if(event.target.id==='breakdownSceneSelect'){selectBreakdownScene(event.target.value);$('breakdownSceneSelect').focus()}
+});
 let splitPointer=null;
-function setSplitRatio(ratio){state.splitRatio=Math.max(25,Math.min(75,ratio));$('workspaceViews').style.setProperty('--split-ratio',`${state.splitRatio}%`);$('workspaceSplitter').setAttribute('aria-valuenow',String(Math.round(state.splitRatio)));fitBoardPreview()}
-$('workspaceSplitter').addEventListener('pointerdown',event=>{splitPointer=event.pointerId;event.target.setPointerCapture(event.pointerId);event.preventDefault()});
-$('workspaceSplitter').addEventListener('pointermove',event=>{if(splitPointer!==event.pointerId)return;const rect=$('workspaceViews').getBoundingClientRect();setSplitRatio((event.clientX-rect.left)/rect.width*100)});
+function setSplitRatio(ratio){state.splitRatio=Math.max(25,Math.min(75,ratio));$('workspaceViews').style.setProperty('--split-ratio',String(state.splitRatio/100));$('workspaceSplitter').setAttribute('aria-valuenow',String(Math.round(state.splitRatio)));fitBoardPreview()}
+$('workspaceSplitter').addEventListener('pointerdown',event=>{if(!event.isPrimary||event.button!==0)return;splitPointer=event.pointerId;event.currentTarget.setPointerCapture(event.pointerId);event.currentTarget.classList.add('dragging');event.preventDefault()});
+$('workspaceSplitter').addEventListener('pointermove',event=>{if(splitPointer!==event.pointerId)return;const rect=$('workspaceViews').getBoundingClientRect(),divider=$('workspaceSplitter').getBoundingClientRect().width;setSplitRatio((event.clientX-rect.left-divider/2)/(rect.width-divider)*100)});
 $('workspaceSplitter').addEventListener('pointerup',()=>{splitPointer=null});
 $('workspaceSplitter').addEventListener('pointercancel',()=>{splitPointer=null});
+$('workspaceSplitter').addEventListener('lostpointercapture',()=>{splitPointer=null;$('workspaceSplitter').classList.remove('dragging')});
 $('workspaceSplitter').addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();setSplitRatio(event.key==='Home'?25:event.key==='End'?75:state.splitRatio+(event.key==='ArrowLeft'?-5:5))}});
 let wasWide=canSplit(window.innerWidth);
 window.addEventListener('resize',()=>{const wide=canSplit(window.innerWidth);if(wide!==wasWide){wasWide=wide;render()}});
 new ResizeObserver(fitBoardPreview).observe($('boardView'));
+document.querySelector('.upload').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();$('fileInput').click()}});
 $('fileInput').addEventListener('change',async e=>{
   const file=e.target.files[0];if(!file)return;
   try{if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Importare un altro file?'))return;

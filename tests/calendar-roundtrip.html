@@ -1,7 +1,7 @@
 <!doctype html><html lang="it"><meta charset="utf-8"><title>Calendar MSD round-trip</title><body><h1>Calendar MSD round-trip</h1><label>Campione reale opzionale <input id="file" type="file" accept=".msd"></label><pre id="result">In corso…</pre><script type="module">
 import {parseMsd} from '../assets/msd-parser.js';
 import {serializeMsd} from '../assets/msd-writer.js';
-import {editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction} from '../assets/calendar-commands.js';
+import {moveCalendarItems,editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction} from '../assets/calendar-commands.js';
 import {calendarDate,boardWithCalendar} from '../assets/production-data.js';
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const bytesEqual=(a,b)=>a.byteLength===b.byteLength&&new Uint8Array(a).every((v,i)=>v===new Uint8Array(b)[i]);
@@ -35,6 +35,16 @@ async function run(bytes,name){
  check('eventi e red flags fissi',equal(p.redFlags.map(f=>[f.id,f.startDate,f.endDate]),reopened.redFlags.map(f=>[f.id,f.startDate,f.endDate])));
  restoreProduction(p,rules);check('Undo ripianificazione ripristina date',equal(dates(p),originalDates));restoreProduction(p,replan);check('Redo ripristina date ripianificate',equal(dates(p),dates(reopened)));
  restoreProduction(p,initial);check('Undo completo restituisce byte originali',bytesEqual(bytes,serializeMsd(p)));
+ const originalKeys=b.scheduledGroups.flatMap(g=>g.strips.map(s=>s.sourceKey)).sort(),source=b.scheduledGroups[0].strips[0],to={boardName:b.name,calendarId:id,date:'2030-01-02'};
+ moveCalendarItems(p,{boardName:b.name,sourceKeys:[source.sourceKey],to});
+ const created=b.scheduledGroups.find(g=>g.date===to.date),dragSaved=serializeMsd(p),dragOpen=await parseMsd(dragSaved,'drag.msd');
+ check('drop su data vuota crea una giornata',created?.created&&created.strips[0]===source);
+ check('tutte le strip conservate nel modello',equal(b.scheduledGroups.flatMap(g=>g.strips.map(s=>s.sourceKey)).sort(),originalKeys));
+ check('nuova data e scena persistono',dragOpen.boards.find(x=>x.name===b.name).scheduledGroups.some(g=>g.date===to.date&&g.strips.some(s=>s.bdsId===source.bdsId)));
+ check('date originali non ripianificate',equal(b.scheduledGroups.filter(g=>!g.created).map(g=>g.date),originalDates[p.boards.indexOf(b)]));
+ check('date bloccate conservate alla riapertura',equal(dates(dragOpen),dates(p)));
+ check('nuovo save no-op dopo riapertura',bytesEqual(dragSaved,serializeMsd(dragOpen)));
+ restoreProduction(p,initial);check('Undo nuova giornata restituisce byte originali',bytesEqual(bytes,serializeMsd(p)));
  }catch(error){failures++;lines.push(`✗ ${error.stack}`)}
  document.querySelector('#result').textContent=lines.join('\n')+`\n${failures?'ERRORI: '+failures:'TUTTI I CONTROLLI SUPERATI'}`;document.body.dataset.passed=String(!failures);
 }
