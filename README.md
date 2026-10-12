@@ -6,7 +6,7 @@
 
 > **Day Out of Days:** DOOD derivato dalle strip correnti, regole per Sub-board/categoria/elemento, eventi condivisi con Calendar, Summary/CSV e anteprima di stampa paginata comune con lo schedule. I nuovi metadati si salvano nel progetto `.studio.json`; l’esportazione nativa MSD/MMSX resta conservativa. Vedi [analisi, interpretazioni e verifiche DOOD](docs/dood.md).
 
-# Stripboard Studio v1.9
+# Stripboard Studio v1.10
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
