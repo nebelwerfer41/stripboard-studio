@@ -12,12 +12,13 @@
       <div class="topbar">
         <div class="brand" aria-label="Stripboard Studio"><span class="brand-mark" aria-hidden="true">▥</span><span><strong>STRIPBOARD</strong><small>STUDIO</small></span></div>
         <details class="project-heading"><summary><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><span aria-hidden="true">⌄</span></summary><div class="project-menu"><div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div></div></details>
-        <div class="top-actions"><span class="local-badge" title="File elaborati in locale">● Locale</span><span id="dirtyIndicator" role="status">Salvato</span><label class="upload" tabindex="0" role="button" aria-label="Importa un file .msd o .mmsx"><input id="fileInput" type="file" accept=".msd,.mmsx">＋ <span>Importa</span></label><button id="saveButton" type="button">↓ Salva .msd</button><button id="printButton" class="print-button" type="button">↗ <span>Stampa vista</span></button></div>
+        <div class="top-actions"><span class="local-badge" title="File elaborati in locale">● Locale</span><span id="dirtyIndicator" role="status">Salvato</span><label class="upload" tabindex="0" role="button" aria-label="Importa un progetto .msd, .mmsx o .studio.json"><input id="fileInput" type="file" accept=".msd,.mmsx,.studio.json">＋ <span>Importa</span></label><button id="saveButton" type="button">↓ Salva .msd</button><button id="printButton" class="print-button" type="button">↗ <span>Stampa vista</span></button></div>
       </div>
       <nav class="primary-nav" aria-label="Navigazione principale">
         <button class="nav active" id="boardNav" title="Durante un drag, tieni la strip qui per aprire la Stripboard" type="button" aria-current="page"><span aria-hidden="true">▤</span> Stripboard <em id="boardCount">—</em></button>
         <button class="nav" id="calendarNav" title="Durante un drag, tieni la strip qui per aprire Calendar" type="button"><span aria-hidden="true">▦</span> Calendar <em id="calendarCount">—</em></button>
         <button class="nav" id="breakdownNav" type="button"><span aria-hidden="true">▧</span> Spoglio</button>
+        <button class="nav" id="doodNav" type="button"><span aria-hidden="true">▦</span> DOOD</button>
         <button class="nav" id="reportNav" type="button"><span aria-hidden="true">▥</span> Report <em id="reportCount">—</em></button>
         <button class="nav" id="redFlagNav" type="button" title="Red Flag Entry"><span aria-hidden="true">⚑</span> Red Flags <em id="redFlagCount">—</em></button>
         <button class="nav" id="dataNav" type="button" title="Dettagli progetto ed elementi"><span aria-hidden="true">≡</span> Progetto ed elementi</button>
@@ -50,6 +51,7 @@
           <div class="workspace-toolbar" id="workspaceToolbar"><button type="button" id="previewButton" aria-expanded="false">Anteprima Spoglio</button><label id="workspaceLayoutControl">Vista <select id="workspaceLayout"><option value="single">Vista singola</option><option value="board-breakdown">Stripboard + Spoglio</option><option value="calendar-breakdown">Calendar + Spoglio</option><option value="calendar-board">Calendar + Stripboard</option></select></label><span id="splitHint"></span></div>
           <div id="workspaceViews" class="workspace-views">
           <div id="boardView" class="view"></div>
+          <div id="doodView" class="view" hidden></div>
           <div id="reportView" class="view" hidden></div>
           <div id="calendarView" class="view" hidden></div>
           <div id="redFlagView" class="view" hidden></div>
