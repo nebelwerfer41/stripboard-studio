@@ -7,6 +7,37 @@ import {parseMmsx,serializeMmsx} from '../assets/mmsx-project.js';
 import {editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction,calendarSignature} from '../assets/calendar-commands.js';
 import {calendarPlanEntries,calendarDayContent,breakdownCategories,activeSceneContext,canSplit,groupSummary} from '../assets/calendar-selectors.js';
 import {calendarMarkup,breakdownMarkup,CALENDAR_VISIBILITY} from '../assets/workspace-views.js';
+for(const format of ['5','3','hybrid'])test(`${format}: switching calendars keeps visible shooting days, strips and native dates without editing the file`,async()=>{
+ const bytes=await encodeMmsx(fixture(format)),p=await parseMmsx(bytes),b=p.boards[0],other=p.calendars.find(c=>c.id!==b.calendarId),initial=snapshotProduction(p);
+ const visible=new Set([b.segmentId]),original=calendarPlanEntries(p,b.name,visible,b.calendarId),switched=calendarPlanEntries(p,b.name,visible,other.id);
+ assert(original.some(e=>e.group.strips.some(s=>s.kind==='scene')));
+ assert.deepEqual(switched,original);
+ for(const entry of switched){assert.equal(entry.board,b);assert.equal(entry.group,b.scheduledGroups[entry.groupIndex]);assert.equal(entry.container,'scheduledGroups')}
+ const s={calendar:other.id,board:b.name,visibleSegments:visible,calendarMonth:'2026-10',calendarDate:'2026-10-06',selectedStripIds:new Set(),calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true]))};
+ const helpers={safe:String,shortDate:String,pages:String,specialLabel:()=>'',sceneColors:()=>({})},html=calendarMarkup(p,s,helpers);
+ assert(html.includes('data-scene-strip'));assert(html.includes('class="calendar-summary"'));assert(html.includes('Scena di prova'));
+ assert(!html.includes('nessun segmento visibile associato'));
+ const all=calendarPlanEntries(p,b.name,new Set(['a','b','yard']),other.id);
+ assert(all.some(e=>e.board===p.boards[1]));assert(!all.some(e=>e.container==='unscheduledGroups'));
+ assert.deepEqual(calendarPlanEntries(p,b.name,new Set(['yard']),other.id),[]);
+ assert.deepEqual(snapshotProduction(p),initial);assert.deepEqual(await serializeMmsx(p,'noop.mmsx'),bytes);
+});
+for(const format of ['5','3','hybrid'])test(`${format}: rules panel follows the selected calendar and keeps separate start-date drafts`,async()=>{
+ const p=await parseMmsx(await encodeMmsx(fixture(format))),b=p.boards[0],other=p.calendars.find(c=>c.id!==b.calendarId&&c.scope.segmentId==='b');
+ editCalendar(p,{calendarId:other.id,weekday:'Tue',off:true});editCalendar(p,{calendarId:other.id,startDate:'2030-01-02'});editCalendar(p,{calendarId:other.id,date:'2026-10-06',type:'travel'});
+ const initial=snapshotProduction(p),bytes=await serializeMmsx(p,'rules.mmsx');
+ const state={calendar:other.id,board:b.name,visibleSegments:new Set(['a','b']),calendarMonth:'2026-10',calendarDate:'2026-10-06',calendarRulesOpen:true,selectedStripIds:new Set(),calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true]))};
+ const helpers={safe:String,shortDate:String,pages:String,specialLabel:()=>'',sceneColors:()=>({})};
+ const panel=s=>calendarMarkup(p,s,helpers).split('<aside class="calendar-rules"')[1];
+ const selected=panel(state);assert(selected.includes(`<strong>${other.name}</strong>`));assert(selected.includes('value="2030-01-02"'));assert(selected.includes('data-calendar-weekday="Tue" checked'));assert(selected.includes('value="travel" selected'));assert(selected.includes(p.boards[1].name));
+ assert(!selected.includes('calendarEditPlan'));assert(!selected.includes('Consulta questo calendario'));
+ const drafts=new Map([[other.id,''],[b.calendarId,'2027-05-01']]);
+ assert(panel({...state,calendarStartDrafts:drafts}).includes('id="calendarStartDate" type="date" value=""'));
+ assert(panel({...state,calendar:b.calendarId,calendarStartDrafts:drafts}).includes('value="2027-05-01"'));
+ const yard=p.calendars.find(c=>c.scope.segmentId==='yard'),yardPanel=panel({...state,calendar:yard.id});
+ assert(yardPanel.includes(`<strong>${yard.name}</strong>`));assert(yardPanel.includes('Nessun piano associato'));assert(yardPanel.includes('id="calendarReschedule" disabled'));
+ assert.deepEqual(snapshotProduction(p),initial);assert.equal(stringifyExact(await decodeMmsx(await serializeMmsx(p,'rules.mmsx'))),stringifyExact(await decodeMmsx(bytes)));
+});
 for(const format of ['5','3','hybrid'])test(`${format}: rule edits, explicit replan, undo/redo and calendar save/reopen preserve opaque data`,async()=>{
  const root=fixture(format),bytes=await encodeMmsx(root),p=await parseMmsx(bytes),b=p.boards[0],id=b.calendarId,c=p.calendars.find(c=>c.id===id),initial=snapshotProduction(p);
  const order=b.scheduledGroups.map(g=>g.strips.map(s=>s.sourceKey)),dates=b.scheduledGroups.map(g=>g.date);

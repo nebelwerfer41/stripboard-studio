@@ -1,7 +1,12 @@
 import {entriesForBoard} from './board-segments.js';
-import {calendarDate,eventsOnDate,redFlagsOnDate,redFlagsForStrip,findCalendar,outsideCalendarActivity} from './production-data.js';
+import {calendarDate,eventsOnDate,redFlagsOnDate,redFlagsForStrip,findCalendar,outsideCalendarActivity,boardWithCalendar} from './production-data.js';
 export function calendarPlanEntries(project,boardName,visibleIds,calendarId){
-  return entriesForBoard(project,boardName,visibleIds).filter(e=>e.container==='scheduledGroups'&&e.board.calendarId===calendarId);
+  const boards=new Map();
+  return entriesForBoard(project,boardName,visibleIds).filter(e=>e.container==='scheduledGroups').map(entry=>{
+    if(!boards.has(entry.board.name))boards.set(entry.board.name,boardWithCalendar(project,entry.board.name,calendarId)||entry.board);
+    const board=boards.get(entry.board.name);
+    return {...entry,board,group:board.scheduledGroups[entry.groupIndex]};
+  });
 }
 export function estimateMinutes(value){
   if(value==null||value==='')return null;

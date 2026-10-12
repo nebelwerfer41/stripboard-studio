@@ -25,7 +25,7 @@ const state = {project:null, mode:'board', board:null, calendar:null, calendarMo
   layout:null,boardLayoutChoice:null,boardFields:null,calendarPreset:'compact',calendarFields:null,calendarStripMenuOpen:false,query:'', unscheduled:false,segmentVisibility:new Map(),showColors:true, hideBanners:false, hideDayBreaks:false,
   allReport:false, importedSource:null, printHeader:true,reportOptions:new Map(),
   revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],redoHistory:[],
-  activeSceneId:null,layoutChoice:'single',previewOpen:false,breakdownReturnMode:'board',splitRatio:55,hideEmptyCategories:true,editPlanId:null,calendarRulesOpen:false,calendarStartDrafts:new Map(),calendarGoDraft:null,calendarMonthDraft:null,calendarMenuOpen:false,calendarDetailOpen:false,calendarExtended:false,calendarAgenda:true,calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true])),
+  activeSceneId:null,layoutChoice:'single',previewOpen:false,breakdownReturnMode:'board',splitRatio:55,hideEmptyCategories:true,calendarRulesOpen:false,calendarStartDrafts:new Map(),calendarGoDraft:null,calendarMonthDraft:null,calendarMenuOpen:false,calendarDetailOpen:false,calendarExtended:false,calendarAgenda:true,calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true])),
   selectedStripIds:new Set(),selectionAnchorId:null,activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
 const freshDoodUI=()=>({category:'',ruleElement:'',sort:[{key:'id',direction:'asc'}],hideUnused:false,hideOff:false,compact:true,selected:null,rulesOpen:false,goDate:null});
 state.dood=freshDoodUI();
@@ -61,6 +61,15 @@ function syncSegmentControls(){
 function closeSegmentMenu(){$('subboardMenu').hidden=true;$('toggleUnscheduled').setAttribute('aria-expanded','false')}
 const displayedBoard = () => boardWithCalendar(state.project,state.board,state.calendar)||selectedBoard();
 const selectedProductionCalendar = () => findCalendar(state.project,state.calendar)||state.project.calendars[0];
+function consultCalendar(id){
+  state.calendar=id;$('calendarSelect').value=id;
+  if(state.project.capabilities.calendarProjection){
+    state.calendarGoDraft=null;state.calendarMonthDraft=null;
+    state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
+    state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);
+  }
+  render();
+}
 const selectedBoardLayout=()=>state.boardLayoutChoice?.startsWith('studio:')?standardLayout(state.boardLayoutChoice.slice(7)):state.project.stripLayouts.find(l=>l.name===state.boardLayoutChoice)||state.project.stripLayouts[0];
 const selectedLayout = () => state.mode==='board'?selectedBoardLayout():state.project.reportLayouts.find(l=>l.name===state.layout);
 function syncBoardDisplay(){
@@ -111,7 +120,7 @@ function setProject(data){
   if(isMmsx)state.mode='board';
   for(const [id,key] of [['reportNav','reports'],['calendarNav','readCalendars'],['redFlagNav','readRedFlags'],['newBoardButton','createBoards']])$(id).disabled=!data.capabilities[key];
   $('saveButton').textContent=isMmsx?'↓ Salva .mmsx':'↓ Salva .msd';
-  state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;state.activeSceneId=null;state.editPlanId=null;state.calendarStartDrafts.clear();state.calendarGoDraft=null;state.calendarMonthDraft=null;state.layoutChoice='single';state.previewOpen=false;
+  state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;state.activeSceneId=null;state.calendarStartDrafts.clear();state.calendarGoDraft=null;state.calendarMonthDraft=null;state.layoutChoice='single';state.previewOpen=false;
   clearStripSelection();
   state.dood=freshDoodUI();state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;state.dataScene=null;state.dataCategory='';state.dataElement=null;
   state.boardLayoutChoice=null;state.boardFields=null;state.calendarPreset=state.calendarExtended?'detailed':'compact';state.calendarFields=presetFields(data,state.calendarPreset,{calendar:true});
@@ -700,7 +709,7 @@ function calendarDropPosition(x,y){
     return {position,anchor,after,wrap:node,vertical:false,cell};
   }
   const source=boardAt(stripPointer?.intent?.from),candidates=entriesForBoard(state.project,state.board,visibleSegmentIds()).map(e=>e.board).filter(b=>b.calendarId===state.calendar);
-  const target=candidates.find(b=>b===source)||candidates.find(b=>b.id===state.editPlanId)||candidates[0];
+  const target=candidates.find(b=>b===source)||candidates.find(b=>b.name===state.board)||candidates[0];
   if(!target)return null;
   return {position:{boardName:target.name,date:cell.dataset.calendarCell,calendarId:state.calendar},wrap:cell.querySelector('.cell-content'),anchor:null,after:false,vertical:false,cell};
 }
@@ -1058,7 +1067,7 @@ $('projectSelect').addEventListener('change',async e=>{
 $('boardSelect').addEventListener('change',e=>{
   clearStripSelection();
   const parent=boardGroups(state.project).find(item=>item.id===e.target.value);if(!parent)return;
-  state.board=parent.plans[0].name;state.editPlanId=null;closeSegmentMenu();syncSegmentControls();
+  state.board=parent.plans[0].name;closeSegmentMenu();syncSegmentControls();
   state.calendar=selectedBoard()?.calendarId||findCalendar(state.project,state.project.defaultCalendar)?.id;
   $('calendarSelect').value=state.calendar;
   state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
@@ -1231,10 +1240,7 @@ document.addEventListener('change',event=>{
   [...picker.querySelectorAll('[data-strip-field-option]')].find(el=>el.dataset.stripFieldOption===input.dataset.stripFieldOption)?.focus();
 });
 $('calendarSelect').addEventListener('change',e=>{
-  state.calendar=e.target.value;
-  state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
-  state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);
-  render();
+  consultCalendar(e.target.value);
 });
 $('boardNav').addEventListener('click',()=>setMode('board'));
 $('reportNav').addEventListener('click',()=>setMode('report'));
@@ -1265,10 +1271,6 @@ $('calendarView').addEventListener('click',event=>{
 
   const go=event.target.closest('[data-go-date]');
   if(go){if(!go.dataset.goDate)return;state.calendarGoDraft=null;state.calendarMonthDraft=null;state.calendarDate=go.dataset.goDate;state.calendarMonth=state.calendarDate.slice(0,7);render();return}
-  const calendar=event.target.closest('[data-calendar-name]');
-  if(calendar){state.calendar=calendar.dataset.calendarName;$('calendarSelect').value=state.calendar;
-    state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
-    state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);render();return}
   const step=event.target.closest('[data-month-step]');
   if(step){state.calendarMonth=monthShift(state.calendarMonth,Number(step.dataset.monthStep));state.calendarDate=`${state.calendarMonth}-01`;render();return}
   const date=event.target.closest('[data-date]');
@@ -1289,7 +1291,6 @@ $('calendarView').addEventListener('change',event=>{
   if(target.hasAttribute('data-calendar-extended')){state.calendarExtended=target.checked;state.calendarPreset=target.checked?'detailed':'compact';state.calendarFields=presetFields(state.project,state.calendarPreset,{calendar:true});state.calendarMenuOpen=true;render();return}
   if(target.dataset.calendarOption){state.calendarVisibility[target.dataset.calendarOption]=target.checked;state.calendarMenuOpen=true;render();return}
   if(target.dataset.calendarWeekday){applyCalendarCommand(()=>editCalendar(state.project,{calendarId:editingCalendar()?.id,weekday:target.dataset.calendarWeekday,off:target.checked}));return}
-  if(target.id==='calendarEditPlan'){state.editPlanId=target.value;render();return}
   if(target.id==='calendarException'){applyCalendarCommand(()=>editCalendar(state.project,{calendarId:editingCalendar()?.id,date:state.calendarDate||`${state.calendarMonth}-01`,type:target.value||null}));return}
   if(target.id==='calendarStartDate'){const id=editingCalendar()?.id;if(applyCalendarCommand(()=>editCalendar(state.project,{calendarId:id,startDate:target.value})))state.calendarStartDrafts.delete(id);return}
   if(target.id==='calendarGoDate'&&target.value){state.calendarGoDraft=null;state.calendarDate=target.value;state.calendarMonth=target.value.slice(0,7);render();return}
@@ -1351,12 +1352,11 @@ $('printButton').addEventListener('click',()=>{
   requestAnimationFrame(()=>window.print());
 });
 function editingCalendar(){
-  const plans=selectedBoardGroup()?.plans||[],plan=plans.find(b=>b.id===state.editPlanId)||plans[0];
-  return findCalendar(state.project,plan?.calendarId);
+  return findCalendar(state.project,state.calendar);
 }
 function openReschedulePreview(){
   try{
-    const c=editingCalendar();if(!c)throw Error('Nessun calendario associato');
+    const c=editingCalendar();if(!c)throw Error('Nessun calendario selezionato');
     if(state.calendarStartDrafts.has(c.id)&&state.calendarStartDrafts.get(c.id)!==c.scheduleDates.ProductionStartDate?.iso)throw Error('Completa e applica il campo Inizio riprese prima di ripianificare');
     const preview=previewReschedule(state.project,c.id);state.rescheduleIntent={calendarId:c.id,preview};
     $('rescheduleEffects').innerHTML=`<p><strong>${safe(c.name)}</strong> · ${preview.length} piani/segmenti coinvolti</p>`+
@@ -1498,7 +1498,7 @@ $('doodView').addEventListener('change',event=>{
     applyStudioCommand(()=>setDoodRules(state.project,state.board,{category,elementId:ui.ruleElement,rules:element?override:rules}));
   }
 });
-const eventManager=createEventManager({getContext:()=>({project:state.project,board:state.mode==='calendar'?(selectedBoardGroup().plans.find(b=>b.id===state.editPlanId)||selectedBoard()):selectedBoard(),calendar:state.mode==='calendar'?editingCalendar():findCalendar(state.project,selectedBoard().calendarId),date:state.mode==='dood'?state.dood.goDate||state.doodReport.dates[0]?.date:state.calendarDate}),onChange:command=>applyStudioCommand(()=>{ensureStudio(state.project);command()})});
+const eventManager=createEventManager({getContext:()=>({project:state.project,board:state.mode==='calendar'?(selectedBoard().calendarId===state.calendar?selectedBoard():state.project.boards.find(b=>b.calendarId===state.calendar)||selectedBoard()):selectedBoard(),calendar:state.mode==='calendar'?editingCalendar():findCalendar(state.project,selectedBoard().calendarId),date:state.mode==='dood'?state.dood.goDate||state.doodReport.dates[0]?.date:state.calendarDate}),onChange:command=>applyStudioCommand(()=>{ensureStudio(state.project);command()})});
 const printService=createPrintService({
   getSource(){
     const metadata={title:state.project.title,boardName:selectedBoardGroup().name,date:new Date().toLocaleDateString('it-IT',{timeZone:'Europe/Rome'}),version:`${state.project.fileName} · revisione ${state.revision}`};

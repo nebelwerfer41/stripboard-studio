@@ -6,9 +6,9 @@
 
 > **Day Out of Days:** DOOD derivato dalle strip correnti, regole per Sub-board/categoria/elemento, eventi condivisi con Calendar, Summary/CSV e anteprima di stampa paginata comune con lo schedule. I nuovi metadati si salvano nel progetto `.studio.json`; l’esportazione nativa MSD/MMSX resta conservativa. Vedi [analisi, interpretazioni e verifiche DOOD](docs/dood.md).
 
-# Stripboard Studio v1.11
+# Stripboard Studio v1.12
 
-Version 1.11 combines Day Out of Days and the shared print preview with fixes for MMSX Boneyard metadata preservation and MSD custom category imports. It retains Studio project saving and conservative native MSD/MMSX exports.
+Version 1.12 fixes Calendar selection and rule editing while retaining Day Out of Days, the shared print preview, Studio project saving, MMSX Boneyard metadata preservation and MSD custom category imports.
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
@@ -58,7 +58,7 @@ Control names below are given in English; some labels in the application are cur
 - Print stripboards and DOOD through the shared preview with paper size, orientation, margins and scale. PDF uses the same preview document via the browser’s Save as PDF destination. The application retains options for the header and starting each day on a new page.
 - Import other local `.msd` files compatible with the sample format.
 
-Day dates are derived from calendars by the included parser and marked as estimates. In Stripboard, selecting another calendar changes only the reading projection; Calendar shows the dates actually associated with the selected calendar: strips, scenes, and schedule order remain intact. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
+Day dates are derived from calendars by the included parser and marked as estimates. In Stripboard, selecting another calendar changes only the reading projection; Calendar keeps all visible scheduled segments: MSD uses the same read-only date projection as Stripboard, while MMSX retains native dates and the displayed month. Strips, scenes, and schedule order remain intact. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
 
 ## MSD writer and integrity
 
@@ -111,3 +111,11 @@ CHROME_PATH=/usr/bin/chromium SYNTHETIC_MMSX=/path/to/fixture.mmsx node tests/br
 ```
 
 The DOOD suite checks rules, events, scene navigation, Studio/native round-trips, shared print preview and PDF page/text parity. The last suite checks independent field settings without file changes, calendar reorder, both cross-pane directions, blank-date save/reopen, cancellation, Undo/Redo, tablet/phone navigation during drag and native phone touch multiselection. MMSX uses the synthetic fixture described in [the calendar documentation](docs/calendar-workspace.md); MSD uses the included real sample.
+
+## v1.12 — Calendar fixes
+
+Changing the selected calendar keeps scene strips and shooting-day summaries visible. Calendar uses the same read-only MSD date projection as Stripboard; MMSX keeps native dates, the displayed month and the selected date.
+
+**Rules and dates** now edits the selected calendar. Weekday rules, date exceptions, production start and rescheduling use that calendar, with associated plans listed in the panel. Start-date drafts remain separate for each calendar.
+
+Verified with the Node suites and Chromium browser tests for MSD and MMSX 5, 3 and hybrid: calendar switching, targeted edits, save/reopen and Undo. Changing the calendar alone preserves the original file bytes.

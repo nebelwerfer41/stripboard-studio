@@ -35,7 +35,7 @@ Le date sono civili ISO `YYYY-MM-DD`, senza conversioni di fuso. Gli intervalli 
 ## Date e calendari
 
 - MMSX: date delle giornate native (`stored`). Selezionare un calendario non genera altre date. Un'incoerenza rispetto alle regole è segnalata nella consultazione.
-- MSD: date di ripresa inferite (`inferred`) con l'algoritmo esistente. La Stripboard conserva la proiezione di lettura legacy, senza modificare `CalendarName` esportato. Calendar visualizza i gruppi effettivamente associati al calendario consultato; non proietta giornate di calendari diversi.
+- MSD: date di ripresa inferite (`inferred`) con l'algoritmo esistente. Stripboard e Calendar usano la stessa proiezione di lettura, senza modificare `CalendarName` esportato. Calendar conserva le giornate e le strip dei segmenti visibili anche quando si consulta un calendario diverso; per MMSX mantiene le date native e il mese visualizzato.
 - Le regole MMSX usano bit lunedì=0 … domenica=6. `offday`, `travel`, `holiday`, `workday` hanno traduzione esplicita. Il lavorativo forzato prevale sul riposo settimanale. Combinazioni MSD conflittuali restano non risolte.
 - Start riprese, prep, end e wrap sono informazioni diverse. Non vengono sintetizzati prep/end/wrap MMSX né dedotti dall'ultima giornata. Senza prep nativo, una data prima di `prodStart` non è classificata automaticamente fuori attività.
 - Le date prep/end/wrap lette da MSD sono valori presenti in quell'MSD; la sola importazione non può dimostrare se un altro programma li abbia derivati. La coppia analizzata dimostra tale derivazione per il campione, senza legittimare una regola universale per qualsiasi MSD.

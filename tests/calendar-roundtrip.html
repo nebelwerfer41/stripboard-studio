@@ -3,6 +3,7 @@ import {parseMsd} from '../assets/msd-parser.js';
 import {serializeMsd} from '../assets/msd-writer.js';
 import {moveCalendarItems,editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction} from '../assets/calendar-commands.js';
 import {calendarDate,boardWithCalendar} from '../assets/production-data.js';
+import {calendarPlanEntries,calendarDayContent} from '../assets/calendar-selectors.js';
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const bytesEqual=(a,b)=>a.byteLength===b.byteLength&&new Uint8Array(a).every((v,i)=>v===new Uint8Array(b)[i]);
 const order=p=>p.boards.map(b=>b.scheduledGroups.map(g=>g.strips.map(s=>s.sourceKey)));
@@ -12,7 +13,17 @@ async function run(bytes,name){
  try{
  const p=await parseMsd(bytes,name),b=p.boards.find(b=>b.scheduledGroups.some(g=>g.kind==='ScheduleDay')),id=b.calendarId,c=p.calendars.find(c=>c.id===id),initial=snapshotProduction(p),originalDates=dates(p),originalOrder=order(p);
  check('no-op binariamente identico',bytesEqual(bytes,serializeMsd(p)));
- boardWithCalendar(p,b.name,p.calendars.find(x=>x.id!==id)?.id);calendarDate(c,'2030-01-01');check('consultazione senza mutazione',bytesEqual(bytes,serializeMsd(p)));
+ const other=p.calendars.find(x=>x.id!==id);
+ if(other){
+  const projected=boardWithCalendar(p,b.name,other.id),entries=calendarPlanEntries(p,b.name,new Set([b.segmentId]),other.id);
+  check('cambio calendario conserva tutte le giornate',entries.length===b.scheduledGroups.length);
+  check('Calendar e Stripboard mostrano le stesse date proiettate',equal(entries.map(e=>e.group.date),projected.scheduledGroups.map(g=>g.date)));
+  check('strip e posizioni originali conservate',entries.every(e=>e.group.strips===b.scheduledGroups[e.groupIndex].strips&&e.board.name===b.name));
+  const day=entries.find(e=>e.group.kind==='ScheduleDay'&&e.group.date);
+  check('giornata proiettata disponibile nella griglia',day&&calendarDayContent(p,other.id,day.group.date,entries).days.some(e=>e.group.id===day.group.id));
+  check('ritorno al calendario originale ripristina la vista',calendarPlanEntries(p,b.name,new Set([b.segmentId]),id).every(e=>e.group===b.scheduledGroups[e.groupIndex]));
+ }
+ calendarDate(c,'2030-01-01');check('consultazione senza mutazione',equal(dates(p),originalDates)&&bytesEqual(bytes,serializeMsd(p)));
  editCalendar(p,{calendarId:id,weekday:'Mon',off:c.daysOff.Mon!=='1'});
  check('regole separate dalle date',equal(dates(p),originalDates));
  const ruleBytes=serializeMsd(p),ruleOpen=await parseMsd(ruleBytes,'rules.msd');
