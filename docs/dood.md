@@ -1,5 +1,7 @@
 # Day Out of Days — analisi e contratto
 
+Dalla v1.13 il DOOD mostra una sola categoria alla volta: all’apertura seleziona la prima categoria disponibile e il menu non offre «Tutte». Matrice, regole categoria/elemento, CSV Summary e stampa seguono la categoria scelta. Cambiare categoria è una preferenza di visualizzazione e non modifica il progetto.
+
 ## Fase 1: architettura verificata prima dell'implementazione
 
 - `project-model.js` normalizza scene (`bdsId`, `id`), elementi (`id`, categoria, BoardID) e `scene.elementRefs`. MSD associa categoria/nome; MMSX conserva ID e quantità. Il motore usa gli ID risolti, non il testo visualizzato.
@@ -44,6 +46,6 @@ CHROME_PATH=/usr/bin/chromium node tests/browser-dood.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
 ```
 
-La suite DOOD verifica il campione MSD reale (59 cast), regole/override, navigazione scena, eventi, undo/redo, conservazione binaria dell'esportazione nativa, salvataggio/riapertura Studio, contenitori MMSX 5/3/hybrid, anteprima condivisa, Summary-only, ingombro tabelle e PDF effettivo con numero di pagine/testo corrispondente all'anteprima. I test puri coprono scene uniche/multiple, Hold/off, Drop/soglie, eventi prima/dopo le scene e fra gli intervalli, Holiday/Move, spostamenti strip/day break, calendario, sub-board e paginazione su entrambi gli assi.
+La suite DOOD verifica selezione iniziale e cambio di categoria senza opzione «Tutte», fallback da selezioni non valide senza modificare il documento, il campione MSD reale (59 cast), regole/override, navigazione scena, eventi, undo/redo, conservazione binaria dell'esportazione nativa, salvataggio/riapertura Studio, contenitori MMSX 5/3/hybrid, anteprima condivisa, Summary-only, ingombro tabelle e PDF effettivo con numero di pagine/testo corrispondente all'anteprima. I test puri coprono scene uniche/multiple, Hold/off, Drop/soglie, eventi prima/dopo le scene e fra gli intervalli, Holiday/Move, spostamenti strip/day break, calendario, sub-board e paginazione su entrambi gli assi.
 
 Rinvii: generazione PDF diretta senza dialogo browser e file XLSX nativi (disponibili Salva come PDF e CSV); editing di eventi nativi e decodifica dei valori DOOD proprietari MSD; importazione di regole/report DOOD senza campioni che ne dimostrino la semantica. Nessun confronto di conformità con un'installazione MMS 6/10 è stato eseguito. Nel dialogo browser usare scala 100%, margini nessuno e disabilitare intestazioni/piè di pagina del browser; carta e impaginazione sono già nel documento dell'anteprima.

@@ -1432,8 +1432,10 @@ $('fileInput').addEventListener('change',async e=>{
   }catch(err){showStatus(err.message);$('projectTitle').textContent='Importazione non riuscita'}finally{e.target.value=''}
 });
 function currentDoodReport(){
-  const report=calculateDood({project:state.project,board:selectedBoard(),calendar:findCalendar(state.project,selectedBoard().calendarId)}),ui=state.dood;
-  report.rows=sortDoodRows(report.rows.filter(r=>(!ui.category||r.element.category===ui.category)&&(!ui.hideUnused||r.totals.worked||r.totals.held)&&(!state.query||`${r.element.boardId||''} ${r.element.name}`.toLocaleLowerCase().includes(state.query.toLocaleLowerCase()))),ui.sort);
+  const ui=state.dood,categories=[...new Set(state.project.elements.map(e=>e.category))];
+  if(!categories.includes(ui.category))ui.category=categories[0]??'';
+  const report=calculateDood({project:state.project,board:selectedBoard(),calendar:findCalendar(state.project,selectedBoard().calendarId),elements:state.project.elements.filter(e=>e.category===ui.category)});
+  report.rows=sortDoodRows(report.rows.filter(r=>(!ui.hideUnused||r.totals.worked||r.totals.held)&&(!state.query||`${r.element.boardId||''} ${r.element.name}`.toLocaleLowerCase().includes(state.query.toLocaleLowerCase()))),ui.sort);
   if(ui.hideOff){const indices=report.dates.map((d,i)=>d.calendar.working!==false?i:-1).filter(i=>i>=0);report.dates=indices.map(i=>report.dates[i]);report.rows=report.rows.map(r=>({...r,cells:indices.map(i=>r.cells[i])}))}
   return report;
 }

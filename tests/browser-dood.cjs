@@ -11,6 +11,21 @@ const out=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-dood-qa';
  try{
  const page=await browser.newPage({viewport:{width:1600,height:1050}}),errors=[];page.on('pageerror',e=>errors.push(e.stack));page.on('dialog',d=>d.accept());await page.addInitScript(()=>{delete window.showSaveFilePicker});
  await page.goto(base);await page.waitForSelector('.strip-outer');await page.locator('#doodNav').click();await page.waitForSelector('.dood-grid');
+ const categories=await page.evaluate(async()=>{
+  const {parseMsd}=await import('./assets/msd-parser.js'),project=await parseMsd(await(await fetch('./samples/Wonderful%20Life%20Demo.msd')).arrayBuffer());
+  return Object.fromEntries([...new Set(project.elements.map(el=>el.category))].map(category=>[category,project.elements.filter(el=>el.category===category).map(el=>el.name).sort()]));
+ });
+ assert.equal(await page.locator('#doodCategory option[value=""]').count(),0);
+ const firstCategory=await page.locator('#doodCategory').inputValue();assert(firstCategory);
+ const rowNames=async()=> (await page.locator('.dood-grid tbody .dood-name').allTextContents()).sort();
+ assert.deepEqual(await rowNames(),categories[firstCategory]);
+ const otherCategory=Object.keys(categories).find(c=>c!==firstCategory);assert(otherCategory);
+ await page.locator('#doodCategory').selectOption(otherCategory);assert.deepEqual(await rowNames(),categories[otherCategory]);
+ // An empty or obsolete UI value falls back to a single valid category.
+ await page.locator('#doodCategory').evaluate(el=>{el.value='';el.dispatchEvent(new Event('change',{bubbles:true}))});
+ assert.equal(await page.locator('#doodCategory').inputValue(),firstCategory);assert.deepEqual(await rowNames(),categories[firstCategory]);
+ assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
+ console.log('PASS one category at a time: default, switching and invalid selection fallback without file changes');
  const category=await page.locator('#doodCategory option').evaluateAll(els=>els.find(el=>/Cast/i.test(el.textContent)).value);await page.locator('#doodCategory').selectOption(category);
  assert.equal(await page.locator('.dood-grid tbody tr').count(),59);assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
  await page.locator('.dood-rules summary').click();await page.locator('[data-dood-rule=allowHold]').uncheck();assert.equal(await page.locator('[data-dood-rule=allowDrop]').isDisabled(),true);assert.equal(await page.locator('#saveButton').innerText(),'↓ Salva progetto Studio');

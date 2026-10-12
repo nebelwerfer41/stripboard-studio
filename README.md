@@ -6,9 +6,9 @@
 
 > **Day Out of Days:** DOOD derivato dalle strip correnti, regole per Sub-board/categoria/elemento, eventi condivisi con Calendar, Summary/CSV e anteprima di stampa paginata comune con lo schedule. I nuovi metadati si salvano nel progetto `.studio.json`; l’esportazione nativa MSD/MMSX resta conservativa. Vedi [analisi, interpretazioni e verifiche DOOD](docs/dood.md).
 
-# Stripboard Studio v1.12
+# Stripboard Studio v1.13
 
-Version 1.12 fixes Calendar selection and rule editing while retaining Day Out of Days, the shared print preview, Studio project saving, MMSX Boneyard metadata preservation and MSD custom category imports.
+Version 1.13 shows one Day Out of Days category at a time. It retains Calendar selection and rule-editing fixes, the shared print preview, Studio project saving, MMSX Boneyard metadata preservation and MSD custom category imports.
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
@@ -119,3 +119,7 @@ Changing the selected calendar keeps scene strips and shooting-day summaries vis
 **Rules and dates** now edits the selected calendar. Weekday rules, date exceptions, production start and rescheduling use that calendar, with associated plans listed in the panel. Start-date drafts remain separate for each calendar.
 
 Verified with the Node suites and Chromium browser tests for MSD and MMSX 5, 3 and hybrid: calendar switching, targeted edits, save/reopen and Undo. Changing the calendar alone preserves the original file bytes.
+
+## v1.13 — One DOOD category at a time
+
+DOOD selects the first available category on opening and displays only that category’s elements. The category menu has no “All” option; changing the category updates the grid, rules, CSV Summary and print output. Category selection is a display preference and does not modify the project.
