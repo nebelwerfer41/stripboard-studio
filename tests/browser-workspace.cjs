@@ -12,7 +12,7 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/private/tmp/stripboard-calendar-q
  const page=await browser.newPage({viewport:{width:1600,height:1050}}),errors=[];
  await page.addInitScript(()=>{delete window.showSaveFilePicker});
  page.on('pageerror',e=>errors.push(e.stack));
- for(const name of ['parser','roundtrip','conservation','calendar-roundtrip']){
+ for(const name of ['parser','msd-categories','roundtrip','conservation','calendar-roundtrip']){
   await page.goto(`${base}/tests/${name}.html`);await page.waitForFunction(()=>['true','false'].includes(document.body.dataset.passed));
   assert.equal(await page.locator('body').getAttribute('data-passed'),'true',`${name}: ${await page.locator('body').innerText()}`);console.log('PASS',name);
  }

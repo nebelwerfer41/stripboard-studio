@@ -1,0 +1,44 @@
+<!doctype html><html lang="it"><meta charset="utf-8"><title>MSD: categorie personalizzate</title>
+<body><h1>MSD: nomi di categoria e conservazione dei riferimenti</h1><pre id="result">In corso…</pre>
+<script type="module">
+import {parseMsd} from '../assets/msd-parser.js';
+import {serializeMsd} from '../assets/msd-writer.js';
+import {moveBoardItems,snapshotBoardOrder,restoreBoardOrder} from '../assets/scheduling.js';
+import {renamedCategoryFixture} from './fixtures/msd.mjs';
+const lines=[];
+const check=(label,ok)=>{if(!ok)throw Error(label);lines.push(`✓ ${label}`)};
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const sameBytes=(a,b)=>a.byteLength===b.byteLength&&new Uint8Array(a).every((x,i)=>x===new Uint8Array(b)[i]);
+function verifyReferences(project,original,name){
+ check(`${name}: conteggi e ID conservati`,same(project.counts,original.counts)&&same(project.scenes.map(s=>s.id),original.scenes.map(s=>s.id)));
+ check(`${name}: categoria personalizzata presente`,project.categorySettings.some(c=>c.name===name));
+ check(`${name}: associazioni elementi conservate`,project.scenes.every((s,i)=>{
+  const before=original.scenes[i];
+  return Object.getPrototypeOf(s.requirements)===null&&same(s.requirements[name],before.requirements['Cast Members'])&&
+   same(s.elementRefs.filter(r=>r.category===name).map(r=>[r.name,r.resolved]),before.elementRefs.filter(r=>r.category==='Cast Members').map(r=>[r.name,r.resolved]));
+ }));
+ check(`${name}: elementi conservati`,same(project.elements.filter(e=>e.category===name).map(e=>e.name),original.elements.filter(e=>e.category==='Cast Members').map(e=>e.name)));
+ check(`${name}: red flags conservate`,same(project.redFlags.filter(f=>f.target.category===name).map(f=>[f.target.element,f.targetResolved]),original.redFlags.filter(f=>f.target.category==='Cast Members').map(f=>[f.target.element,f.targetResolved])));
+}
+try{
+ const bytes=await (await fetch('../samples/Wonderful Life Demo.msd')).arrayBuffer(),original=await parseMsd(bytes);
+ for(const name of ['constructor','toString','__proto__']){
+  const fixture=renamedCategoryFixture(original,'Cast Members',name),p=await parseMsd(fixture,`${name}.msd`);
+  verifyReferences(p,original,name);
+  check(`${name}: no-op identico byte per byte`,sameBytes(serializeMsd(p),fixture));
+  const board=p.boards.find(b=>b.scheduledGroups.some(g=>g.strips.some(s=>s.kind==='scene'))&&b.unscheduledGroups.length),before=snapshotBoardOrder(board);
+  const strip=board.scheduledGroups.flatMap(g=>g.strips).find(s=>s.kind==='scene');
+  check(`${name}: trasferimento applicato`,moveBoardItems(p,{boardName:board.name,sourceKeys:[strip.sourceKey],to:{container:'unscheduledGroups',groupIndex:0,stripIndex:0}}));
+  const saved=serializeMsd(p),round=await parseMsd(saved);
+  verifyReferences(round,original,name);
+  check(`${name}: trasferimento persistente`,round.boards.find(b=>b.name===board.name).unscheduledGroups.flatMap(g=>g.strips).some(s=>s.bdsId===strip.bdsId));
+  for(const section of p.sourceDocument.sections)if(section.root!=='StripBoardMgr'){
+   const reopened=round.sourceDocument.sections.find(s=>s.root===section.root);
+   check(`${name}: ${section.root} conservata`,sameBytes(fixture.slice(section.offset,section.offset+section.length),saved.slice(reopened.offset,reopened.offset+reopened.length)));
+  }
+  restoreBoardOrder(board,before);check(`${name}: Undo binario`,sameBytes(serializeMsd(p),fixture));
+ }
+ lines.push('TUTTI I CONTROLLI SUPERATI');document.body.dataset.passed='true';
+}catch(error){lines.push(`ERRORE: ${error.message}`);document.body.dataset.passed='false'}
+document.querySelector('#result').textContent=lines.join('\n');
+</script></body></html>

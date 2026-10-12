@@ -187,7 +187,7 @@ function buildProject(container){
     for(const [key,name] of Object.entries(fieldMap))scene[key]=attr(node,name);
     const rawPages=attr(node,'NumScriptPages');scene.pagesEighths=/^\d+$/.test(rawPages||'')?Number(rawPages):null;
     if(scene.pagesEighths===null)issue(issues,'UNPARSED_PAGE_COUNT');
-    const requirements={};for(const ref of paths(node,['ElementRefs','ElementRef'])){
+    const requirements=Object.create(null);for(const ref of paths(node,['ElementRefs','ElementRef'])){
       associationCount++;const category=attr(ref,'CategoryName'),name=attr(ref,'ElementName');
       (requirements[category]??=[]).push(name);
       if(!elementIndex.has(JSON.stringify([category,name])))issue(issues,'MISSING_SCENE_ELEMENT');

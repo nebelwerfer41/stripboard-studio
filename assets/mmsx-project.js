@@ -22,7 +22,7 @@ export async function parseMmsx(bytes,fileName='imported.mmsx'){
   const rule=Object.values(c.rules||{}).find(r=>r.intExt===s.intExt&&r.dayNight===s.dayNight);
   scenes.push({bdsId:id,scene:s.scenes||'',synopsis:s.synopsis||'',set:name(s.set),location:name(s.location),ie:name(s.intExt),dn:name(s.dayNight),scriptDay:name(s.scriptDay),unit:name(s.unit),sequence:name(s.sequence),comments:s.comments||'',scriptPageNumbers:s.scriptPages??null,estimateTimeA:Number.isFinite(s.estHours)&&Number.isFinite(s.estMinutes)?`${s.estHours}:${String(s.estMinutes).padStart(2,'0')}`:null,estimateTimeB:s.screenTime??null,pagesEighths:s.eigths==null?null:Number(s.eigths),requirements,elementRefs,mmsxColors:{bg:resolveColor(s.backgroundColor)||resolveColor(rule?.backgroundColor)||'#FFFFFF',fg:resolveColor(s.color)||resolveColor(rule?.color)||'#333333'}});
  }
- const boards=[],recordMaps=new Map(),initialSegments=new Map();
+ const boards=[],recordMaps=new Map(),initialSegments=new Map(),initialDayStrips=new Map();
  for(const [bid,b] of sorted(c.stripboard)){
   const records=new Map();recordMaps.set(bid,records);
   const convert=(sid,id,r)=>{const key=JSON.stringify([bid,sid,id]);if(!['breakdown','banner','day'].includes(r.type))throw Error(`Tipo strip MMSX non supportato: ${r.type}`);if(r.type==='breakdown'&&!seen.has(r.sheet))throw Error('MMSX contiene una strip senza scheda');records.set(key,{id,sid,record:r});return {kind:r.type==='breakdown'?'scene':'banner',sourceKey:key,bdsId:r.sheet,text:r.type==='day'?'Fine giornata (Boneyard)':r.text||'',estimateTimeA:Number.isFinite(r.estHours)&&Number.isFinite(r.estMinutes)?`${r.estHours}:${String(r.estMinutes).padStart(2,'0')}`:null,style:{backgroundColor:resolveColor(r.backgroundColor)||resolveColor(r.color)||'#663301',fontColor:'#FFFFFF'}}};
@@ -33,7 +33,7 @@ export async function parseMmsx(bytes,fileName='imported.mmsx'){
    const segmentGroups=[],calendarId=productionData.calendars.find(c=>c.scope.boardId===bid&&c.scope.segmentId===sid)?.id||null;let pending=[];
    for(const [id,r] of sorted(s.stripMap)){
     const strip=convert(sid,id,r);
-    if(r.type==='day'){segmentGroups.push({kind:'UnscheduledDay',sourceIndex:segmentGroups.length,calendarId,mmsxSegment:sid,mmsxDay:strip.sourceKey,ordinal:null,shootingDayNumber:Number(r.shootDay)||null,date:iso(r.date),attributes:{},strips:pending});pending=[]}
+    if(r.type==='day'){initialDayStrips.set(strip.sourceKey,pending.map(s=>s.sourceKey));segmentGroups.push({kind:'UnscheduledDay',sourceIndex:segmentGroups.length,calendarId,mmsxSegment:sid,mmsxDay:strip.sourceKey,ordinal:null,shootingDayNumber:Number(r.shootDay)||null,date:iso(r.date),attributes:{},strips:pending});pending=[]}
     else pending.push(strip);
    }
    segmentGroups.push({kind:'RemainingUnscheduledStrips',sourceIndex:segmentGroups.length,calendarId,mmsxSegment:sid,attributes:{},date:null,strips:pending});
@@ -46,7 +46,7 @@ export async function parseMmsx(bytes,fileName='imported.mmsx'){
    const scheduledGroups=[];let pending=[];
    for(const [id,r] of sorted(s.stripMap)){
     const strip=convert(sid,id,r);
-    if(r.type==='day'){scheduledGroups.push({kind:'ScheduleDay',sourceIndex:scheduledGroups.length,mmsxSegment:sid,mmsxDay:strip.sourceKey,ordinal:Number(r.shootDay)||scheduledGroups.length+1,shootingDayNumber:Number(r.shootDay)||scheduledGroups.length+1,date:iso(r.date),attributes:{},strips:pending});pending=[]}
+    if(r.type==='day'){initialDayStrips.set(strip.sourceKey,pending.map(s=>s.sourceKey));scheduledGroups.push({kind:'ScheduleDay',sourceIndex:scheduledGroups.length,mmsxSegment:sid,mmsxDay:strip.sourceKey,ordinal:Number(r.shootDay)||scheduledGroups.length+1,shootingDayNumber:Number(r.shootDay)||scheduledGroups.length+1,date:iso(r.date),attributes:{},strips:pending});pending=[]}
     else pending.push(strip);
    }
    scheduledGroups.push({kind:'RemainingScheduledStrips',sourceIndex:scheduledGroups.length,mmsxSegment:sid,attributes:{},date:null,strips:pending});
@@ -58,7 +58,7 @@ export async function parseMmsx(bytes,fileName='imported.mmsx'){
  }
  if(!boards.length)throw Error('Nessun piano MMSX disponibile');
  const elements=sorted(c.element).map(([id,e])=>({id,category:c.category[e.category_id]?.name||'Elementi',name:e.name,boardId:e.boardId,sortOrder:e.sortOrder,properties:e.properties||{},source:e}));
- return completeProjectModel({format:'mmsx',fileName,title:root.productionInfo?.title||root.name||fileName,capabilities:{editCalendars:true},...productionData,scenes,elements,categorySettings:sorted(c.category).map(([id,v])=>({id,name:v.name,attributes:{SortOrder:String(v.sortOrder)},properties:v.propertyDesc||{},color:resolveColor(v.color),source:v})),boards,activeBoard:boards[0].name,defaultCalendar:null,stripLayouts:[layout],reportLayouts:[],colors:{preferences:{Banner:{bg:'#663301',fg:'#FFFFFF'},DayStrip:{bg:'#333333',fg:'#FFFFFF'}}},counts:{scenes:scenes.length,elements:elements.length,stripboards:boards.length,scheduleDays:boards.reduce((n,b)=>n+b.scheduledGroups.filter(g=>g.kind==='ScheduleDay').length,0),unscheduledDays:boards.reduce((n,b)=>n+b.unscheduledGroups.filter(g=>g.kind==='UnscheduledDay').length,0)},mmsxSource:{root,originalRoot,recordMaps,initialSegments,initialCalendars:new Map(productionData.calendars.map(c=>[c.id,calendarSignature(c)])),boardCount:boards.length,bytes:new Uint8Array(bytes).slice()}});
+ return completeProjectModel({format:'mmsx',fileName,title:root.productionInfo?.title||root.name||fileName,capabilities:{editCalendars:true},...productionData,scenes,elements,categorySettings:sorted(c.category).map(([id,v])=>({id,name:v.name,attributes:{SortOrder:String(v.sortOrder)},properties:v.propertyDesc||{},color:resolveColor(v.color),source:v})),boards,activeBoard:boards[0].name,defaultCalendar:null,stripLayouts:[layout],reportLayouts:[],colors:{preferences:{Banner:{bg:'#663301',fg:'#FFFFFF'},DayStrip:{bg:'#333333',fg:'#FFFFFF'}}},counts:{scenes:scenes.length,elements:elements.length,stripboards:boards.length,scheduleDays:boards.reduce((n,b)=>n+b.scheduledGroups.filter(g=>g.kind==='ScheduleDay').length,0),unscheduledDays:boards.reduce((n,b)=>n+b.unscheduledGroups.filter(g=>g.kind==='UnscheduledDay').length,0)},mmsxSource:{root,originalRoot,recordMaps,initialSegments,initialDayStrips,initialCalendars:new Map(productionData.calendars.map(c=>[c.id,calendarSignature(c)])),boardCount:boards.length,bytes:new Uint8Array(bytes).slice()}});
 }
 export function updatedMmsxRoot(project){
  const source=project.mmsxSource;if(!source||project.boards.length!==source.boardCount)throw Error('Creazione di piani MMSX non disponibile');
@@ -93,7 +93,11 @@ export function updatedMmsxRoot(project){
     const origin=records.get(key)||(isDay&&group.created===true&&group.createdDayId&&key===group.mmsxDay?{id:group.createdDayId,record:{id:group.createdDayId,type:'day'}}:null);if(!origin)throw Error('Strip MMSX sconosciuta');
     if(Object.hasOwn(stripMap,origin.id))throw Error('Strip MMSX duplicata');
     const r=cloneExact(origin.record);r.sortOrder=order++;
-    if(yard||group.kind!=='ScheduleDay'){delete r.date;delete r.shootDay;delete r.beforeShootDay}
+    if(yard||group.kind!=='ScheduleDay'){
+     // Existing Boneyard records retain their source metadata; transfers from a schedule clear it.
+     const fromYard=source.root.contents.stripboard[board.mmsxBoard].segmentMap[origin.sid]?.type==='boneyard';
+     if(!yard||!fromYard){delete r.date;delete r.shootDay;delete r.beforeShootDay}
+    }
     else if(group.date){r.date=compactDate(group.date);r.shootDay=group.shootingDayNumber;delete r.beforeShootDay}
     else{
      const dayOrigin=records.get(group.mmsxDay)?.record;
@@ -101,7 +105,12 @@ export function updatedMmsxRoot(project){
      // Native undated boundaries (including PURGED) stay undated after a move.
      delete r.date;delete r.shootDay;delete r.beforeShootDay;
     }
-    if(isDay)r.eighths=group.strips.reduce((n,s)=>n+(sceneMap.get(s.bdsId)?.pagesEighths||0),0);
+    if(isDay){
+     // Preserve stored totals (including absent values) until that day's strips change.
+     const initial=source.initialDayStrips.get(key);
+     if(!initial||initial.length!==group.strips.length||initial.some((sourceKey,i)=>sourceKey!==group.strips[i].sourceKey))
+      r.eighths=group.strips.reduce((n,s)=>n+(sceneMap.get(s.bdsId)?.pagesEighths||0),0);
+    }
     stripMap[origin.id]=r;
    }
    for(const group of groups){for(const strip of group.strips)append(strip.sourceKey,group);if(group.mmsxDay)append(group.mmsxDay,group,true)}

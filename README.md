@@ -94,6 +94,8 @@ Credits: [nebelwerfer41 on GitHub](https://github.com/nebelwerfer41).
 
 `node --test tests/*.mjs` covers display fields and native MMSX day creation in formats 5, 3 and hybrid, including conservation and Undo/Redo. `tests/calendar-roundtrip.html` also verifies new civil-date drops and reopening in the included MSD sample. Browser suites require Playwright, a local server and optionally `CHROME_PATH`:
 
+`tests/mmsx-conservation.mjs` verifies that edits preserve metadata on records already in the Boneyard, clear scheduling dates on transfers from a schedule, and recalculate day totals only when their strips change. It covers save/reopen and Undo/Redo in formats 5, 3 and hybrid. `tests/msd-categories.html`, included in the browser workspace suite, checks import, element references, binary no-op and save/reopen with custom category names `constructor`, `toString` and `__proto__`.
+
 ```sh
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-calendar-density.cjs
