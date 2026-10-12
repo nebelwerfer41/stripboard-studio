@@ -4,7 +4,11 @@
 
 > **Flash common model:** Calendar now combines the monthly plan and calendar rule editing; Anteprima Spoglio follows the active scene. Events, red flags, production data and per-sheet quantities remain inspectable. Imported projects save in their original format; native MMSX dates are never recalculated on import or calendar selection. MMSX boards retain their sub-board hierarchy: use the Sub-board menu to show normal segments and the shared Boneyard together. Segment labels and spacing appear only in the editing UI. See [the common contract and save strategy](docs/flash-common-model.md).
 
-# Stripboard Studio v1.9
+> **Day Out of Days:** DOOD derivato dalle strip correnti, regole per Sub-board/categoria/elemento, eventi condivisi con Calendar, Summary/CSV e anteprima di stampa paginata comune con lo schedule. I nuovi metadati si salvano nel progetto `.studio.json`; l’esportazione nativa MSD/MMSX resta conservativa. Vedi [analisi, interpretazioni e verifiche DOOD](docs/dood.md).
+
+# Stripboard Studio v1.11
+
+Version 1.11 combines Day Out of Days and the shared print preview with fixes for MMSX Boneyard metadata preservation and MSD custom category imports. It retains Studio project saving and conservative native MSD/MMSX exports.
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
@@ -51,7 +55,7 @@ Control names below are given in English; some labels in the application are cur
 - Days have no additional heading or trailing space. In vertical layouts, days sit side by side with horizontal scrolling.
 - The horizontal stripboard preview automatically fits the panel width, including when the window is resized.
 - Preview report layouts stored in the file, with fields linked to data and browser printing. Banners and day breaks appear as text rows in the report flow when the template includes them.
-- Print stripboards with paper size, orientation, margins, and scaling controlled by the browser’s print dialog. The application retains options for the header and starting each day on a new page.
+- Print stripboards and DOOD through the shared preview with paper size, orientation, margins and scale. PDF uses the same preview document via the browser’s Save as PDF destination. The application retains options for the header and starting each day on a new page.
 - Import other local `.msd` files compatible with the sample format.
 
 Day dates are derived from calendars by the included parser and marked as estimates. In Stripboard, selecting another calendar changes only the reading projection; Calendar shows the dates actually associated with the selected calendar: strips, scenes, and schedule order remain intact. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
@@ -74,7 +78,7 @@ For banner and day-break styles, `Alignment` uses `20` for left, `21` for right,
 
 The sample files contain no day-break margin/spacing attribute or stripboard page-break attribute. A day break therefore occupies a strip at the layout’s specified height, without an external margin; the small text padding is internal. Stripboard printing continues across days without forced page breaks. The schedule’s `HideStripBoardHeader` determines the header option’s initial state. For reports, `ReportSettings.PageBreak` is a separate property and is not applied to the stripboard.
 
-The browser controls paper and the printable area without an application-imposed `@page` constraint. The stripboard automatically enlarges or shrinks to fill the printable width when strip height permits; scaling remains adjustable in the print dialog. The `.msd` file retains its original values. `PrintScale` and `ScaleStyle` remain in the original model: the observed templates use `ScaleStyle=Refit`, while some `PrintScale` values do not match strip length.
+The shared schedule/DOOD preview now sets paper and the printable area with a physical `@page` size. Other legacy report views continue to use the browser dialog directly. The shared preview fits source strips inside the selected printable area and exposes page scale; print the generated pages at 100% in the browser dialog. The `.msd` file retains its original values. `PrintScale` and `ScaleStyle` remain in the original model: the observed templates use `ScaleStyle=Refit`, while some `PrintScale` values do not match strip length.
 
 The side marker has been removed from the stripboard. Print-canvas width depends only on the strips; the optional header and the strips’ left border start at the same printable margin. In reports, template properties `IncludeBanners`, `IncludeDayBreaks`, and `DayBreakFooterText` determine the initial special rows. Visibility controls can hide these rows without changing the MSD model.
 
@@ -90,17 +94,20 @@ Credits: [nebelwerfer41 on GitHub](https://github.com/nebelwerfer41).
 
 [MIT](LICENSE). Copies and derivative works must retain the copyright notice and license text. Dependencies and third-party materials retain their own licenses.
 
-## v1.9 verification
+## v1.11 verification
 
-`node --test tests/*.mjs` covers display fields and native MMSX day creation in formats 5, 3 and hybrid, including conservation and Undo/Redo. `tests/calendar-roundtrip.html` also verifies new civil-date drops and reopening in the included MSD sample. Browser suites require Playwright, a local server and optionally `CHROME_PATH`:
+`node --test tests/*.mjs` covers display fields, DOOD calculations and pagination, Studio project saving, and native MMSX day creation in formats 5, 3 and hybrid, including conservation and Undo/Redo. `tests/calendar-roundtrip.html` also verifies new civil-date drops and reopening in the included MSD sample.
 
 `tests/mmsx-conservation.mjs` verifies that edits preserve metadata on records already in the Boneyard, clear scheduling dates on transfers from a schedule, and recalculate day totals only when their strips change. It covers save/reopen and Undo/Redo in formats 5, 3 and hybrid. `tests/msd-categories.html`, included in the browser workspace suite, checks import, element references, binary no-op and save/reopen with custom category names `constructor`, `toString` and `__proto__`.
 
+Browser suites require Playwright, a local server and optionally `CHROME_PATH`. The DOOD suite also requires `pdfinfo` and `pdftotext` to verify the generated PDF against the preview:
+
 ```sh
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
+CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-dood-qa node tests/browser-dood.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-calendar-density.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-responsive.cjs
 CHROME_PATH=/usr/bin/chromium SYNTHETIC_MMSX=/path/to/fixture.mmsx node tests/browser-strip-layouts-drag.cjs
 ```
 
-The last suite checks independent field settings without file changes, calendar reorder, both cross-pane directions, blank-date save/reopen, cancellation, Undo/Redo, tablet/phone navigation during drag and native phone touch multiselection. MMSX uses the synthetic fixture described in [the calendar documentation](docs/calendar-workspace.md); MSD uses the included real sample.
+The DOOD suite checks rules, events, scene navigation, Studio/native round-trips, shared print preview and PDF page/text parity. The last suite checks independent field settings without file changes, calendar reorder, both cross-pane directions, blank-date save/reopen, cancellation, Undo/Redo, tablet/phone navigation during drag and native phone touch multiselection. MMSX uses the synthetic fixture described in [the calendar documentation](docs/calendar-workspace.md); MSD uses the included real sample.

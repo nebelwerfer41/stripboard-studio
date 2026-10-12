@@ -1310,3 +1310,35 @@ footer a:hover {
 #boardView.is-standard .day{width:100%;min-width:0}
 #boardView.is-standard .standard-strip{border-color:#a9b8bf;border-bottom-color:#899ba6}
 @media print{#boardView.is-standard{width:100%;max-width:100%;zoom:1!important}#boardView.is-standard .day{width:100%}}
+
+/* DOOD is a single operational projection; print pagination lives in the shared service. */
+#doodView{padding:0;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#doodView[hidden]{display:none}
+.dood-toolbar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:12px 16px;border-bottom:1px solid #d9e1e5;background:#f7fafb;font-size:12px}
+.dood-toolbar label,.dood-rule-controls label{display:flex;gap:5px;align-items:center}
+.dood-toolbar button,.dood-toolbar select,.dood-toolbar input,.dood-rule-controls select,.dood-rule-controls input,.dood-rule-controls button{font:inherit;min-height:29px;border:1px solid #c8d3d9;border-radius:4px;background:white;padding:4px 7px;color:#263943}
+.dood-toolbar input[type=checkbox],.dood-rule-controls input[type=checkbox]{min-height:0}
+.dood-toolbar input[type=date]{max-width:130px}
+.dood-menu{position:relative}.dood-menu summary{cursor:pointer;padding:6px 9px;list-style:none;border:1px solid #c8d3d9;border-radius:4px;background:white}
+.dood-menu>div{position:absolute;top:100%;left:0;z-index:30;background:white;border:1px solid #c8d3d9;box-shadow:0 5px 20px #142d3e20;padding:12px;min-width:270px;display:grid;gap:10px}
+.dood-rules,.dood-diagnostics{padding:8px 16px;font-size:12px;border-bottom:1px solid #d9e1e5}.dood-rules summary,.dood-diagnostics summary{cursor:pointer}.dood-rule-controls{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px}.dood-rule-controls input[type=number]{width:70px}.dood-rules p{color:#62747e;margin:8px 0}
+.dood-grid-scroll{overflow:auto;flex:1;min-height:150px;position:relative;overscroll-behavior:contain}
+.dood-grid{border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fixed;width:max-content;min-width:100%;--dood-date-width:54px;--dood-row-height:32px}
+.dood-grid-scroll.compact .dood-grid{--dood-date-width:42px;--dood-row-height:27px;font-size:11px}
+.dood-grid th,.dood-grid td{padding:0;border-right:1px solid #d9e1e5;border-bottom:1px solid #d9e1e5;text-align:center;min-width:var(--dood-date-width);width:var(--dood-date-width);height:var(--dood-row-height);background:#fff;color:#344650}
+.dood-grid thead th{position:sticky;top:0;z-index:5;height:23px;font-weight:500;background:#eaf0f3}
+.dood-grid thead tr:nth-child(2) th{top:23px}.dood-grid thead tr:nth-child(3) th{top:46px}.dood-grid thead tr:nth-child(4) th{top:69px}
+.dood-grid .dood-id,.dood-grid .dood-name,.dood-grid .dood-worked,.dood-grid .dood-held{position:sticky;z-index:4;background:#f7fafb}
+.dood-grid .dood-id{left:0;width:44px;min-width:44px}.dood-grid .dood-name{left:44px;width:200px;min-width:200px;text-align:left;padding:0 9px;white-space:normal;overflow-wrap:anywhere;font-weight:500}
+.dood-grid .dood-worked{left:244px;width:54px;min-width:54px}.dood-grid .dood-held{left:298px;width:46px;min-width:46px;box-shadow:2px 0 3px #26394312}
+.dood-grid thead .dood-id,.dood-grid thead .dood-name,.dood-grid thead .dood-worked,.dood-grid thead .dood-held{z-index:8;background:#eaf0f3}
+.dood-grid .nonworking{background:#eef0f2}.dood-grid .dood-dropped{color:#a5adb3}
+.dood-grid td button{border:0;border-radius:0;background:transparent;color:inherit;width:100%;height:100%;min-height:var(--dood-row-height);padding:2px;font:inherit;cursor:pointer;white-space:normal;line-height:1.1}
+.dood-grid td button:hover{background:#ddece9}.dood-grid td button.selected{background:#d1e8e3;box-shadow:inset 0 0 0 2px #318779}.dood-conflict{color:#a74438!important}
+.dood-legend{padding:9px 16px;font-size:10px;color:#62747e;border-top:1px solid #d9e1e5;background:#f7fafb}.dood-empty{padding:18px}
+.dood-cell-detail{position:relative;max-height:34vh;overflow:auto;padding:12px 18px;border-top:1px solid #c8d3d9;background:#f7fafb;font-size:12px}.dood-cell-detail h3{font-size:14px;margin:0 0 8px}.dood-cell-detail h4{margin:12px 0 6px}.dood-cell-detail #doodCloseCell{float:right}.dood-cell-detail button{border:1px solid #c8d3d9;border-radius:4px;background:white;padding:5px 9px;margin-right:6px;font:inherit;cursor:pointer}
+.studio-print-dialog{width:min(96vw,1500px);max-width:96vw;height:94vh;max-height:94vh;border:0;border-radius:8px;padding:16px;overflow:hidden;background:#f5f7f8}
+.studio-print-dialog[open]{display:flex;flex-direction:column;gap:10px}.studio-print-dialog::backdrop,.production-event-dialog::backdrop{background:#102a3d88}.print-service-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.print-service-header h2{font-size:18px;margin:0}.print-service-controls{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px}.print-service-controls label{display:flex;gap:5px;align-items:center}.print-service-controls label[hidden]{display:none}.print-service-controls input[type=number]{width:60px}.print-service-controls input,.print-service-controls select,.print-service-controls button,.print-service-header button{font:inherit;padding:5px;border:1px solid #bdcbd3;border-radius:4px;background:white}.print-service-status{font-size:11px;margin:0;color:#526772}.studio-print-dialog iframe{width:100%;flex:1;min-height:0;border:1px solid #bdcbd3;background:#e7eaed}
+.production-event-dialog{width:min(650px,94vw);max-height:90vh;border:0;border-radius:8px;padding:20px;overflow:auto}.production-event-list{max-height:180px;overflow:auto;font-size:12px;border:1px solid #d9e1e5;padding:10px}.production-event-list>div{margin-bottom:8px}.production-event-dialog form{display:grid;gap:10px}.production-event-dialog form>label{display:grid;gap:4px;font-size:12px}.production-event-dialog label[hidden]{display:none}.production-event-dialog input,.production-event-dialog select,.production-event-dialog textarea{font:inherit;padding:7px;border:1px solid #c8d3d9;border-radius:4px}.production-event-dialog form h3{font-size:14px}
+@media(max-width:600px){.dood-grid .dood-name{width:140px;min-width:140px}.dood-grid .dood-worked{left:184px}.dood-grid .dood-held{left:238px}.dood-toolbar{padding:8px;gap:5px}.dood-toolbar label{font-size:11px}.dood-legend{font-size:9px}.dood-menu>div{position:fixed;left:10px;right:10px;top:210px}.dood-cell-detail{max-height:40vh}.studio-print-dialog{padding:8px}}
+@media print{#studioPrintDialog,#productionEventDialog,.dood-toolbar,.dood-rules,.dood-legend,.dood-cell-detail{display:none!important}}
