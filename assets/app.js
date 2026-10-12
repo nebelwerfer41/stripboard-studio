@@ -13,7 +13,7 @@ import {moveCalendarItems,editCalendar,previewReschedule,rescheduleCalendar,snap
 import {canSplit} from './calendar-selectors.js';
 import {calendarMarkup,breakdownMarkup,CALENDAR_VISIBILITY} from './workspace-views.js';
 import {STANDARD_PRESETS,standardLayout,presetFields,selectedFields,fieldsMarkup,fieldsPickerMarkup} from './strip-display.js';
-import {calculateDood,sortDoodRows,doodSummaryCsv,effectiveDoodRules,DEFAULT_DOOD_RULES} from './dood-engine.js';
+import {calculateDood,doodElements,sortDoodRows,doodSummaryCsv,effectiveDoodRules,DEFAULT_DOOD_RULES} from './dood-engine.js';
 import {doodMarkup} from './dood-view.js';
 import {ensureStudio,snapshotStudio,restoreStudio,setDoodRules,serializeStudio,parseStudio} from './studio-project.js';
 import {createPrintService} from './print-service.js';
@@ -1432,9 +1432,9 @@ $('fileInput').addEventListener('change',async e=>{
   }catch(err){showStatus(err.message);$('projectTitle').textContent='Importazione non riuscita'}finally{e.target.value=''}
 });
 function currentDoodReport(){
-  const ui=state.dood,categories=[...new Set(state.project.elements.map(e=>e.category))];
+  const ui=state.dood,elements=doodElements(state.project),categories=[...new Set(elements.map(e=>e.category))];
   if(!categories.includes(ui.category))ui.category=categories[0]??'';
-  const report=calculateDood({project:state.project,board:selectedBoard(),calendar:findCalendar(state.project,selectedBoard().calendarId),elements:state.project.elements.filter(e=>e.category===ui.category)});
+  const report=calculateDood({project:state.project,board:selectedBoard(),calendar:findCalendar(state.project,selectedBoard().calendarId),elements:elements.filter(e=>e.category===ui.category)});
   report.rows=sortDoodRows(report.rows.filter(r=>(!ui.hideUnused||r.totals.worked||r.totals.held)&&(!state.query||`${r.element.boardId||''} ${r.element.name}`.toLocaleLowerCase().includes(state.query.toLocaleLowerCase()))),ui.sort);
   if(ui.hideOff){const indices=report.dates.map((d,i)=>d.calendar.working!==false?i:-1).filter(i=>i>=0);report.dates=indices.map(i=>report.dates[i]);report.rows=report.rows.map(r=>({...r,cells:indices.map(i=>r.cells[i])}))}
   return report;
@@ -1489,7 +1489,7 @@ $('doodView').addEventListener('change',event=>{
     ui.sort=[...$('doodView').querySelectorAll('[data-dood-sort]')].map((select,i)=>({key:select.value,direction:$('doodView').querySelector(`[data-dood-direction="${i}"]`).value})).filter(c=>c.key);renderDood();return;
   }
   if(input.dataset.doodRule){
-    const category=ui.category||state.project.elements[0]?.category,element=state.project.elements.find(e=>e.id===ui.ruleElement);
+    const category=ui.category,element=doodElements(state.project).find(e=>e.id===ui.ruleElement);
     const existing=element?effectiveDoodRules(state.project,selectedBoard(),element):{...DEFAULT_DOOD_RULES,...state.project.studio?.dood?.[state.board]?.categories?.[category]};
     const rules={...existing,[input.dataset.doodRule]:input.type==='checkbox'?input.checked:Math.max(1,Math.floor(Number(input.value)||7))};
     if(!rules.allowHold)rules.allowDrop=false;

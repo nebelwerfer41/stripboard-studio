@@ -6,9 +6,9 @@
 
 > **Day Out of Days:** DOOD derivato dalle strip correnti, regole per Sub-board/categoria/elemento, eventi condivisi con Calendar, Summary/CSV e anteprima di stampa paginata comune con lo schedule. I nuovi metadati si salvano nel progetto `.studio.json`; l’esportazione nativa MSD/MMSX resta conservativa. Vedi [analisi, interpretazioni e verifiche DOOD](docs/dood.md).
 
-# Stripboard Studio v1.13
+# Stripboard Studio v1.14
 
-Version 1.13 shows one Day Out of Days category at a time. It retains Calendar selection and rule-editing fixes, the shared print preview, Studio project saving, MMSX Boneyard metadata preservation and MSD custom category imports.
+Version 1.14 fixes Day Out of Days attendance for built-in scene fields, including Set, DN and INT/EXT. It retains one-category DOOD views, Calendar selection and rule-editing fixes, the shared print preview, Studio project saving and conservative MSD/MMSX exports.
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
@@ -123,3 +123,9 @@ Verified with the Node suites and Chromium browser tests for MSD and MMSX 5, 3 a
 ## v1.13 — One DOOD category at a time
 
 DOOD selects the first available category on opening and displays only that category’s elements. The category menu has no “All” option; changing the category updates the grid, rules, CSV Summary and print output. Category selection is a display preference and does not modify the project.
+
+## v1.14 — Built-in DOOD attendance
+
+DOOD now reads Set, Location, Script Day, Unit, Sequence, DN and INT/EXT from scheduled scenes. MMSX uses native field element IDs; MSD uses scalar scene values and reuses catalog IDs where available. Missing MSD catalog entries appear as derived DOOD rows without changing the imported elements or file. Rules, scene details, CSV and print use the same attendance projection.
+
+Verified against the real MSD sample and synthetic MMSX 5/3/hybrid fixtures, including duplicate names, moves to the Boneyard, save/reopen and byte-identical Undo.

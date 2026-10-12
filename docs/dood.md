@@ -2,6 +2,12 @@
 
 Dalla v1.13 il DOOD mostra una sola categoria alla volta: all’apertura seleziona la prima categoria disponibile e il menu non offre «Tutte». Matrice, regole categoria/elemento, CSV Summary e stampa seguono la categoria scelta. Cambiare categoria è una preferenza di visualizzazione e non modifica il progetto.
 
+## Categorie integrate — v1.14
+
+Set, Location, Script Day, Unit, Sequence, DN e INT/EXT contribuiscono alle presenze tramite i campi della scena, oltre ai riferimenti agli elementi dello spoglio. MMSX conserva gli ID nativi di questi campi in `scene.fieldElementIds`: elementi omonimi con ID diversi restano distinti. MSD risolve i valori scalari per campo/categoria e nome; riusa gli ID del catalogo e proietta righe con ID stabili quando manca una voce, come DN e INT/EXT nel campione incluso. `doodElements` è una proiezione di sola lettura: raccolte, conteggi e file importati restano invariati. Le regole per elementi derivati rimangono metadati Studio.
+
+`tests/dood-builtins.mjs` verifica tutti i campi, identità native, elementi omonimi, categorie personalizzate distinte, trasferimenti nel Boneyard, salvataggio/riapertura e Undo nei formati MMSX 5/3/ibrido. La suite browser DOOD confronta le date di lavoro delle sette categorie integrate con i campi delle scene effettivamente programmate del campione MSD.
+
 ## Fase 1: architettura verificata prima dell'implementazione
 
 - `project-model.js` normalizza scene (`bdsId`, `id`), elementi (`id`, categoria, BoardID) e `scene.elementRefs`. MSD associa categoria/nome; MMSX conserva ID e quantità. Il motore usa gli ID risolti, non il testo visualizzato.

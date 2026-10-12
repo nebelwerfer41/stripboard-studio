@@ -26,6 +26,26 @@ const out=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-dood-qa';
  assert.equal(await page.locator('#doodCategory').inputValue(),firstCategory);assert.deepEqual(await rowNames(),categories[firstCategory]);
  assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
  console.log('PASS one category at a time: default, switching and invalid selection fallback without file changes');
+ const builtins=await page.evaluate(async()=>{
+  const {parseMsd}=await import('./assets/msd-parser.js'),p=await parseMsd(await(await fetch('./samples/Wonderful%20Life%20Demo.msd')).arrayBuffer());
+  const board=p.boards.find(b=>b.name===p.activeBoard)||p.boards[0],scenes=new Map(p.scenes.map(s=>[s.bdsId,s]));
+  return Object.fromEntries([['Set','set'],['Location','location'],['Script Day','scriptDay'],['Unit','unit'],['Sequence','sequence'],['DN','dn'],['INT/EXT','ie']].map(([category,field])=>{
+   const dates=new Map();
+   for(const group of board.scheduledGroups.filter(g=>g.kind==='ScheduleDay'&&g.date))for(const strip of group.strips.filter(s=>s.kind==='scene')){
+    const name=scenes.get(strip.bdsId)?.[field];if(!name)continue;if(!dates.has(name))dates.set(name,new Set());dates.get(name).add(group.date);
+   }
+   return [category,Object.fromEntries([...dates].map(([name,days])=>[name,[...days].sort()]))];
+  }));
+ });
+ for(const [category,elements] of Object.entries(builtins)){
+  await page.locator('#doodCategory').selectOption(category);
+  const observed=await page.locator('.dood-grid tbody tr').evaluateAll(rows=>Object.fromEntries(rows.map(row=>[
+   row.querySelector('.dood-name').textContent,[...row.querySelectorAll('[data-dood-cell]')].filter(cell=>/^(SWF|SW|WF|W)( |$)/.test(cell.textContent)).map(cell=>cell.dataset.doodCell).sort()
+  ])));
+  for(const [name,dates] of Object.entries(elements))assert.deepEqual(observed[name],dates,`${category}: ${name}`);
+ }
+ assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
+ console.log('PASS MSD built-in attendance matches scheduled scene fields for Set, Location, Script Day, Unit, Sequence, DN and INT/EXT');
  const category=await page.locator('#doodCategory option').evaluateAll(els=>els.find(el=>/Cast/i.test(el.textContent)).value);await page.locator('#doodCategory').selectOption(category);
  assert.equal(await page.locator('.dood-grid tbody tr').count(),59);assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
  await page.locator('.dood-rules summary').click();await page.locator('[data-dood-rule=allowHold]').uncheck();assert.equal(await page.locator('[data-dood-rule=allowDrop]').isDisabled(),true);assert.equal(await page.locator('#saveButton').innerText(),'↓ Salva progetto Studio');

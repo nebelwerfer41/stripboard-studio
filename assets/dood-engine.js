@@ -5,6 +5,25 @@ export const DOOD_EVENT_TYPES=Object.freeze({travel:'Travel',fitting:'Fitting',r
 const ACTIVITY_CODES={travel:'TR',fitting:'FT',rehearsal:'R',unavailable:'U'};
 const COMPANY_CODES={holiday:'/',move:'M'};
 const DAY_MS=86400000;
+const SCENE_FIELDS=[['set','Set'],['location','Location'],['scriptDay','Script Day'],['unit','Unit'],['sequence','Sequence'],['dn','DN'],['ie','INT/EXT']];
+const FIELD_CATEGORIES=new Map([['set','set'],['location','location'],['scriptday','scriptDay'],['unit','unit'],['sequence','sequence'],['dn','dn'],['daynight','dn'],['ie','ie'],['intext','ie']]);
+const categoryField=category=>FIELD_CATEGORIES.get(String(category??'').toLowerCase().replace(/[\s/]/g,''));
+// MSD stores built-ins as scalar scene values, sometimes without catalog elements.
+// Derived rows are a read-only DOOD projection; native catalog IDs remain authoritative.
+export function doodElements(project){
+  if(project.format!=='msd')return project.elements;
+  const elements=project.elements.map(element=>{
+    const field=categoryField(element.category);
+    return field?{...element,doodField:field}:element;
+  });
+  const keys=new Set(elements.filter(e=>e.doodField).map(e=>JSON.stringify([e.doodField,e.name])));
+  for(const [field,category] of SCENE_FIELDS)for(const scene of project.scenes){
+    const name=scene[field];if(name==null||name==='')continue;
+    const key=JSON.stringify([field,name]);if(keys.has(key))continue;keys.add(key);
+    elements.push({id:`dood-field:${key}`,category:elements.find(e=>e.doodField===field)?.category||category,name,boardId:'',doodField:field});
+  }
+  return elements;
+}
 export const doodBoardKey=board=>board.name; // unique in both adapters and stable after reopening
 export function normalizeRules(value={}){
   const rules={...DEFAULT_DOOD_RULES,...value};
@@ -50,7 +69,7 @@ export function findDropIntervals(cells,rules){
   }
   return intervals;
 }
-export function calculateDood({project,board,calendar,elements=project.elements,events=project.events||[],rulesForElement=e=>effectiveDoodRules(project,board,e),startDate=null,endDate=null}){
+export function calculateDood({project,board,calendar,elements=doodElements(project),events=project.events||[],rulesForElement=e=>effectiveDoodRules(project,board,e),startDate=null,endDate=null}){
   if(!board)throw Error('Sub-board DOOD non disponibile');
   const diagnostics=[],days=new Map(),sceneIndex=new Map(project.scenes.map(s=>[s.bdsId,s]));
   for(const group of board.scheduledGroups||[]){
@@ -82,8 +101,12 @@ export function calculateDood({project,board,calendar,elements=project.elements,
   if(dates.some(d=>d.calendar.working===null))diagnostics.push('Calendario non risolto: Hold non assegnato nei giorni ambigui');
   const rows=elements.map(element=>{
     const rules=normalizeRules(rulesForElement(element));
+    const field=project.format==='msd'?(element.doodField||categoryField(element.category)):null;
     const cells=dates.map(day=>{
-      const scenes=[...(days.get(day.date)?.scenes.values()||[])].filter(({scene})=>(scene.elementRefs||[]).some(ref=>ref.resolved&&ref.elementId===element.id));
+      const scenes=[...(days.get(day.date)?.scenes.values()||[])].filter(({scene})=>
+        (scene.elementRefs||[]).some(ref=>ref.resolved&&ref.elementId===element.id)||
+        (scene.fieldElementIds||[]).includes(element.id)||
+        field&&scene[field]===element.name);
       const matching=known.filter(e=>intervalContains(e,day.date)&&(['holiday','move'].includes(doodEventType(e))||targetsElement(e,element)));
       const individualTypes=[...new Set(matching.map(doodEventType).filter(t=>Object.hasOwn(ACTIVITY_CODES,t)))];
       const companyTypes=[...new Set(matching.map(doodEventType).filter(t=>Object.hasOwn(COMPANY_CODES,t)))];

@@ -88,3 +88,7 @@ Nella versione 1.7, il Boneyard è presentato in coda, senza modificare il suo `
 ## Fase Calendar e Spoglio, 8 ottobre 2026
 
 La v1.8 abilita `editCalendars` negli adattatori MSD/MMSX. La consultazione non modifica neppure `ActiveStripBoard`. La selezione condivisa include `activeSceneId`, `activeStripId` e multiselezione di source keys. Categorie e quantità alimentano la preview senza schema di categorie hardcoded. Gli affiancamenti sono espliciti oltre 1200 CSS px; nella v1.9, a 1200 px e sotto, lo spoglio occupa la vista a tutta larghezza. [Componenti, comandi, writer, test e limiti](calendar-workspace.md). Le restrizioni di sola consultazione delle sezioni storiche si riferiscono alla fase precedente.
+
+### Presenze dei campi integrati — v1.14
+
+MMSX espone `scene.fieldElementIds` per gli ID nativi di Set, Location, Script Day, Unit, Sequence, DN e INT/EXT, separati dai riferimenti dello spoglio e dalle quantità. Il DOOD usa questi ID; per MSD risolve i valori scalari nei corrispondenti campi e proietta le eventuali voci mancanti senza aggiungerle a `project.elements`. Identità, conteggi e archivi sorgente restano conservati.
