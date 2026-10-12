@@ -8,9 +8,9 @@
 
 > **Creazione ed editing completo:** nuovi progetti Studio, scene e quantità, elementi/proprietà, categorie, produzione, piani, giorni/banner e vincoli modificabili. Le modifiche complete persistono in `.studio.json` v2, con conservazione dell’archivio importato e lettura dei progetti v1. Layout report e stripboard preservati. Vedi [funzioni, fonti ufficiali, compatibilità e verifiche](docs/document-editing.md).
 
-# Stripboard Studio v1.15
+# Stripboard Studio v1.16
 
-Version 1.15 consolidates all work on main and includes iOS Home Screen metadata, a web app manifest and app icons. It retains built-in DOOD attendance, one-category views, Calendar selection and rule-editing fixes, the shared print preview, Studio project saving and conservative MSD/MMSX exports.
+Version 1.16 adds project creation and complete editing of production data, breakdown sheets, quantities, categories, elements, calendars, plans, shooting days, banners, events and Red Flags. Full edits save in Studio v2 files while preserving the original imported archive and support for Studio v1. Existing report and stripboard layouts remain unchanged; conservative native MSD/MMSX exports remain available for supported scheduling and calendar edits.
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
@@ -135,3 +135,7 @@ Verified against the real MSD sample and synthetic MMSX 5/3/hybrid fixtures, inc
 ## v1.15 — Consolidated main branch and Home Screen icons
 
 All branch changes are merged into `main`, including the iOS Home Screen metadata and web app manifest. The referenced Apple touch icon and 192/512 px app icons are included. Use the browser’s Add to Home Screen action to open the site in standalone mode on iOS.
+
+## v1.16 — Document creation and complete editing
+
+Create projects from scratch, edit scene fields and element quantities, manage production properties and linked elements, and update calendars, plans, days, banners, events and availability constraints. Shared references update across breakdown, scheduling, DOOD and reports. Complete edits use the versioned Studio v2 container, retaining original MSD/MMSX archives and compatibility with Studio v1. Validation, Undo/Redo, draft protection and failed-write recovery cover the authoring flows. Report and stripboard geometry and rendering remain unchanged. See [sources, implementation, compatibility limits and verification](docs/document-editing.md).
