@@ -13,13 +13,14 @@
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png">
   <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/document-editor.css">
 </head>
 <body>
   <div class="shell">
     <header class="app-header">
       <div class="topbar">
         <div class="brand" aria-label="Stripboard Studio"><span class="brand-mark" aria-hidden="true">▥</span><span><strong>STRIPBOARD</strong><small>STUDIO</small></span></div>
-        <details class="project-heading"><summary><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><span aria-hidden="true">⌄</span></summary><div class="project-menu"><div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div></div></details>
+        <details class="project-heading"><summary><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><span aria-hidden="true">⌄</span></summary><div class="project-menu"><div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div><button id="newDocumentButton" type="button">＋ Nuovo progetto</button><button id="editDocumentButton" type="button">Modifica documento…</button><button id="documentUndoButton" type="button">↶ Annulla modifica</button><button id="documentRedoButton" type="button">↷ Ripeti modifica</button></div></details>
         <div class="top-actions"><span class="local-badge" title="File elaborati in locale">● Locale</span><span id="dirtyIndicator" role="status">Salvato</span><label class="upload" tabindex="0" role="button" aria-label="Importa un progetto .msd, .mmsx o .studio.json"><input id="fileInput" type="file" accept=".msd,.mmsx,.studio.json">＋ <span>Importa</span></label><button id="saveButton" type="button">↓ Salva .msd</button><button id="printButton" class="print-button" type="button">↗ <span>Stampa vista</span></button></div>
       </div>
       <nav class="primary-nav" aria-label="Navigazione principale">

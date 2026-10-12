@@ -1,3 +1,5 @@
+> **Editing completo:** le successive funzioni di creazione/modifica e il contenitore Studio v2 sono descritti in [document-editing.md](document-editing.md). Le limitazioni delle fasi precedenti riportate sotto sono storiche.
+
 # Calendar operativo, layout e Spoglio — v1.12
 
 Implementazione dell’8 ottobre 2026. Le note delle fasi precedenti restano evidenza storica; questa fase abilita l’editing dei calendari.

@@ -6,6 +6,8 @@
 
 > **Day Out of Days:** DOOD derivato dalle strip correnti, regole per Sub-board/categoria/elemento, eventi condivisi con Calendar, Summary/CSV e anteprima di stampa paginata comune con lo schedule. I nuovi metadati si salvano nel progetto `.studio.json`; l’esportazione nativa MSD/MMSX resta conservativa. Vedi [analisi, interpretazioni e verifiche DOOD](docs/dood.md).
 
+> **Creazione ed editing completo:** nuovi progetti Studio, scene e quantità, elementi/proprietà, categorie, produzione, piani, giorni/banner e vincoli modificabili. Le modifiche complete persistono in `.studio.json` v2, con conservazione dell’archivio importato e lettura dei progetti v1. Layout report e stripboard preservati. Vedi [funzioni, fonti ufficiali, compatibilità e verifiche](docs/document-editing.md).
+
 # Stripboard Studio v1.15
 
 Version 1.15 consolidates all work on main and includes iOS Home Screen metadata, a web app manifest and app icons. It retains built-in DOOD attendance, one-category views, Calendar selection and rule-editing fixes, the shared print preview, Studio project saving and conservative MSD/MMSX exports.

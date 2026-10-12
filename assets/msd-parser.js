@@ -259,7 +259,7 @@ function buildProject(container){
       unscheduledDays:boards.reduce((n,b)=>n+b.unscheduledGroups.filter(g=>g.kind==='UnscheduledDay').length,0)},
     activeBoard:active,defaultCalendar,calendars,calendarManager:{source:rawNode(roots.CalendarMgr)},
     redFlags,redFlagNames:redFlagData.names,redFlagSettings:redFlagData.settings,redFlagManagerSource:redFlagData.source,
-    scenes,elements:elements.map(({linkedElements,...rest})=>rest),categorySettings,boards,
+    scenes,elements,categorySettings,boards,
     stripLayouts:parseLayouts(roots.StripBoardLayoutMgr,'strip'),reportLayouts:parseLayouts(roots.ReportLayoutMgr,'report'),
     colors:parseColors(roots.ColorSettings),issues,sourceXmlSections,sourceDocument};
   completeProjectModel(project);

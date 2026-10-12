@@ -157,6 +157,7 @@ function patchCalendars(project){
   return encoder.encode(prefix+new XMLSerializer().serializeToString(doc.documentElement));
 }
 export function serializeMsd(project){
+ if(project.documentEditing)throw Error('Le modifiche complete richiedono Salva progetto Studio (.studio.json). Esportazione nativa non disponibile per questo documento.');
   const source=project?.sourceDocument;
   if(!source?.bytes||!source?.sections)throw Error('Documento MSD originale non disponibile');
   const boardChanged=boardSignature(project)!==source.boardSignature,calendarChanged=calendarsSignature(project)!==source.calendarsSignature;

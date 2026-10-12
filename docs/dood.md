@@ -1,3 +1,5 @@
+> **Editing completo:** le successive funzioni di creazione/modifica e il contenitore Studio v2 sono descritti in [document-editing.md](document-editing.md). Le limitazioni delle fasi precedenti riportate sotto sono storiche.
+
 # Day Out of Days — analisi e contratto
 
 Dalla v1.13 il DOOD mostra una sola categoria alla volta: all’apertura seleziona la prima categoria disponibile e il menu non offre «Tutte». Matrice, regole categoria/elemento, CSV Summary e stampa seguono la categoria scelta. Cambiare categoria è una preferenza di visualizzazione e non modifica il progetto.

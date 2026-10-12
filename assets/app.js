@@ -17,6 +17,8 @@ import {calculateDood,doodElements,sortDoodRows,doodSummaryCsv,effectiveDoodRule
 import {doodMarkup} from './dood-view.js';
 import {ensureStudio,snapshotStudio,restoreStudio,setDoodRules,serializeStudio,parseStudio} from './studio-project.js';
 import {createPrintService} from './print-service.js';
+import {createDocumentEditor} from './document-editor.js';
+import {snapshotDocument,restoreDocument,refreshDocument,validateDocument,createPlan} from './document-model.js';
 import {createEventManager} from './production-events.js';
 const $ = id => document.getElementById(id);
 const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
@@ -89,11 +91,26 @@ function showStatus(message){$('status').textContent=message;$('status').hidden=
 function isDirty(){return documentIsDirty(state)}
 function updateDocumentStatus(){
   const saving=state.serializationState==='saving';
-  if(state.project)$('saveButton').textContent=state.project.studio||state.project.studioContainer?'↓ Salva progetto Studio':state.project.format==='mmsx'?'↓ Salva .mmsx':'↓ Salva .msd';
+  if(state.project)$('saveButton').textContent=state.project.documentEditing||state.project.studio||state.project.studioContainer?'↓ Salva progetto Studio':state.project.format==='mmsx'?'↓ Salva .mmsx':'↓ Salva .msd';
   $('dirtyIndicator').textContent=saving?'Salvataggio…':isDirty()?'Modifiche non salvate':'Salvato';
   $('dirtyIndicator').classList.toggle('dirty',isDirty());
   $('saveButton').disabled=saving||!state.project;
+  $('documentUndoButton').disabled=!state.orderHistory.length;$('documentRedoButton').disabled=!state.redoHistory.length;
 }
+function rebuildDocumentIndexes(){
+  refreshDocument(state.project);state.sceneMap=sceneIndex();state.elementMap=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e]));state.elementIds=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.categorySettings=new Map(state.project.categorySettings.map(c=>[c.name,c.attributes]));
+  if(!state.project.boards.some(b=>b.name===state.board))state.board=state.project.activeBoard||state.project.boards[0].name;
+  $('projectTitle').textContent=state.project.title;refreshBoardOptions();$('calendarCount').textContent=state.project.calendars.length;$('redFlagCount').textContent=state.project.redFlags.length;
+  $('calendarSelect').innerHTML=state.project.calendars.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
+}
+function applyDocumentCommand(command){
+  const before=snapshotDocument(state.project);
+  try{command();state.project.documentEditing=true;validateDocument(state.project);rebuildDocumentIndexes();state.orderHistory.push({kind:'document',before});state.redoHistory=[];edited();return true}
+  catch(error){restoreDocument(state.project,before);throw error}
+}
+const documentEditor=createDocumentEditor({getContext:()=>({project:state.project,boardName:state.board}),onChange:applyDocumentCommand,onCreate:project=>{setProject(project);state.projectChoice='new';markDocumentEdited(state);updateDocumentStatus();setMode('data')},onRefresh:()=>render()});
+$('newDocumentButton').addEventListener('click',()=>{if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Creare un nuovo progetto?'))return;document.querySelector('.project-heading').open=false;documentEditor.newDocument()});
+$('editDocumentButton').addEventListener('click',()=>{document.querySelector('.project-heading').open=false;documentEditor.open()});
 function edited(){
   state.project.counts.events=state.project.events.length;
   state.project.counts.scheduleDays=state.project.boards.reduce((n,board)=>n+board.scheduledGroups.filter(group=>group.kind==='ScheduleDay').length,0);
@@ -117,7 +134,7 @@ function setProject(data){
   document.querySelector('.project-heading').open=false;
   resetDocumentState(state);
   const isMmsx=data.format==='mmsx';
-  if(isMmsx)state.mode='board';
+  if(isMmsx||data.format==='studio')state.mode='board';
   for(const [id,key] of [['reportNav','reports'],['calendarNav','readCalendars'],['redFlagNav','readRedFlags'],['newBoardButton','createBoards']])$(id).disabled=!data.capabilities[key];
   $('saveButton').textContent=isMmsx?'↓ Salva .mmsx':'↓ Salva .msd';
   state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;state.activeSceneId=null;state.calendarStartDrafts.clear();state.calendarGoDraft=null;state.calendarMonthDraft=null;state.layoutChoice='single';state.previewOpen=false;
@@ -219,10 +236,10 @@ function render(){
   if(breakdownVisible)renderBreakdown();
   $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
   if(state.mode==='breakdown'){$('viewTitle').textContent='Spoglio';$('viewSubtitle').textContent='Scheda scena e fabbisogni di produzione';return}
-  if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, riferimenti delle schede ed elementi · consultazione';renderProductionViewer();return}
-  if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e tipi presenti nel file · consultazione';renderRedFlagViewer();return}
+  if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, schede ed elementi modificabili';renderProductionViewer();return}
+  if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();$('redFlagView').insertAdjacentHTML('afterbegin','<div class="dialog-actions"><button type="button" data-edit-document="flag">Modifica Red Flag</button><button type="button" data-edit-document="flag" data-new-record>Nuova Red Flag</button></div>');return}
   if(state.mode==='dood'){$('viewTitle').textContent='Day Out of Days';$('viewSubtitle').textContent='Presenze derivate dal piano · regole della Sub-board';renderDood();return}
-  if(calendarVisible)renderCalendarViewer();
+  if(calendarVisible){renderCalendarViewer();$('calendarView').insertAdjacentHTML('beforeend','<div class="dialog-actions"><button type="button" data-edit-document="calendar">Dettagli calendario</button><button type="button" data-edit-document="calendar" data-new-record>Nuovo calendario</button><button type="button" data-edit-document="day">Giornate</button><button type="button" data-edit-document="banner">Banner</button><button type="button" data-edit-document="plan">Piani</button></div>')}
   if(boardVisible){
     renderBoard(displayedBoard(),selectedBoardLayout());
   }
@@ -237,6 +254,7 @@ function render(){
 }
 function renderBreakdown(){
   $('breakdownPreview').innerHTML=breakdownMarkup(state.project,state,{safe,shortDate,pages,valueText,sceneOrder:breakdownSceneOrder()});
+  $('breakdownPreview').insertAdjacentHTML('beforeend','<div class="dialog-actions"><button type="button" data-edit-document="scene">Modifica scena</button><button type="button" data-edit-document="scene" data-new-record>Nuova scena</button></div>');
 }
 function renderStats(board){
   const scheduled=state.mode==='board'?displayedEntries().filter(entry=>entry.container==='scheduledGroups').map(entry=>entry.group):board.scheduledGroups;
@@ -839,7 +857,9 @@ function applyCalendarCommand(command){
 }
 function historyStep(from,to){
   const entry=from.pop();if(!entry)return;
-  if(entry.kind==='studio'){
+  if(entry.kind==='document'){
+    to.push({kind:'document',before:snapshotDocument(state.project)});restoreDocument(state.project,entry.before);rebuildDocumentIndexes();
+  }else if(entry.kind==='studio'){
     to.push({kind:'studio',before:snapshotStudio(state.project)});restoreStudio(state.project,entry.before);
   }else if(entry.kind==='production'){
     to.push({kind:'production',before:snapshotProduction(state.project)});restoreProduction(state.project,entry.before);
@@ -986,6 +1006,7 @@ function dateRange(item){
 }
 function table(headers,rows){return `<div class="flag-table-wrap"><table class="flag-table"><thead><tr>${headers.map(h=>`<th>${safe(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(value=>`<td>${safe(value)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${headers.length}">Nessun dato presente.</td></tr>`}</tbody></table></div>`}
 function valueText(value){return value?.text??(value==null?'—':typeof value==='object'?JSON.stringify(value):String(value))}
+document.addEventListener('click',event=>{const button=event.target.closest('[data-edit-document]');if(!button)return;const kind=button.dataset.editDocument;const id=button.hasAttribute('data-new-record')?'':kind==='scene'?(state.mode==='data'?state.dataScene:state.activeSceneId):kind==='element'?state.dataElement:kind==='calendar'?state.calendar:kind==='flag'?state.flagSelectedId:undefined;documentEditor.open(kind,id??undefined)});
 function renderProductionViewer(){
   const p=state.project,scenes=[...p.scenes].sort((a,b)=>Number(!a.scene)-Number(!b.scene)||collator.compare(a.scene||'',b.scene||''));
   const scene=scenes.find(s=>s.bdsId===state.dataScene)||scenes[0];
@@ -996,12 +1017,12 @@ function renderProductionViewer(){
   const productionLabels={artDirector:'Scenografia',setDresser:'Arredamento set',timing:'Tempi',episode:'Episodio',miscOne:'Informazioni aggiuntive 1',miscTwo:'Informazioni aggiuntive 2',miscThree:'Informazioni aggiuntive 3',miscFour:'Informazioni aggiuntive 4',title:'Titolo',PictureTitle:'Titolo',company:'Società',director:'Regia',producer:'Produttore',upm:'Direttore di produzione',asstDirector:'Aiuto regia',scriptDated:'Data sceneggiatura',prodNo:'Numero produzione',preparer:'Preparato da'};
   const category=p.categorySettings.find(c=>c.name===element?.category);
   const properties=Object.entries(element?.properties||{}).map(([key,value])=>[category?.properties?.[key]?.name||key,valueText(value)]);
-  $('dataView').innerHTML=`<div class="viewer-intro"><p>Dati consultabili in sola lettura. Il nome di un elemento e la quantità richiesta dalla scheda sono distinti; una quantità assente non viene ricavata dal nome.</p></div>
-    <div class="production-cards"><div class="viewer-card"><h3>Produzione</h3>${table(['Campo','Valore'],Object.entries(p.production).map(([key,value])=>[productionLabels[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2'),valueText(value)]))}</div>
-    <div class="viewer-card"><h3>Quantità per scheda</h3><label class="viewer-label" for="dataSceneSelect">Scheda</label><select id="dataSceneSelect">${scenes.map(s=>`<option value="${safe(s.bdsId)}" ${s===scene?'selected':''}>${safe(s.scene||'Senza numero')} · ${safe(s.synopsis)}</option>`).join('')}</select>
+  $('dataView').innerHTML=`<div class="viewer-intro"><p>Modifica i dati dal pulsante dedicato; le modifiche complete si salvano nel progetto Studio. Il nome di un elemento e la quantità richiesta dalla scheda sono distinti; una quantità assente non viene ricavata dal nome.</p></div>
+    <div class="production-cards"><div class="viewer-card"><h3>Produzione</h3><button type="button" data-edit-document="production">Modifica produzione</button>${table(['Campo','Valore'],Object.entries(p.production).map(([key,value])=>[productionLabels[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2'),valueText(value)]))}</div>
+    <div class="viewer-card"><h3>Quantità per scheda</h3><button type="button" data-edit-document="scene">Modifica scena e quantità</button><button type="button" data-edit-document="scene" data-new-record>Nuova scena</button><label class="viewer-label" for="dataSceneSelect">Scheda</label><select id="dataSceneSelect">${scenes.map(s=>`<option value="${safe(s.bdsId)}" ${s===scene?'selected':''}>${safe(s.scene||'Senza numero')} · ${safe(s.synopsis)}</option>`).join('')}</select>
       ${table(['Categoria','Elemento','Quantità','Stato'],(scene?.elementRefs||[]).map(ref=>[ref.category,ref.name,valueText(ref.quantity),!ref.resolved?'Riferimento non risolto':ref.quantityOrigin==='stored'?'Quantità salvata':'Quantità non presente']))}</div>
-    <div class="viewer-card"><h3>Elementi e proprietà</h3><label class="viewer-label" for="dataCategorySelect">Categoria</label><select id="dataCategorySelect"><option value="">Tutte le categorie</option>${categories.map(name=>`<option value="${safe(name)}" ${name===state.dataCategory?'selected':''}>${safe(name)}</option>`).join('')}</select>
-      <label class="viewer-label" for="dataElementSelect">Elemento</label><select id="dataElementSelect" ${elements.length?'':'disabled'}>${elements.map(e=>`<option value="${safe(e.id)}" ${e===element?'selected':''}>${state.dataCategory?'':`${safe(e.category)} · `}${safe(e.name||'Senza nome')}</option>`).join('')||'<option>Nessun elemento in questa categoria</option>'}</select>${table(['Proprietà','Valore'],properties)}${element?.source?.notes?`<p>${safe(element.source.notes)}</p>`:''}</div></div>`;
+    <div class="viewer-card"><h3>Elementi e proprietà</h3><button type="button" data-edit-document="element">Modifica elemento</button><button type="button" data-edit-document="element" data-new-record>Nuovo elemento</button><button type="button" data-edit-document="category">Categorie</button><label class="viewer-label" for="dataCategorySelect">Categoria</label><select id="dataCategorySelect"><option value="">Tutte le categorie</option>${categories.map(name=>`<option value="${safe(name)}" ${name===state.dataCategory?'selected':''}>${safe(name)}</option>`).join('')}</select>
+      <label class="viewer-label" for="dataElementSelect">Elemento</label><select id="dataElementSelect" ${elements.length?'':'disabled'}>${elements.map(e=>`<option value="${safe(e.id)}" ${e===element?'selected':''}>${state.dataCategory?'':`${safe(e.category)} · `}${safe(e.name||'Senza nome')}</option>`).join('')||'<option>Nessun elemento in questa categoria</option>'}</select>${table(['Proprietà','Valore'],properties)}${(element?.notes??element?.source?.notes)?`<p>${safe(element.notes??element.source.notes)}</p>`:''}</div></div>`;
 }
 function renderCalendarViewer(){
   const view=$('calendarView');
@@ -1049,7 +1070,7 @@ function renderRedFlagViewer(){
       <div class="viewer-card"><h3>2 · Data o intervallo</h3><div class="month-toolbar"><button type="button" data-flag-month-step="-1" aria-label="Mese precedente">‹</button><strong>${safe(monthLabel(month))}</strong><button type="button" data-flag-month-step="1" aria-label="Mese successivo">›</button><input id="rfMonthInput" type="month" value="${month}" aria-label="Vai al mese"></div>${grid}
         <div class="date-range"><label>Dal <input id="rfFrom" type="date" value="${safe(state.flagStart)}"></label><label>Al <input id="rfTo" type="date" value="${safe(state.flagEnd)}"></label><button id="rfClearDates" type="button">Azzera</button></div>
         <label class="viewer-label" for="rfCalendar">Contesto calendario</label><select id="rfCalendar"><option value="">Solo Red Flags</option>${calendarOptions}</select></div>
-      <div class="viewer-card"><h3>3 · Tipo di Red Flag</h3><select id="rfType" size="7" aria-label="Tipo di Red Flag"><option value="" ${!state.flagName?'selected':''}>Tutti i tipi</option>${typeOptions}</select><p class="viewer-hint">Tipi definiti nel file; nessuna modifica viene salvata.</p></div></div>
+      <div class="viewer-card"><h3>3 · Tipo di Red Flag</h3><select id="rfType" size="7" aria-label="Tipo di Red Flag"><option value="" ${!state.flagName?'selected':''}>Tutti i tipi</option>${typeOptions}</select><p class="viewer-hint">I vincoli modificati si salvano nel progetto Studio.</p></div></div>
     <div class="viewer-card flag-results"><div class="results-heading"><h3>Red Flags nel file</h3><span>${filtered.length} di ${project.redFlags.length} voci</span></div>
       <div class="flag-table-wrap"><table class="flag-table"><thead><tr><th>Data</th><th>Categoria</th><th>Elemento</th><th>Tipo</th><th>Nota</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="no-results">Nessuna Red Flag per questi filtri.</td></tr>'}</tbody></table></div></div>
     ${selected?`<div class="viewer-card flag-detail"><div><span class="detail-kicker">RED FLAG SELEZIONATA</span><h3>${safe(selected.name||'Red Flag')}</h3><p>${safe(dateRange(selected))} · ${safe(selected.target.kind==='project'?'Intera giornata':selected.target.kind==='unresolved'?'Riferimento non risolto':`${selected.target.category}: ${selected.target.element}`)}</p></div><div><strong>Nota</strong><p>${safe(selected.note||'Nessuna nota')}</p><small>Tipo originale: ${safe(selected.type||selected.name||'—')} · Colore: ${safe(selected.color||'—')} · ${selected.targetResolved?'Riferimento risolto':'Riferimento non risolto'}${selected.doodStatus!=null?` · DOODStatus: ${safe(selected.doodStatus)}`:''}</small></div></div>`:''}`;
@@ -1082,7 +1103,9 @@ $('newBoardForm').addEventListener('submit',event=>{
   event.preventDefault();
   if(event.submitter?.value!=='create'){$('newBoardDialog').close();return}
   try{
-    const board=createStripboard(state.project,{name:$('newBoardName').value,sourceBoardName:state.board});
+    let board;
+    if(state.project.documentEditing)applyDocumentCommand(()=>{board=createPlan(state.project,{name:$('newBoardName').value,calendarId:selectedBoard().calendarId,copyFrom:selectedBoard().id})});
+    else board=createStripboard(state.project,{name:$('newBoardName').value,sourceBoardName:state.board});
     clearStripSelection();
     state.board=board.name;state.calendar=board.calendarId;state.printHeader=board.attributes.HideStripBoardHeader!=='1';
     $('calendarSelect').value=state.calendar;syncPrintOptions();refreshBoardOptions();showStatus('');$('newBoardDialog').close();setMode('board');edited();
@@ -1184,13 +1207,15 @@ $('moveForm').addEventListener('submit',event=>{
 $('moveDialog').addEventListener('close',()=>{state.moveIntent=null});
 $('undoMoveButton').addEventListener('click',undoBoardMove);
 $('redoMoveButton').addEventListener('click',redoBoardMove);
+$('documentUndoButton').addEventListener('click',()=>{document.querySelector('.project-heading').open=false;undoBoardMove()});
+$('documentRedoButton').addEventListener('click',()=>{document.querySelector('.project-heading').open=false;redoBoardMove()});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'&&scheduleInteractionEnabled()&&!event.target.closest('dialog')){
     closeSegmentMenu();
     if(stripPointer)endStripDrag(event,true);
     clearStripSelection();
   }
-  if((event.metaKey||event.ctrlKey)&&!event.target.closest('input,textarea,[contenteditable="true"]')&&['board','calendar'].includes(state.mode)){
+  if((event.metaKey||event.ctrlKey)&&!event.target.closest('input,textarea,[contenteditable="true"]')&&!event.target.closest('dialog')){
     const key=event.key.toLowerCase();
     if(key==='z'&&!event.shiftKey&&state.orderHistory.length){event.preventDefault();undoBoardMove()}
     else if(((key==='z'&&event.shiftKey)||key==='y')&&state.redoHistory.length){event.preventDefault();redoBoardMove()}
@@ -1199,13 +1224,15 @@ document.addEventListener('keydown',event=>{
 $('saveButton').addEventListener('click',async()=>{
   if(!state.project||state.serializationState==='saving')return;
   const token=beginDocumentSave(state),project=token.project;
+  const saveProject={...project,...snapshotDocument(project)};
   updateDocumentStatus();showStatus('');
   try{
-    const isMmsx=project.format==='mmsx',studio=Boolean(project.studio||project.studioContainer),extension=studio?'.json':isMmsx?'.mmsx':'.msd';
-    const fileName=studio?project.fileName.replace(/\.(msd|mmsx)$/i,'')+'.studio.json':isMmsx?project.fileName.replace(/\.mmsx$/i,'')+'-edited.mmsx':project.fileName.replace(/\.msd$/i,'')+'-edited.msd';
+    const isMmsx=project.format==='mmsx',studio=Boolean(project.documentEditing||project.studio||project.studioContainer),extension=studio?'.json':isMmsx?'.mmsx':'.msd';
+    const fileName=studio?project.fileName.replace(/(?:\.studio\.json|\.(?:msd|mmsx))$/i,'')+'.studio.json':isMmsx?project.fileName.replace(/\.mmsx$/i,'')+'-edited.mmsx':project.fileName.replace(/\.msd$/i,'')+'-edited.msd';
     // Open the picker during the user gesture, before asynchronous compression.
-    const handle=window.showSaveFilePicker?await window.showSaveFilePicker({suggestedName:fileName,types:[{description:'Movie Magic Scheduling',accept:{'application/octet-stream':[extension]}}]}):null;
-    const bytes=studio?await serializeStudio(project):isMmsx?await serializeMmsx(project,fileName):serializeMsd(project);
+    let handle=null;
+    if(window.showSaveFilePicker)try{handle=await window.showSaveFilePicker({suggestedName:fileName,types:[{description:studio?'Stripboard Studio':'Movie Magic Scheduling',accept:{'application/octet-stream':[extension]}}]})}catch(error){if(!['SecurityError','NotSupportedError'].includes(error.name))throw error}
+    const bytes=studio?await serializeStudio(saveProject):isMmsx?await serializeMmsx(saveProject,fileName):serializeMsd(saveProject);
     if(handle){
       const writer=await handle.createWritable();await writer.write(bytes);await writer.close();
     }else{
@@ -1217,7 +1244,7 @@ $('saveButton').addEventListener('click',async()=>{
   }catch(error){finishDocumentSave(state,token,false);if(error.name!=='AbortError')showStatus(`Salvataggio non riuscito: ${error.message}`)}
   finally{updateDocumentStatus()}
 });
-window.addEventListener('beforeunload',event=>{if(isDirty()){event.preventDefault();event.returnValue=''}});
+window.addEventListener('beforeunload',event=>{if(isDirty()||documentEditor.hasDraft()||eventManager.hasDraft()){event.preventDefault();event.returnValue=''}});
 $('layoutSelect').addEventListener('change',e=>{
   if(state.mode==='board'){
     state.boardLayoutChoice=e.target.value;
@@ -1429,7 +1456,7 @@ $('fileInput').addEventListener('change',async e=>{
     state.importedSource={bytes,name:file.name};
     if(!$('projectSelect').querySelector('[value="imported"]')){$('projectSelect').insertAdjacentHTML('beforeend','<option value="imported">File importato</option>')}
     $('projectSelect').value='imported';setProject(data);state.projectChoice='imported';
-  }catch(err){showStatus(err.message);$('projectTitle').textContent='Importazione non riuscita'}finally{e.target.value=''}
+  }catch(err){showStatus(err.message);$('projectTitle').textContent=state.project?.title||'Importazione non riuscita'}finally{e.target.value=''}
 });
 function currentDoodReport(){
   const ui=state.dood,elements=doodElements(state.project),categories=[...new Set(elements.map(e=>e.category))];
@@ -1500,7 +1527,7 @@ $('doodView').addEventListener('change',event=>{
     applyStudioCommand(()=>setDoodRules(state.project,state.board,{category,elementId:ui.ruleElement,rules:element?override:rules}));
   }
 });
-const eventManager=createEventManager({getContext:()=>({project:state.project,board:state.mode==='calendar'?(selectedBoard().calendarId===state.calendar?selectedBoard():state.project.boards.find(b=>b.calendarId===state.calendar)||selectedBoard()):selectedBoard(),calendar:state.mode==='calendar'?editingCalendar():findCalendar(state.project,selectedBoard().calendarId),date:state.mode==='dood'?state.dood.goDate||state.doodReport.dates[0]?.date:state.calendarDate}),onChange:command=>applyStudioCommand(()=>{ensureStudio(state.project);command()})});
+const eventManager=createEventManager({getContext:()=>({project:state.project,board:state.mode==='calendar'?(selectedBoard().calendarId===state.calendar?selectedBoard():state.project.boards.find(b=>b.calendarId===state.calendar)||selectedBoard()):selectedBoard(),calendar:state.mode==='calendar'?editingCalendar():findCalendar(state.project,selectedBoard().calendarId),date:state.mode==='dood'?state.dood.goDate||state.doodReport.dates[0]?.date:state.calendarDate}),onChange:(command,{native=false}={})=>{if(native||state.project.documentEditing)return applyDocumentCommand(()=>{ensureStudio(state.project);command()});return applyStudioCommand(()=>{ensureStudio(state.project);command()})}});
 const printService=createPrintService({
   getSource(){
     const metadata={title:state.project.title,boardName:selectedBoardGroup().name,date:new Date().toLocaleDateString('it-IT',{timeZone:'Europe/Rome'}),version:`${state.project.fileName} · revisione ${state.revision}`};

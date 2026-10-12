@@ -128,6 +128,7 @@ export function updatedMmsxRoot(project){
  return source.originalRoot?.dataFormat===3?restoreMmsxV3(source,root):root;
 }
 export async function serializeMmsx(project,fileName,{copy=false}={}){
+ if(project.documentEditing)throw Error('Le modifiche complete richiedono Salva progetto Studio (.studio.json). Esportazione nativa non disponibile per questo documento.');
  const root=updatedMmsxRoot(project);
  if(!copy&&stringifyExact(root)===stringifyExact(project.mmsxSource.originalRoot))return project.mmsxSource.bytes.slice();
  if(copy){root.id=crypto.randomUUID();root.name=fileName.replace(/\.mmsx$/i,'');root.changed=false;

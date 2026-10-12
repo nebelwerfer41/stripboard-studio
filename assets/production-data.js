@@ -118,6 +118,9 @@ export function intervalOverlaps(item,start,end){
 export function eventsOnDate(project,calendarId,iso){return (project?.events||[]).filter(e=>e.calendarId===calendarId&&intervalContains(e,iso))}
 export function redFlagsOnDate(project,iso){return (project?.redFlags||[]).filter(item=>intervalContains(item,iso))}
 function matchesElement(scene,target){
+  if(target.elementId&&scene.fieldElementIds?.includes(target.elementId))return true;
+  const field={Set:'set',Location:'location','Script Day':'scriptDay',Unit:'unit',Sequence:'sequence',DN:'dn','INT/EXT':'ie'}[target.category];
+  if(field&&target.element&&scene[field]===target.element)return true;
   if(target.elementId&&scene.elementRefs)return scene.elementRefs.some(ref=>ref.elementId===target.elementId&&ref.resolved);
   return (scene.requirements?.[target.category]||[]).includes(target.element);
 }

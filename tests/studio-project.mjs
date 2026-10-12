@@ -17,4 +17,4 @@ test('history restores Studio metadata/events without cloning native opaque even
  restoreStudio(project,before);assert.equal(project.studio,undefined);assert.equal(project.events[0],original);assert.equal(project.events.filter(e=>e.studio).length,0);
  restoreStudio(project,after);assert.equal(project.studio.dood[project.boards[0].name].categories.Cast.allowHold,false);assert.equal(project.events.filter(e=>e.studio).length,1);
 });
-test('unsupported Studio container versions fail before native parsing',async()=>{await assert.rejects(()=>parseStudio(new TextEncoder().encode(JSON.stringify({type:'stripboard-studio',version:2,native:'',events:[]}))),/non supportato/)});
+test('unsupported Studio container versions fail before native parsing',async()=>{await assert.rejects(()=>parseStudio(new TextEncoder().encode(JSON.stringify({type:'stripboard-studio',version:3,native:'',events:[]}))),/non supportato/)});

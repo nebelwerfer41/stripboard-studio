@@ -1,3 +1,5 @@
+> **Editing completo:** le successive funzioni di creazione/modifica e il contenitore Studio v2 sono descritti in [document-editing.md](document-editing.md). Le limitazioni delle fasi precedenti riportate sotto sono storiche.
+
 # Flash Studio: contratto comune minimo, versione 1
 
 Decisioni consolidate il 7 ottobre 2026. Base verificata su GitHub: `96ad1bc2ebfc92f006d5b47eee5ff0ba2a46968c`. Implementato nella versione applicativa 1.6; la versione del contratto del modello resta 1.
