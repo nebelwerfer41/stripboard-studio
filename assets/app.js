@@ -18,6 +18,7 @@ import {doodMarkup} from './dood-view.js';
 import {ensureStudio,snapshotStudio,restoreStudio,setDoodRules,serializeStudio,parseStudio} from './studio-project.js';
 import {createPrintService} from './print-service.js';
 import {createDocumentEditor} from './document-editor.js';
+import {sceneEditingMarkup,elementCatalogMarkup,createIntegratedEditing,fitSceneTextareas} from './integrated-editing.js';
 import {snapshotDocument,restoreDocument,refreshDocument,validateDocument,createPlan} from './document-model.js';
 import {createEventManager} from './production-events.js';
 const $ = id => document.getElementById(id);
@@ -95,7 +96,7 @@ function updateDocumentStatus(){
   $('dirtyIndicator').textContent=saving?'Salvataggio…':isDirty()?'Modifiche non salvate':'Salvato';
   $('dirtyIndicator').classList.toggle('dirty',isDirty());
   $('saveButton').disabled=saving||!state.project;
-  $('documentUndoButton').disabled=!state.orderHistory.length;$('documentRedoButton').disabled=!state.redoHistory.length;
+  $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
 }
 function rebuildDocumentIndexes(){
   refreshDocument(state.project);state.sceneMap=sceneIndex();state.elementMap=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e]));state.elementIds=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.categorySettings=new Map(state.project.categorySettings.map(c=>[c.name,c.attributes]));
@@ -103,14 +104,16 @@ function rebuildDocumentIndexes(){
   $('projectTitle').textContent=state.project.title;refreshBoardOptions();$('calendarCount').textContent=state.project.calendars.length;$('redFlagCount').textContent=state.project.redFlags.length;
   $('calendarSelect').innerHTML=state.project.calendars.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
 }
-function applyDocumentCommand(command){
+let preservedEditingView=null;
+function applyDocumentCommand(command,{preserveView=null}={}){
   const before=snapshotDocument(state.project);
-  try{command();state.project.documentEditing=true;validateDocument(state.project);rebuildDocumentIndexes();state.orderHistory.push({kind:'document',before});state.redoHistory=[];edited();return true}
-  catch(error){restoreDocument(state.project,before);throw error}
+  try{command();state.project.documentEditing=true;validateDocument(state.project);rebuildDocumentIndexes();state.orderHistory.push({kind:'document',before});state.redoHistory=[];preservedEditingView=preserveView;edited();showStatus('');return true}
+  catch(error){restoreDocument(state.project,before);rebuildDocumentIndexes();throw error}
+  finally{preservedEditingView=null}
 }
 const documentEditor=createDocumentEditor({getContext:()=>({project:state.project,boardName:state.board}),onChange:applyDocumentCommand,onCreate:project=>{setProject(project);state.projectChoice='new';markDocumentEdited(state);updateDocumentStatus();setMode('data')},onRefresh:()=>render()});
 $('newDocumentButton').addEventListener('click',()=>{if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Creare un nuovo progetto?'))return;document.querySelector('.project-heading').open=false;documentEditor.newDocument()});
-$('editDocumentButton').addEventListener('click',()=>{document.querySelector('.project-heading').open=false;documentEditor.open()});
+const integratedEditing=createIntegratedEditing({getProject:()=>state.project,onChange:applyDocumentCommand,onError:showStatus});
 function edited(){
   state.project.counts.events=state.project.events.length;
   state.project.counts.scheduleDays=state.project.boards.reduce((n,board)=>n+board.scheduledGroups.filter(group=>group.kind==='ScheduleDay').length,0);
@@ -131,6 +134,7 @@ async function loadSample(id){
   catch(e){showStatus(e.message);$('projectTitle').textContent=state.project?.title||'Importa un progetto .msd'}
 }
 function setProject(data){
+  documentEditor.reset();
   document.querySelector('.project-heading').open=false;
   resetDocumentState(state);
   const isMmsx=data.format==='mmsx';
@@ -207,6 +211,7 @@ function setMode(mode){
 }
 function render(){
   if(!state.project)return;
+  renderStripColorSettings();
   const savedScroll=Object.fromEntries(['boardView','calendarView','breakdownPreview','doodView'].map(id=>[id,[$(id).scrollTop,$(id).scrollLeft]]));
   const primary=['board','calendar'].includes(state.mode),wide=canSplit(window.innerWidth);
   const split=primary&&wide&&state.layoutChoice!=='single';
@@ -236,12 +241,12 @@ function render(){
   if(breakdownVisible)renderBreakdown();
   $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
   if(state.mode==='breakdown'){$('viewTitle').textContent='Spoglio';$('viewSubtitle').textContent='Scheda scena e fabbisogni di produzione';return}
-  if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, schede ed elementi modificabili';renderProductionViewer();return}
-  if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();$('redFlagView').insertAdjacentHTML('afterbegin','<div class="dialog-actions"><button type="button" data-edit-document="flag">Modifica Red Flag</button><button type="button" data-edit-document="flag" data-new-record>Nuova Red Flag</button></div>');return}
+  if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, schede ed elementi modificabili';if(preservedEditingView!=='dataView')renderProductionViewer();return}
+  if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();documentEditor.restoreHost($('redFlagView'));$('redFlagView').insertAdjacentHTML('afterbegin','<div class="inline-category-tools"><button type="button" data-edit-document="flag">Modifica Red Flag</button><button type="button" data-edit-document="flag" data-new-record>Nuova Red Flag</button></div>');return}
   if(state.mode==='dood'){$('viewTitle').textContent='Day Out of Days';$('viewSubtitle').textContent='Presenze derivate dal piano · regole della Sub-board';renderDood();return}
-  if(calendarVisible){renderCalendarViewer();$('calendarView').insertAdjacentHTML('beforeend','<div class="dialog-actions"><button type="button" data-edit-document="calendar">Dettagli calendario</button><button type="button" data-edit-document="calendar" data-new-record>Nuovo calendario</button><button type="button" data-edit-document="day">Giornate</button><button type="button" data-edit-document="banner">Banner</button><button type="button" data-edit-document="plan">Piani</button></div>')}
+  if(calendarVisible){renderCalendarViewer();$('calendarView').querySelector('.calendar-toolbar')?.insertAdjacentHTML('beforeend','<details class="calendar-management"><summary>Calendario e piano ▾</summary><div class="inline-category-tools"><button type="button" data-edit-document="calendar">Dettagli calendario</button><button type="button" data-edit-document="calendar" data-new-record>Nuovo calendario</button><button type="button" data-edit-document="day">Giornate</button><button type="button" data-edit-document="banner">Banner</button><button type="button" data-edit-document="plan">Piani</button></div></details>')}
   if(boardVisible){
-    renderBoard(displayedBoard(),selectedBoardLayout());
+    renderBoard(displayedBoard(),selectedBoardLayout());renderBoardEditingTools();
   }
   for(const [id,[top,left]] of Object.entries(savedScroll)){$(id).scrollTop=top;$(id).scrollLeft=left}
   if(state.mode==='calendar'){$('viewTitle').textContent='Calendar';$('viewSubtitle').textContent='Piano, date e regole di produzione · scene e banner in ordine';return}
@@ -253,9 +258,43 @@ function render(){
   if(state.mode==='report')renderReport(board,layout);
 }
 function renderBreakdown(){
+  if(preservedEditingView==='breakdownPreview'){
+    const scene=state.project.scenes.find(s=>s.id===state.activeSceneId),heading=$('breakdownPreview').querySelector('h3'),option=$('breakdownSceneSelect')?.selectedOptions[0];
+    if(heading&&scene)heading.textContent=`Scena ${scene.scene}`;
+    if(option&&scene)option.textContent=`${scene.scene} · ${scene.set||scene.synopsis||'Senza set'}`;
+    return;
+  }
   $('breakdownPreview').innerHTML=breakdownMarkup(state.project,state,{safe,shortDate,pages,valueText,sceneOrder:breakdownSceneOrder()});
-  $('breakdownPreview').insertAdjacentHTML('beforeend','<div class="dialog-actions"><button type="button" data-edit-document="scene">Modifica scena</button><button type="button" data-edit-document="scene" data-new-record>Nuova scena</button></div>');
+  const scene=state.project.scenes.find(s=>s.id===state.activeSceneId);
+  if(scene){const view=$('breakdownPreview');for(const el of view.querySelectorAll('.breakdown-fields,.breakdown-synopsis,.breakdown-empty-toggle,.breakdown-categories'))el.remove();view.insertAdjacentHTML('beforeend',sceneEditingMarkup(state.project,scene,state));const colors=sceneColors(scene)||{};view.querySelector('.inline-scene-colors').insertAdjacentHTML('beforeend',`<label class="inline-field"><span>Colore strip</span><input type="color" data-scene-color="bg" aria-label="Colore strip scena" value="${safe(colors.bg||'#ffffff')}"></label><label class="inline-field"><span>Colore testo</span><input type="color" data-scene-color="fg" aria-label="Colore testo scena" value="${safe(colors.fg||'#263746')}"></label>`);}
+  $('breakdownPreview').insertAdjacentHTML('beforeend','<div class="inline-category-tools"><button type="button" data-inline-new="scene">＋ Nuova scena</button></div><div data-editor-host></div>');
+  documentEditor.restoreHost($('breakdownPreview'));fitSceneTextareas($('breakdownPreview'));
 }
+function renderBoardEditingTools(){
+  const view=$('boardView');view.querySelector('.board-edit-toolbar')?.remove();
+  const key=state.selectedStripIds.has(state.selectionAnchorId)?state.selectionAnchorId:state.activeStripId;
+  const strip=displayedEntries().flatMap(e=>e.group.strips).find(s=>s.sourceKey===key);
+  const banner=strip?.kind==='banner'?strip:null;
+  const toolbar=document.createElement('div');toolbar.className='board-edit-toolbar';
+  toolbar.innerHTML=`<button type="button" data-inline-new="scene">＋ Scena</button><button type="button" data-inline-new="banner">＋ Banner</button><button type="button" data-inline-new="day">＋ Fine giornata</button><button type="button" data-edit-document="plan" data-record-id="${safe(selectedBoard().id)}">Proprietà piano</button>${strip?.kind==='scene'?'<button type="button" data-open-active-scene>Spoglio della scena</button>':''}${banner?`<form data-inline-banner="${safe(banner.sourceKey)}"><label>Banner<input name="text" aria-label="Testo banner selezionato" required value="${safe(banner.text)}"></label><label>Sfondo<input name="backgroundColor" type="color" aria-label="Colore banner" value="${safe(banner.style?.backgroundColor||'#663301')}"></label><label>Testo<input name="fontColor" type="color" aria-label="Colore testo banner" value="${safe(banner.style?.fontColor||'#ffffff')}"></label><button type="submit">Applica</button></form>`:''}`;
+  view.prepend(toolbar);documentEditor.restoreHost(view);
+}
+function renderStripColorSettings(){
+  let host=$('stripColorSettings');if(!host){host=document.createElement('details');host.id='stripColorSettings';host.className='strip-color-settings';document.querySelector('#displayOptions .options-row').append(host)}
+  const colors=state.project.colors||{},cells=Object.entries(colors.cells||{}).filter(([key])=>{const [row,col]=key.split(':');return colors.rows?.[row]&&colors.columns?.[col]&&colors.rows[row]!=='Other'&&colors.columns[col]!=='Other'});
+  host.hidden=!cells.length;
+  host.innerHTML=`<summary>Colori strip ▾</summary><div class="flag-table-wrap"><table class="flag-table"><thead><tr><th>INT / EXT</th><th>DAY / NIGHT</th><th>Strip</th><th>Testo</th></tr></thead><tbody>${cells.map(([key,value])=>{const [row,col]=key.split(':');return `<tr><td>${safe(colors.columns[col])}</td><td>${safe(colors.rows[row])}</td><td><input type="color" data-strip-color="${safe(key)}" data-color-channel="bg" aria-label="Colore strip ${safe(colors.columns[col])} ${safe(colors.rows[row])}" value="${safe(value.bg||'#ffffff')}"></td><td><input type="color" data-strip-color="${safe(key)}" data-color-channel="fg" aria-label="Colore testo ${safe(colors.columns[col])} ${safe(colors.rows[row])}" value="${safe(value.fg||'#263746')}"></td></tr>`}).join('')}</tbody></table></div>`;
+}
+document.addEventListener('change',event=>{
+  const key=event.target.dataset.stripColor;if(!key)return;
+  try{applyDocumentCommand(()=>{state.project.colors.cells[key][event.target.dataset.colorChannel]=event.target.value});showStatus('')}catch(error){showStatus(error.message)}
+});
+document.addEventListener('click',event=>{if(event.target.closest('[data-open-active-scene]'))setMode('breakdown')});
+document.addEventListener('submit',event=>{
+  if(!event.target.matches('[data-inline-banner]'))return;event.preventDefault();
+  const form=event.target,values=new FormData(form);
+  try{applyDocumentCommand(()=>{const banner=displayedEntries().flatMap(e=>e.group.strips).find(s=>s.sourceKey===form.dataset.inlineBanner);if(!banner)throw Error('Banner non trovato');banner.text=String(values.get('text')).trim();if(!banner.text)throw Error('Testo banner obbligatorio');banner.style={...banner.style,backgroundColor:values.get('backgroundColor'),fontColor:values.get('fontColor')};});showStatus('')}catch(error){showStatus(error.message)}
+});
 function renderStats(board){
   const scheduled=state.mode==='board'?displayedEntries().filter(entry=>entry.container==='scheduledGroups').map(entry=>entry.group):board.scheduledGroups;
   const dated=scheduled.filter(g=>g.kind==='ScheduleDay');
@@ -461,6 +500,7 @@ function matchColorIndex(labels,value){
   return exact?.[0]??Object.entries(labels||{}).find(([,label])=>label==='Other')?.[0]??'11';
 }
 function sceneColors(scene){
+  if(scene.studioColors)return scene.studioColors;
   if(scene.mmsxColors)return scene.mmsxColors;
   const colors=state.project.colors||{};
   const row=matchColorIndex(colors.rows,scene.dn),col=matchColorIndex(colors.columns,scene.ie);
@@ -553,7 +593,7 @@ function isSceneKey(key){return entriesForBoard(state.project,state.board)
 function selectionChanged(previousActive,reason='selection',open=false){
   const occurrence=entriesForBoard(state.project,state.board).flatMap(e=>e.group.strips).find(strip=>strip.sourceKey===state.activeStripId&&strip.kind==='scene');
   state.activeSceneId=occurrence?state.sceneMap.get(occurrence.bdsId)?.id??null:null;
-  syncStripSelection();if(state.project&&!$('breakdownPreview').hidden)renderBreakdown();
+  syncStripSelection();if(state.project&&!$('breakdownPreview').hidden)renderBreakdown();if(state.project&&!$('boardView').hidden)renderBoardEditingTools();
   const detail={selectedStripIds:[...state.selectedStripIds],activeStripId:state.activeStripId,activeSceneId:state.activeSceneId,reason};
   $('boardView').dispatchEvent(new CustomEvent('stripselectionchange',{detail}));
   if(previousActive!==state.activeStripId)$('boardView').dispatchEvent(new CustomEvent('stripactivechange',{detail}));
@@ -1006,7 +1046,16 @@ function dateRange(item){
 }
 function table(headers,rows){return `<div class="flag-table-wrap"><table class="flag-table"><thead><tr>${headers.map(h=>`<th>${safe(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(value=>`<td>${safe(value)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${headers.length}">Nessun dato presente.</td></tr>`}</tbody></table></div>`}
 function valueText(value){return value?.text??(value==null?'—':typeof value==='object'?JSON.stringify(value):String(value))}
-document.addEventListener('click',event=>{const button=event.target.closest('[data-edit-document]');if(!button)return;const kind=button.dataset.editDocument;const id=button.hasAttribute('data-new-record')?'':kind==='scene'?(state.mode==='data'?state.dataScene:state.activeSceneId):kind==='element'?state.dataElement:kind==='calendar'?state.calendar:kind==='flag'?state.flagSelectedId:undefined;documentEditor.open(kind,id??undefined)});
+document.addEventListener('click',event=>{
+  const category=event.target.closest('[data-catalog-category]');if(category){state.dataCategory=category.dataset.catalogCategory;renderProductionViewer();return}
+  const button=event.target.closest('[data-edit-document],[data-inline-new]');if(!button)return;
+  const kind=button.dataset.editDocument||button.dataset.inlineNew;
+  const id=button.dataset.recordId??(button.hasAttribute('data-new-record')||button.dataset.inlineNew?'':kind==='scene'?(state.mode==='data'?state.dataScene:state.activeSceneId):kind==='element'?state.dataElement:kind==='calendar'?state.calendar:kind==='flag'?state.flagSelectedId:undefined);
+  if(kind==='scene'&&id){selectBreakdownScene(id);setMode('breakdown');return}
+  const view=button.closest('.view')||$('boardView');let host=view.querySelector('[data-editor-host]');if(!host){host=document.createElement('div');host.dataset.editorHost='';view.prepend(host)}
+  documentEditor.open(kind,id??undefined,host);
+  if(button.dataset.category){const select=host.querySelector('[name=category]');if(select)select.value=button.dataset.category}
+});
 function renderProductionViewer(){
   const p=state.project,scenes=[...p.scenes].sort((a,b)=>Number(!a.scene)-Number(!b.scene)||collator.compare(a.scene||'',b.scene||''));
   const scene=scenes.find(s=>s.bdsId===state.dataScene)||scenes[0];
@@ -1015,21 +1064,19 @@ function renderProductionViewer(){
   const element=elements.find(e=>e.id===state.dataElement)||elements.find(e=>e.name)||elements[0];
   state.dataScene=scene?.bdsId??null;state.dataElement=element?.id??null;
   const productionLabels={artDirector:'Scenografia',setDresser:'Arredamento set',timing:'Tempi',episode:'Episodio',miscOne:'Informazioni aggiuntive 1',miscTwo:'Informazioni aggiuntive 2',miscThree:'Informazioni aggiuntive 3',miscFour:'Informazioni aggiuntive 4',title:'Titolo',PictureTitle:'Titolo',company:'Società',director:'Regia',producer:'Produttore',upm:'Direttore di produzione',asstDirector:'Aiuto regia',scriptDated:'Data sceneggiatura',prodNo:'Numero produzione',preparer:'Preparato da'};
-  const category=p.categorySettings.find(c=>c.name===element?.category);
-  const properties=Object.entries(element?.properties||{}).map(([key,value])=>[category?.properties?.[key]?.name||key,valueText(value)]);
-  $('dataView').innerHTML=`<div class="viewer-intro"><p>Modifica i dati dal pulsante dedicato; le modifiche complete si salvano nel progetto Studio. Il nome di un elemento e la quantità richiesta dalla scheda sono distinti; una quantità assente non viene ricavata dal nome.</p></div>
+  $('dataView').innerHTML=`${elementCatalogMarkup(p,state)}<details class="project-details"><summary>Produzione e quantità per scheda ▾</summary>
     <div class="production-cards"><div class="viewer-card"><h3>Produzione</h3><button type="button" data-edit-document="production">Modifica produzione</button>${table(['Campo','Valore'],Object.entries(p.production).map(([key,value])=>[productionLabels[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2'),valueText(value)]))}</div>
     <div class="viewer-card"><h3>Quantità per scheda</h3><button type="button" data-edit-document="scene">Modifica scena e quantità</button><button type="button" data-edit-document="scene" data-new-record>Nuova scena</button><label class="viewer-label" for="dataSceneSelect">Scheda</label><select id="dataSceneSelect">${scenes.map(s=>`<option value="${safe(s.bdsId)}" ${s===scene?'selected':''}>${safe(s.scene||'Senza numero')} · ${safe(s.synopsis)}</option>`).join('')}</select>
       ${table(['Categoria','Elemento','Quantità','Stato'],(scene?.elementRefs||[]).map(ref=>[ref.category,ref.name,valueText(ref.quantity),!ref.resolved?'Riferimento non risolto':ref.quantityOrigin==='stored'?'Quantità salvata':'Quantità non presente']))}</div>
-    <div class="viewer-card"><h3>Elementi e proprietà</h3><button type="button" data-edit-document="element">Modifica elemento</button><button type="button" data-edit-document="element" data-new-record>Nuovo elemento</button><button type="button" data-edit-document="category">Categorie</button><label class="viewer-label" for="dataCategorySelect">Categoria</label><select id="dataCategorySelect"><option value="">Tutte le categorie</option>${categories.map(name=>`<option value="${safe(name)}" ${name===state.dataCategory?'selected':''}>${safe(name)}</option>`).join('')}</select>
-      <label class="viewer-label" for="dataElementSelect">Elemento</label><select id="dataElementSelect" ${elements.length?'':'disabled'}>${elements.map(e=>`<option value="${safe(e.id)}" ${e===element?'selected':''}>${state.dataCategory?'':`${safe(e.category)} · `}${safe(e.name||'Senza nome')}</option>`).join('')||'<option>Nessun elemento in questa categoria</option>'}</select>${table(['Proprietà','Valore'],properties)}${(element?.notes??element?.source?.notes)?`<p>${safe(element.notes??element.source.notes)}</p>`:''}</div></div>`;
+    </div></details>`;
+  documentEditor.restoreHost($('dataView'));
 }
 function renderCalendarViewer(){
   const view=$('calendarView');
   const scroll=view.querySelector('.calendar-grid-scroll'),top=scroll?.scrollTop||0,left=scroll?.scrollLeft||0;
   view.innerHTML=calendarMarkup(state.project,{...state,visibleSegments:visibleSegmentIds()},{safe,shortDate,pages,specialLabel,sceneColors});
   view.querySelector('.calendar-toolbar')?.insertAdjacentHTML('beforeend','<button type="button" data-event-manager>Eventi di produzione</button>');
-  const next=view.querySelector('.calendar-grid-scroll');if(next){next.scrollTop=top;next.scrollLeft=left}
+  const next=view.querySelector('.calendar-grid-scroll');if(next){next.scrollTop=top;next.scrollLeft=left}documentEditor.restoreHost(view);
 }
 
 function flagMatches(flag,{includeDate=true}={}){
@@ -1207,8 +1254,6 @@ $('moveForm').addEventListener('submit',event=>{
 $('moveDialog').addEventListener('close',()=>{state.moveIntent=null});
 $('undoMoveButton').addEventListener('click',undoBoardMove);
 $('redoMoveButton').addEventListener('click',redoBoardMove);
-$('documentUndoButton').addEventListener('click',()=>{document.querySelector('.project-heading').open=false;undoBoardMove()});
-$('documentRedoButton').addEventListener('click',()=>{document.querySelector('.project-heading').open=false;redoBoardMove()});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'&&scheduleInteractionEnabled()&&!event.target.closest('dialog')){
     closeSegmentMenu();
@@ -1223,6 +1268,7 @@ document.addEventListener('keydown',event=>{
 });
 $('saveButton').addEventListener('click',async()=>{
   if(!state.project||state.serializationState==='saving')return;
+  if(integratedEditing.hasDraft()||documentEditor.hasDraft()||eventManager.hasDraft()){showStatus('Applica o correggi i campi ancora in modifica prima di salvare.');return}
   const token=beginDocumentSave(state),project=token.project;
   const saveProject={...project,...snapshotDocument(project)};
   updateDocumentStatus();showStatus('');
@@ -1244,7 +1290,7 @@ $('saveButton').addEventListener('click',async()=>{
   }catch(error){finishDocumentSave(state,token,false);if(error.name!=='AbortError')showStatus(`Salvataggio non riuscito: ${error.message}`)}
   finally{updateDocumentStatus()}
 });
-window.addEventListener('beforeunload',event=>{if(isDirty()||documentEditor.hasDraft()||eventManager.hasDraft()){event.preventDefault();event.returnValue=''}});
+window.addEventListener('beforeunload',event=>{if(isDirty()||documentEditor.hasDraft()||integratedEditing.hasDraft()||eventManager.hasDraft()){event.preventDefault();event.returnValue=''}});
 $('layoutSelect').addEventListener('change',e=>{
   if(state.mode==='board'){
     state.boardLayoutChoice=e.target.value;
@@ -1277,6 +1323,7 @@ $('breakdownNav').addEventListener('click',()=>{if(!state.activeSceneId)selectBr
 $('redFlagNav').addEventListener('click',()=>setMode('redflags'));
 $('dataNav').addEventListener('click',()=>setMode('data'));
 $('dataView').addEventListener('change',event=>{
+  if(!['dataSceneSelect','dataCategorySelect','dataElementSelect'].includes(event.target.id))return;
   if(event.target.id==='dataSceneSelect')state.dataScene=event.target.value;
   if(event.target.id==='dataCategorySelect'){state.dataCategory=event.target.value;state.dataElement=null}
   if(event.target.id==='dataElementSelect')state.dataElement=event.target.value;
@@ -1433,6 +1480,7 @@ function selectBreakdownScene(id){
   syncStripSelection();
 }
 $('breakdownPreview').addEventListener('change',event=>{
+  if(event.target.dataset.sceneColor){const scene=state.project.scenes.find(s=>s.id===state.activeSceneId);if(scene)try{applyDocumentCommand(()=>{scene.studioColors={...(sceneColors(scene)||{bg:'#ffffff',fg:'#263746'}),[event.target.dataset.sceneColor]:event.target.value}})}catch(error){showStatus(error.message)}return}
   if(event.target.id==='hideEmptyCategories'){state.hideEmptyCategories=event.target.checked;renderBreakdown();$('hideEmptyCategories').focus()}
   if(event.target.id==='breakdownSceneSelect'){selectBreakdownScene(event.target.value);$('breakdownSceneSelect').focus()}
 });

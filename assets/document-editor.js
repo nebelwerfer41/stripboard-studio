@@ -1,4 +1,5 @@
-import {SCENE_FIELDS,createDocument,editScene,editElement,editCategory,createCalendar,editCalendarDetails,createPlan,editPlan,addDay,editFlag} from './document-model.js';
+import {createDocument,editScene,editElement,editCategory,createCalendar,editCalendarDetails,createPlan,editPlan,addDay,editFlag} from './document-model.js';
+import {sceneFieldsMarkup,fitSceneTextareas} from './integrated-editing.js';
 import {escapeHtml as e} from './dood-print.js';
 import {validDate} from './production-data.js';
 const labels={production:'Produzione',scene:'Scene e spoglio',element:'Elementi e proprietà',category:'Categorie',calendar:'Calendari',plan:'Piani',day:'Giornate',banner:'Banner',flag:'Red Flags'};
@@ -6,7 +7,7 @@ const fields=(spec,values)=>spec.map(([key,label,type='text',required=false])=>`
 const options=(list,id,label)=>list.map(r=>`<option value="${e(id(r))}">${e(label(r))}</option>`).join('');
 export function createDocumentEditor({getContext,onChange,onCreate,onRefresh}){
   const dialog=document.createElement('dialog');dialog.id='documentEditor';dialog.className='document-editor';document.body.append(dialog);
-  let kind='production',recordId='',context,draftRefs=[];
+  let kind='production',recordId='',context,draftRefs=[],inline=false,viewId=null;
   const p=()=>context.project;
   function records(){switch(kind){case 'scene':return p().scenes;case 'element':return p().elements;case 'category':return p().categorySettings;case 'calendar':return p().calendars;case 'plan':return p().boards;case 'flag':return p().redFlags;case 'day':return board().scheduledGroups.filter(g=>g.kind==='ScheduleDay');case 'banner':return [...board().scheduledGroups,...board().unscheduledGroups].flatMap(g=>g.strips.filter(s=>s.kind==='banner'));default:return []}}
   const id=r=>r.id||r.sourceKey||r.name;
@@ -16,12 +17,19 @@ export function createDocumentEditor({getContext,onChange,onCreate,onRefresh}){
     const list=records(),r=list.find(r=>id(r)===recordId)||{},fresh=!list.some(r=>id(r)===recordId);
     dialog.innerHTML=`<div class="print-service-header"><h2>Modifica documento</h2><button type="button" data-close>Chiudi</button></div><div class="document-edit-controls"><label>Sezione<select id="editorKind">${Object.entries(labels).map(([k,v])=>`<option value="${k}" ${k===kind?'selected':''}>${v}</option>`).join('')}</select></label>${kind!=='production'?`<label>Voce<select id="editorRecord"><option value="">Nuovo…</option>${options(list,id,label)}</select></label><button type="button" data-new>＋ Nuovo</button>`:''}</div><form id="documentEditForm"><div class="document-edit-fields">${body(r,fresh)}</div><p role="alert" id="editorError"></p><div class="dialog-actions"><button type="button" data-cancel>Annulla</button><button type="submit">${fresh&&kind!=='production'?'Crea':'Applica modifiche'}</button></div></form>`;
     if(dialog.querySelector('#editorRecord'))dialog.querySelector('#editorRecord').value=recordId;
+    if(inline){
+      dialog.querySelector('h2').textContent=labels[kind];
+      dialog.querySelector('#editorKind').closest('label').hidden=true;
+      const picker=dialog.querySelector('#editorRecord');
+      if(picker&&!['day','banner','plan'].includes(kind))picker.closest('label').hidden=true;
+      const add=dialog.querySelector('[data-new]');if(add)add.hidden=true;
+    }
     dialog.querySelector('[data-close]').onclick=()=>close();dialog.querySelector('[data-cancel]').onclick=close;
     dialog.querySelector('#editorKind').onchange=event=>{if(!discard()) {event.target.value=kind;return}kind=event.target.value;recordId=records()[0]?id(records()[0]):'';draw()};
     const select=dialog.querySelector('#editorRecord');if(select)select.onchange=event=>{if(!discard()){event.target.value=recordId;return}recordId=event.target.value;draw()};
     const add=dialog.querySelector('[data-new]');if(add)add.onclick=()=>{if(discard()){recordId='';draw()}};
     dialog.querySelector('form').onsubmit=submit;
-    if(kind==='scene')wireRefs(r);
+    if(kind==='scene'){wireRefs(r);fitSceneTextareas(dialog)}
     if(kind==='element')dialog.querySelector('[name=category]').value=r.category||p().categorySettings[0]?.name||'';
     if(kind==='plan')dialog.querySelector('[name=calendarId]').value=r.calendarId||board().calendarId;
     if(kind==='flag')dialog.querySelector('[name=targetId]').value=r.target?.kind==='unresolved'?'__studio_unresolved_target__':r.target?.elementId||'';
@@ -36,18 +44,18 @@ export function createDocumentEditor({getContext,onChange,onCreate,onRefresh}){
     if(kind==='production')return fields([['title','Titolo progetto','text',true]],p())+propertyFields(p().production,'production');
     if(kind==='scene'){
       draftRefs=structuredClone(r.elementRefs||[]);
-      return fields(Object.entries(SCENE_FIELDS).map(([k,label])=>[k,label,k==='pagesEighths'?'number':['synopsis','comments'].includes(k)?'textarea':'text',k==='scene']),r)+`<fieldset><legend>Elementi della scena e quantità</legend><div id="editorRefs"></div><label>Aggiungi elemento<select id="editorAddElement"><option value="">Scegli…</option>${options(p().elements,r=>r.id,r=>`${r.category} · ${r.boardId||''} ${r.name}`)}</select></label></fieldset>`;
+      return sceneFieldsMarkup(r,{form:true})+`<fieldset><legend>Elementi della scena e quantità</legend><div id="editorRefs"></div><label>Aggiungi elemento<select id="editorAddElement"><option value="">Scegli…</option>${options(p().elements,r=>r.id,r=>`${r.category} · ${r.boardId||''} ${r.name}`)}</select></label></fieldset>`;
     }
-    if(kind==='element')return fields([['name','Nome','text',true],['boardId','Board ID'],['sortOrder','Ordine'],['notes','Note','textarea']],{...r,notes:r.notes??r.source?.notes??''})+`<label>Categoria<select name="category">${options([...p().categorySettings,...(r.category&&!p().categorySettings.some(c=>c.name===r.category)?[{name:r.category}]:[])],c=>c.name,c=>c.name)}</select></label>`+propertyFields(r.properties||{},'properties')+fields([['linkedElements','Elementi collegati (categoria e nome)','json']],{...r,linkedElements:r.linkedElements||[]});
-    if(kind==='category')return fields([['name','Nome','text',true],['color','Colore'],['attributes','Impostazioni categoria','json'],['properties','Definizioni proprietà','json']],r);
-    if(kind==='calendar')return fields([['name','Nome','text',true],['options','Opzioni calendario','json']],r)+fields(['ProductionPrepStartDate','ProductionStartDate','ProductionEndDate','ProductionWrapDate'].map(key=>[key,{ProductionPrepStartDate:'Inizio preparazione',ProductionStartDate:'Inizio riprese',ProductionEndDate:'Fine riprese',ProductionWrapDate:'Wrap'}[key],'date']),Object.fromEntries(Object.entries(r.scheduleDates||{}).map(([k,v])=>[k,v.iso])))+`<p>Regole settimanali ed eccezioni si modificano in Calendar → Regole e date.</p>`;
+    if(kind==='element')return fields([['name','Nome','text',true],['boardId','Board ID'],['sortOrder','Ordine'],['notes','Note','textarea']],{...r,notes:r.notes??r.source?.notes??''})+`<label>Categoria<select name="category">${options([...p().categorySettings,...(r.category&&!p().categorySettings.some(c=>c.name===r.category)?[{name:r.category}]:[])],c=>c.name,c=>c.name)}</select></label>`+propertyFields(r.properties||{},'properties')+`<label>Elementi collegati<select name="linkedElementIds" multiple size="5">${p().elements.filter(el=>el.id!==r.id).map(el=>`<option value="${e(el.id)}" ${(r.linkedElements||[]).some(([cat,name])=>cat===el.category&&name===el.name)?'selected':''}>${e(el.category)} · ${e(el.name)}</option>`).join('')}</select></label>`;
+    if(kind==='category')return fields([['name','Nome','text',true],['color','Colore','color']],{...r,color:r.color||'#0c877c'})+propertyFields(r.attributes||{},'attributes')+propertyFields(r.properties||{},'properties');
+    if(kind==='calendar')return fields([['name','Nome','text',true]],r)+fields(['ProductionPrepStartDate','ProductionStartDate','ProductionEndDate','ProductionWrapDate'].map(key=>[key,{ProductionPrepStartDate:'Inizio preparazione',ProductionStartDate:'Inizio riprese',ProductionEndDate:'Fine riprese',ProductionWrapDate:'Wrap'}[key],'date']),Object.fromEntries(Object.entries(r.scheduleDates||{}).map(([k,v])=>[k,v.iso])))+propertyFields(r.options||{},'options')+`<p>Regole settimanali ed eccezioni si modificano in Calendar → Regole e date.</p>`;
     if(kind==='plan')return fields([['name','Nome','text',true],['description','Descrizione','textarea']],r)+`<label>Calendario<select name="calendarId">${options(p().calendars,c=>c.id,c=>c.name)}</select></label>${fresh?`<label>Copia ordine da<select name="copyFrom"><option value="">Piano vuoto</option>${options(p().boards,b=>b.id,b=>b.name)}</select></label>`:''}`;
     if(kind==='day')return fields([['date','Data riprese','date',true],['shootingDayNumber','Numero giornata','number',true]],r);
     if(kind==='banner')return fields([['text','Testo banner','textarea',true],['estimateTimeA','Tempo stimato']],r)+`<label>Gruppo<select name="groupId">${options([...board().scheduledGroups,...board().unscheduledGroups],g=>g.id,g=>g.kind==='ScheduleDay'?`G ${g.shootingDayNumber} · ${g.date||''}`:g.kind)}</select></label>`;
     if(kind==='flag')return fields([['name','Nome vincolo','text',true],['type','Tipo (unavailable per indisponibilità)'],['typeId','ID tipo sorgente'],['startDate','Dal','date',true],['endDate','Al','date',true],['note','Note','textarea'],['color','Colore']],r)+`<label>Disponibilità / vincolo per<select name="targetId"><option value="">Intero progetto</option>${r.target?.kind==='unresolved'?'<option value="__studio_unresolved_target__">Riferimento importato non risolto</option>':''}${options(p().elements,r=>r.id,r=>`${r.category} · ${r.name}`)}</select></label>`;
     return '';
   }
-  function propertyFields(values,prefix){return `<fieldset data-properties="${prefix}"><legend>${prefix==='production'?'Informazioni di produzione':'Proprietà elemento'}</legend><div data-property-rows>${Object.entries(values).map(([key,v])=>propertyRow(key,v)).join('')}</div><button type="button" data-add-property>Aggiungi campo</button></fieldset>`}
+  function propertyFields(values,prefix){return `<fieldset data-properties="${prefix}"><legend>${({production:'Informazioni di produzione',attributes:'Impostazioni categoria',options:'Opzioni calendario',properties:'Proprietà'})[prefix]}</legend><div data-property-rows>${Object.entries(values).map(([key,v])=>propertyRow(key,v)).join('')}</div><button type="button" data-add-property>Aggiungi campo</button></fieldset>`}
   function propertyRow(key,value){return `<div data-property-row><input aria-label="Nome campo" data-key value="${e(key)}"><textarea aria-label="Valore campo" data-value ${value&&typeof value==='object'?'data-json-value':''}>${e(value&&typeof value==='object'?JSON.stringify(value,null,2):value??'')}</textarea><button type="button" data-remove-property aria-label="Rimuovi campo">×</button></div>`}
   dialog.addEventListener('click',event=>{const add=event.target.closest('[data-add-property]'),remove=event.target.closest('[data-remove-property]');if(add){add.parentElement.querySelector('[data-property-rows]').insertAdjacentHTML('beforeend',propertyRow('',''));dirty=true}if(remove){remove.closest('[data-property-row]').remove();dirty=true}});
   function wireRefs(scene){
@@ -61,6 +69,11 @@ export function createDocumentEditor({getContext,onChange,onCreate,onRefresh}){
     try{
       const original=records().find(r=>id(r)===recordId)||{};
       const values={};for(const input of form.querySelectorAll('[name]')){let value=input.value;if(input.hasAttribute('data-json'))value=JSON.parse(value);if(input.type==='number')value=value===''?null:Number(value);values[input.name]=!input.hasAttribute('data-json')&&Object.hasOwn(original,input.name)&&input.value===String(original[input.name]??'')?original[input.name]:value}
+      if(kind==='element'){
+        values.linkedElements=[...form.querySelector('[name=linkedElementIds]').selectedOptions].map(option=>{const el=p().elements.find(el=>el.id===option.value);return [el.category,el.name]});
+        for(const link of original.linkedElements||[])if(!p().elements.some(el=>el.category===link[0]&&el.name===link[1]))values.linkedElements.push(link);
+        delete values.linkedElementIds;
+      }
       for(const section of form.querySelectorAll('[data-properties]')){const props={};for(const row of section.querySelectorAll('[data-property-row]')){const key=row.querySelector('[data-key]').value.trim(),input=row.querySelector('[data-value]');if(!key)throw Error('Nome campo obbligatorio');if(Object.hasOwn(props,key))throw Error('Nome campo duplicato');Object.defineProperty(props,key,{enumerable:true,configurable:true,writable:true,value:input.hasAttribute('data-json-value')?JSON.parse(input.value):input.value})}values[section.dataset.properties]=props}
       const success=onChange(()=>{
         const project=p(),r=records().find(r=>id(r)===recordId);
@@ -79,7 +92,8 @@ export function createDocumentEditor({getContext,onChange,onCreate,onRefresh}){
       if(success===false)throw Error('Modifiche non applicate');dirty=false;dialog.close();onRefresh?.();
     }catch(error){dialog.querySelector('#editorError').textContent=error.message}
   }
-  return {hasDraft:()=>dialog.open&&dirty,open(section='production',selectedId){context=getContext();kind=section;recordId=selectedId??(records()[0]?id(records()[0]):'');draw();dialog.showModal()},newDocument(){
+  return {hasDraft:()=>dialog.open&&dirty,reset(){dialog.close();dirty=false},restoreHost(view){if(!inline||!dialog.open||view.id!==viewId||view.contains(dialog))return;let host=view.querySelector('[data-editor-host]');if(!host){host=document.createElement('div');host.dataset.editorHost='';view.prepend(host)}host.append(dialog)},open(section='production',selectedId,host){if(dialog.open&&!discard())return;dialog.close();context=getContext();kind=section;recordId=selectedId??(records()[0]?id(records()[0]):'');inline=Boolean(host);viewId=host?.closest('.view')?.id;dialog.classList.toggle('inline-document-editor',inline);(host||document.body).append(dialog);draw();if(inline){dialog.show();dialog.scrollIntoView({block:'nearest'});}else dialog.showModal()},newDocument(){
+    inline=false;dialog.close();dialog.classList.remove('inline-document-editor');document.body.append(dialog);
     dialog.innerHTML=`<h2>Nuovo progetto</h2><form id="newDocumentForm"><label>Titolo<input name="title" required maxlength="160" value="Nuovo progetto"></label><div class="dialog-actions"><button type="button" data-cancel>Annulla</button><button type="submit">Crea progetto</button></div><p role="alert"></p></form>`;
     dialog.querySelector('[data-cancel]').onclick=close;dialog.querySelector('form').onsubmit=event=>{event.preventDefault();try{onCreate(createDocument(event.target.elements.title.value.trim()));dirty=false;dialog.close()}catch(error){dialog.querySelector('[role=alert]').textContent=error.message}};dirty=false;dialog.showModal();
   }};

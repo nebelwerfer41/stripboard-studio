@@ -20,8 +20,8 @@
     <header class="app-header">
       <div class="topbar">
         <div class="brand" aria-label="Stripboard Studio"><span class="brand-mark" aria-hidden="true">▥</span><span><strong>STRIPBOARD</strong><small>STUDIO</small></span></div>
-        <details class="project-heading"><summary><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><span aria-hidden="true">⌄</span></summary><div class="project-menu"><div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div><button id="newDocumentButton" type="button">＋ Nuovo progetto</button><button id="editDocumentButton" type="button">Modifica documento…</button><button id="documentUndoButton" type="button">↶ Annulla modifica</button><button id="documentRedoButton" type="button">↷ Ripeti modifica</button></div></details>
-        <div class="top-actions"><span class="local-badge" title="File elaborati in locale">● Locale</span><span id="dirtyIndicator" role="status">Salvato</span><label class="upload" tabindex="0" role="button" aria-label="Importa un progetto .msd, .mmsx o .studio.json"><input id="fileInput" type="file" accept=".msd,.mmsx,.studio.json">＋ <span>Importa</span></label><button id="saveButton" type="button">↓ Salva .msd</button><button id="printButton" class="print-button" type="button">↗ <span>Stampa vista</span></button></div>
+        <details class="project-heading"><summary><div><h1 id="projectTitle">Stripboard Studio</h1><p id="projectSubtitle">Caricamento del progetto…</p></div><span aria-hidden="true">⌄</span></summary><div class="project-menu"><div class="control" id="projectControl"><label for="projectSelect">PROGETTO</label><select id="projectSelect"><option value="wonderful">Wonderful Life</option></select></div><button id="newDocumentButton" type="button">＋ Nuovo progetto</button></div></details>
+        <div class="top-actions"><button id="undoMoveButton" class="subtle-button" type="button" disabled aria-label="Annulla" title="Annulla l’ultima modifica">↶ Annulla</button><button id="redoMoveButton" class="subtle-button" type="button" disabled aria-label="Ripeti" title="Ripristina l’ultima modifica annullata">↷ Ripeti</button><span class="local-badge" title="File elaborati in locale">● Locale</span><span id="dirtyIndicator" role="status">Salvato</span><label class="upload" tabindex="0" role="button" aria-label="Importa un progetto .msd, .mmsx o .studio.json"><input id="fileInput" type="file" accept=".msd,.mmsx,.studio.json">＋ <span>Importa</span></label><button id="saveButton" type="button">↓ Salva .msd</button><button id="printButton" class="print-button" type="button">↗ <span>Stampa vista</span></button></div>
       </div>
       <nav class="primary-nav" aria-label="Navigazione principale">
         <button class="nav active" id="boardNav" title="Durante un drag, tieni la strip qui per aprire la Stripboard" type="button" aria-current="page"><span aria-hidden="true">▤</span> Stripboard <em id="boardCount">—</em></button>
@@ -30,7 +30,7 @@
         <button class="nav" id="doodNav" type="button"><span aria-hidden="true">▦</span> DOOD</button>
         <button class="nav" id="reportNav" type="button"><span aria-hidden="true">▥</span> Report <em id="reportCount">—</em></button>
         <button class="nav" id="redFlagNav" type="button" title="Red Flag Entry"><span aria-hidden="true">⚑</span> Red Flags <em id="redFlagCount">—</em></button>
-        <button class="nav" id="dataNav" type="button" title="Dettagli progetto ed elementi"><span aria-hidden="true">≡</span> Progetto ed elementi</button>
+        <button class="nav" id="dataNav" type="button" title="Dettagli progetto ed elementi"><span aria-hidden="true">≡</span> Elementi e progetto</button>
       </nav>
     </header>
     <main class="main">
@@ -42,7 +42,7 @@
         </section>
         <section class="stats" id="stats" aria-label="Riepilogo del piano"></section>
         <section class="content-panel">
-          <div class="panel-header"><div class="panel-heading"><div class="section-kicker" id="sectionKicker">PIANO DI LAVORAZIONE</div><h2 id="viewTitle">Stripboard</h2><p id="viewSubtitle"></p></div><div class="panel-tools" id="panelTools"><label class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" aria-label="Cerca nelle strip o nel report" placeholder="Cerca scena, set, testo…"></label><button id="undoMoveButton" class="subtle-button" type="button" disabled title="Annulla l’ultimo spostamento">↶ Annulla</button><button id="redoMoveButton" class="subtle-button" type="button" disabled title="Ripristina l’ultimo spostamento annullato">↷ Ripeti</button><div class="subboard-picker"><button id="toggleUnscheduled" class="subtle-button" type="button" aria-expanded="false" aria-controls="subboardMenu">Sub-board ▾</button><div id="subboardMenu" class="subboard-menu" role="group" aria-label="Sub-board da mostrare" hidden></div></div></div><details class="display-options" id="displayOptions"><summary>Visualizzazione ▾</summary><div class="options-row">
+          <div class="panel-header"><div class="panel-heading"><div class="section-kicker" id="sectionKicker">PIANO DI LAVORAZIONE</div><h2 id="viewTitle">Stripboard</h2><p id="viewSubtitle"></p></div><div class="panel-tools" id="panelTools"><label class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" aria-label="Cerca nelle strip o nel report" placeholder="Cerca scena, set, testo…"></label><div class="subboard-picker"><button id="toggleUnscheduled" class="subtle-button" type="button" aria-expanded="false" aria-controls="subboardMenu">Sub-board ▾</button><div id="subboardMenu" class="subboard-menu" role="group" aria-label="Sub-board da mostrare" hidden></div></div></div><details class="display-options" id="displayOptions"><summary>Visualizzazione ▾</summary><div class="options-row">
           <div class="control" id="layoutControl"><label for="layoutSelect" id="layoutLabel">LAYOUT STRIPBOARD</label><select id="layoutSelect"></select></div>
           <div id="boardFieldPicker" hidden></div>
           <section class="print-options" id="printOptions" aria-label="Opzioni di visualizzazione e stampa stripboard">
@@ -69,7 +69,7 @@
           <aside id="breakdownPreview" class="view breakdown-preview" aria-label="Anteprima Spoglio" hidden></aside>
           </div>
         </section>
-        <footer>Stripboard Studio v1.16 <span>·</span> <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41</a><span class="footer-local">File elaborati in locale</span></footer>
+        <footer>Stripboard Studio v1.17 <span>·</span> <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41</a><span class="footer-local">File elaborati in locale</span></footer>
       </div>
     </main>
   </div>

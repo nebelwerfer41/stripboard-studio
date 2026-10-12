@@ -21,10 +21,10 @@ Le fonti documentano scene/schede, categorie/elementi, strip, ottavi, giorni e r
 
 ## Funzioni e uso
 
-Nel menu del titolo progetto sono disponibili **Nuovo progetto** e **Modifica documento**. L'editor permette di scegliere sezione e record oppure crearne uno nuovo:
+Nel menu del titolo progetto è disponibile **Nuovo progetto**. L’editing è integrato nelle viste del documento:
 
 - Produzione: titolo e tutte le proprietà, anche aggiuntive.
-- Scene: numero, scheda, sinossi, INT/EXT, DAY/NIGHT, set, location, script day, unità, sequenza, pagine script, ottavi, entrambi i tempi, commenti. Collegamento/scollegamento degli elementi e quantità per scheda; quantità vuota significa `null`.
+- Scene: numero scena, sheet in sola lettura, sinossi, INT/EXT, DAY/NIGHT, set, location, script day, unità, sequenza, pagine script, ottavi, entrambi i tempi, commenti. Collegamento/scollegamento degli elementi e quantità per scheda; quantità vuota significa `null`.
 - Elementi: nome/categoria, Board ID, ordine, note, proprietà, collegamenti. Le rinomine aggiornano associazioni, riferimenti di eventi e vincoli, cataloghi e campi integrati corrispondenti.
 - Categorie: nome, colore e metadati interpretati. La rinomina aggiorna i riferimenti nelle schede e nei campi dei layout, senza cambiarne la geometria, oltre alle regole DOOD.
 - Calendari: creazione, nome, prep/start/end/wrap e opzioni; regole settimanali, eccezioni e ripianificazione restano nei controlli Calendar esistenti. Nessun cambio automatico delle giornate al solo cambio dei metadati.
@@ -34,7 +34,9 @@ Nel menu del titolo progetto sono disponibili **Nuovo progetto** e **Modifica do
 - Red Flags: creazione/modifica di nome, tipo, ID tipo sorgente, colore, nota, intervallo e target. Il tipo `unavailable` alimenta anche i conflitti DOOD. Le date restano fisse durante la ripianificazione.
 - Eventi: l'editor condiviso Calendar/DOOD modifica anche gli eventi importati; conserva metadati sconosciuti, target non risolti e tipi sconosciuti, evitando conversioni implicite.
 
-Spoglio, produzione, Calendar e Red Flags hanno accessi diretti all'editor. Le modifiche complete usano transazioni con rollback e Undo/Redo; Ctrl/⌘-Z e Ctrl/⌘-Shift-Z funzionano in tutte le viste, fuori dagli input e dalle finestre modali. L'applicazione segnala bozze non applicate, sostituzione di documenti non salvati, errori di caricamento/scrittura e salvataggio in corso.
+Spoglio riserva tutta la riga a Set, Sinossi e Commenti; Location e Sequenza hanno più spazio dei campi numerici. Sinossi e Commenti crescono con il testo, fino a un’altezza massima scorrevole. Le stesse proporzioni sono usate per le nuove scene e si adattano ai pannelli stretti e al telefono. Lo sheet è un valore visualizzato, senza controllo di inserimento: i comandi rifiutano le modifiche al suo numero e le nuove scene ricevono automaticamente il numero successivo ai valori numerici già presenti. I numeri importati non vengono rinumerati.
+
+Spoglio modifica i campi direttamente nella scheda, anche accanto alla Stripboard o a Calendar. Gli elementi si scelgono con checkbox e ricerca dentro ciascuna categoria; è possibile crearli nella stessa scheda. Le quantità mantengono la distinzione fra vuoto e zero. Elementi e progetto mostra categorie laterali, ricerca e campi Nome/Board ID modificabili nella tabella. Creazione e proprietà aggiuntive usano form nella vista corrente, senza aprire un editor globale. La Stripboard offre Scena, Banner, Fine giornata e Proprietà piano; selezionando un banner compaiono testo e colori. Visualizzazione contiene i colori INT/EXT × DAY/NIGHT; la scheda scena permette anche colori individuali. Calendar contiene la gestione di calendari, giornate, banner e piani nella propria barra. Annulla/Ripeti sono sempre nella barra superiore. Le modifiche complete usano transazioni con rollback e Undo/Redo; Ctrl/⌘-Z e Ctrl/⌘-Shift-Z funzionano in tutte le viste, fuori dagli input e dalle finestre modali. L'applicazione segnala bozze non applicate, sostituzione di documenti non salvati, errori di caricamento/scrittura e salvataggio in corso.
 
 ## Persistenza, migrazione e compatibilità
 
@@ -49,7 +51,8 @@ Le identità, i localizzatori sorgente, dati derivati e geometrie dei layout son
 ## File interessati
 
 - `assets/document-model.js`: creazione, comandi e validazione, sincronizzazione delle dipendenze, snapshot/rollback.
-- `assets/document-editor.js` e `assets/document-editor.css`: editor modale, proprietà, riferimenti e bozze.
+- `assets/integrated-editing.js`: campi diretti, categorie, ricerca, catalogo e transazioni.
+- `assets/document-editor.js` e `assets/document-editor.css`: form contestuali, proprietà, riferimenti e bozze; solo Nuovo progetto resta modale.
 - `assets/studio-project.js`: contenitore v2 e lettura v1.
 - `assets/app.js` e `index.html`: collegamenti delle sezioni, cronologia, apertura e salvataggio reali.
 - `assets/production-events.js`: editing degli eventi; `assets/production-data.js`: vincoli anche per i campi integrati.
@@ -69,6 +72,8 @@ CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-dood-qa node te
 git diff --check
 ```
 
+Il test browser usa i controlli integrati, verifica l’assenza di finestre modali durante l’editing, filtri, quantità zero, creazione rapida, colori, rinomine e salvataggio/riapertura anche su telefono.
+
 I test nuovi verificano campi/quantità/proprietà, identità e relazioni dopo le rinomine, vincoli, snapshot, documenti nuovi, calendari/piani, archivio originale MMSX 3/5/ibrido, Boneyard condiviso, formati/versioni non validi e assenza di export nativi silenziosamente incompleti. Il test browser confronta dimensioni, posizioni, font, bordi e padding dei campi report e delle strip prima/dopo l'editing di un MSD reale; copre download/riapertura, authoring da zero, errori di scrittura e aggiornamenti fra viste. Il contenuto può cambiare e continuano a valere le regole preesistenti di crescita/paginazione.
 
 ### Esito della verifica finale
@@ -82,3 +87,7 @@ I test nuovi verificano campi/quantità/proprietà, identità e relazioni dopo l
 - `git diff --check`: nessun errore.
 
 Le prove browser sono state eseguite con Chromium Linux su server statico locale. Safari/iPad, picker di sistema effettivo e riapertura degli export con un'installazione di Movie Magic non sono stati verificati in questa sessione. Nessun dato di produzione privato è stato aggiunto.
+
+### Verifica v1.17
+
+147 test Node passati e suite Chromium di authoring integrato, workspace, responsive e DOOD/PDF passate. Le verifiche includono proporzioni dei campi, espansione delle aree di testo, assenza di controlli per modificare lo sheet, protezione nel modello, numerazione automatica, preservazione dei valori importati, Undo/Redo e salvataggio/riapertura.

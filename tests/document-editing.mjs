@@ -9,7 +9,7 @@ import {fixture} from './fixtures/calendar.mjs';
 import {moveCalendarItems} from '../assets/calendar-commands.js';
 import {redFlagsForStrip} from '../assets/production-data.js';
 import {calculateDood} from '../assets/dood-engine.js';
-function scene(p,element){return editScene(p,null,{scene:'12A',pagesEighths:11,set:'Casa',location:'Roma',ie:'INT',dn:'DAY',synopsis:'Arrivo',comments:'Nota',unit:'1',sequence:'A',scriptDay:'2',scriptPageNumbers:'10–11',sheetNumber:'4',estimateTimeA:'1:30',estimateTimeB:'0:20'},[{elementId:element.id,quantity:3}])}
+function scene(p,element){return editScene(p,null,{scene:'12A',pagesEighths:11,set:'Casa',location:'Roma',ie:'INT',dn:'DAY',synopsis:'Arrivo',comments:'Nota',unit:'1',sequence:'A',scriptDay:'2',scriptPageNumbers:'10–11',estimateTimeA:'1:30',estimateTimeB:'0:20'},[{elementId:element.id,quantity:3}])}
 test('new document persists every scene field, properties, quantities, days and linked constraints',async()=>{
  const p=createDocument('Film'),actor=editElement(p,null,{name:'Anna',category:'Cast',boardId:'1',properties:{actor:'Alice',contact:{email:'test@example.invalid'}}}),s=scene(p,actor),b=p.boards[0];
  addDay(p,b.id,{date:'2026-10-12',shootingDayNumber:1});const key=b.unscheduledGroups[0].strips[0].sourceKey;
@@ -55,4 +55,24 @@ test('opaque quantities and unresolved references retain their imported state du
 test('existing MMSX documents without a calendar remain editable and reopen without invented dates',async()=>{
  const p=await parseMmsx(await encodeMmsx(mmsxFixture),'source.mmsx');p.documentEditing=true;editScene(p,p.scenes[0].id,{comments:'A note'});
  const again=await parseStudio(await serializeStudio(p));assert.equal(again.calendars.length,0);assert.equal(again.scenes[0].comments,'A note');
+});
+
+// Sheet identities are assigned by the model and survive every editing path.
+test('sheet numbers are automatic, immutable and preserved by undo and save/reopen',async()=>{
+ const p=createDocument('Film'),first=editScene(p,null,{scene:'1'}),second=editScene(p,null,{scene:'2'});
+ assert.equal(first.sheetNumber,'1');assert.equal(second.sheetNumber,'2');
+ const before=snapshotDocument(p);
+ assert.throws(()=>editScene(p,first.id,{scene:'Changed',sheetNumber:'99'}),/sheet non è modificabile/);
+ assert.deepEqual(snapshotDocument(p),before);
+ assert.throws(()=>editScene(p,null,{scene:'3',sheetNumber:'99'}),/sheet non è modificabile/);
+ assert.equal(p.scenes.length,2);
+ editScene(p,first.id,{scene:'1A',comments:'Note'});assert.equal(first.sheetNumber,'1');
+ const after=snapshotDocument(p);restoreDocument(p,before);assert.equal(p.scenes[0].sheetNumber,'1');restoreDocument(p,after);
+ const reopened=await parseStudio(await serializeStudio(p));assert.deepEqual(reopened.scenes.map(s=>s.sheetNumber),['1','2']);
+});
+test('new scenes continue imported sheet numbering without changing imported values',async()=>{
+ const p=await parseMmsx(await encodeMmsx(fixture()),'source.mmsx');
+ p.scenes[0].sheetNumber='42';p.scenes[1].sheetNumber='Imported opaque label';
+ const next=editScene(p,null,{scene:'New'});assert.equal(next.sheetNumber,'43');
+ assert.equal(p.scenes[0].sheetNumber,'42');assert.equal(p.scenes[1].sheetNumber,'Imported opaque label');
 });

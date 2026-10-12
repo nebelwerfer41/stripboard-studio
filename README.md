@@ -8,9 +8,11 @@
 
 > **Creazione ed editing completo:** nuovi progetti Studio, scene e quantità, elementi/proprietà, categorie, produzione, piani, giorni/banner e vincoli modificabili. Le modifiche complete persistono in `.studio.json` v2, con conservazione dell’archivio importato e lettura dei progetti v1. Layout report e stripboard preservati. Vedi [funzioni, fonti ufficiali, compatibilità e verifiche](docs/document-editing.md).
 
-# Stripboard Studio v1.16
+> **Editing integrato:** Spoglio modifica campi, colori, elementi e quantità direttamente nella scheda; Elementi e progetto include un catalogo per categoria. Creazione e proprietà si aprono dentro la vista corrente. Banner e giornate hanno comandi nella Stripboard, Annulla/Ripeti sono sempre nella barra superiore. Le modifiche complete continuano a salvarsi in `.studio.json`.
 
-Version 1.16 adds project creation and complete editing of production data, breakdown sheets, quantities, categories, elements, calendars, plans, shooting days, banners, events and Red Flags. Full edits save in Studio v2 files while preserving the original imported archive and support for Studio v1. Existing report and stripboard layouts remain unchanged; conservative native MSD/MMSX exports remain available for supported scheduling and calendar edits.
+# Stripboard Studio v1.17
+
+Version 1.17 integrates authoring into the existing workspaces. Breakdown entry gives Set, Location, Synopsis and Comments more room, with expanding text areas and a responsive layout shared by new scenes. Sheet numbers are read-only and assigned automatically to new scenes. Elements, quantities, colors and contextual forms support Undo/Redo and save/reopen in Studio v2, preserving imported archives and native export behavior.
 
 Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
 
@@ -139,3 +141,11 @@ All branch changes are merged into `main`, including the iOS Home Screen metadat
 ## v1.16 — Document creation and complete editing
 
 Create projects from scratch, edit scene fields and element quantities, manage production properties and linked elements, and update calendars, plans, days, banners, events and availability constraints. Shared references update across breakdown, scheduling, DOOD and reports. Complete edits use the versioned Studio v2 container, retaining original MSD/MMSX archives and compatibility with Studio v1. Validation, Undo/Redo, draft protection and failed-write recovery cover the authoring flows. Report and stripboard geometry and rendering remain unchanged. See [sources, implementation, compatibility limits and verification](docs/document-editing.md).
+
+## v1.17 — Integrated authoring and spacious breakdown entry
+
+Edit scene fields and quantities directly in Spoglio, select and create elements inside their categories, and manage the element catalog by category. Scene, banner, day, plan, calendar and constraint controls open in their existing workspaces. Undo/Redo remains available in the top bar.
+
+Set, Synopsis and Comments span the entry panel; Location and Sequence have wider fields than short codes and numbers. Long text expands vertically and the form adapts to narrow split panes and phones. Sheet numbers are displayed in read-only form, preserved on existing scenes and generated automatically for new ones. Studio v2 persistence and the conservative native export contract remain unchanged.
+
+Verified with 147 Node tests and Chromium authoring, responsive, workspace and DOOD/PDF suites, including sheet protection, text expansion, save/reopen and phone authoring.
