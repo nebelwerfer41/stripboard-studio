@@ -48,7 +48,7 @@ const out=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-dood-qa';
  console.log('PASS MSD built-in attendance matches scheduled scene fields for Set, Location, Script Day, Unit, Sequence, DN and INT/EXT');
  const category=await page.locator('#doodCategory option').evaluateAll(els=>els.find(el=>/Cast/i.test(el.textContent)).value);await page.locator('#doodCategory').selectOption(category);
  assert.equal(await page.locator('.dood-grid tbody tr').count(),59);assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
- await page.locator('.dood-rules summary').click();await page.locator('[data-dood-rule=allowHold]').uncheck();assert.equal(await page.locator('[data-dood-rule=allowDrop]').isDisabled(),true);assert.equal(await page.locator('#saveButton').innerText(),'↓ Salva progetto Studio');
+ await page.locator('.dood-rules summary').click();await page.locator('[data-dood-rule=allowHold]').uncheck();assert.equal(await page.locator('[data-dood-rule=allowDrop]').isDisabled(),true);assert.equal(await page.locator('#saveButton').innerText(),'↓ Salva Studio');
  await page.locator('#undoMoveButton').click();assert(await page.locator('[data-dood-rule=allowHold]').isChecked());await page.locator('#redoMoveButton').click();assert(!(await page.locator('[data-dood-rule=allowHold]').isChecked()));
  // Element override + category inheritance.
  const actor=await page.locator('#doodRuleElement option').evaluateAll(els=>els.find(el=>/George/.test(el.textContent)).value);await page.locator('#doodRuleElement').selectOption(actor);await page.locator('[data-dood-rule=allowHold]').check();

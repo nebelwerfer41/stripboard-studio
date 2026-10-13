@@ -19,12 +19,12 @@ const base=process.env.STUDIO_URL||'http://127.0.0.1:8766';
   assert.equal(await page.locator('.operational-grid .calendar-strip-pages').first().innerText(),process.env.LONG_DAY_MMSX?'1':'5/8');
   if(process.env.LONG_DAY_MMSX){const long=compact.find(m=>m.count===40);assert(long);assert(long.height>310)}
   await page.locator('.operational-grid .calendar-strip').first().click();const key=await page.locator('.operational-grid .calendar-strip.active').first().getAttribute('data-scene-strip');
-  await page.locator('.calendar-view-menu summary').click();await page.locator('[data-calendar-extended]').check();
+  await page.locator('#displaySettingsButton').click();await page.locator('#calendarStripPreset').selectOption('detailed');
   assert(await page.locator('.operational-grid .mini-synopsis').count()>0);const extended=await checkFullCells();
   const busiest=compact.reduce((best,m,i)=>m.count>compact[best].count?i:best,0);assert(extended[busiest].height>compact[busiest].height);
   assert.equal(await page.locator('.operational-grid .calendar-strip.active').first().getAttribute('data-scene-strip'),key);assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
-  await page.locator('[data-calendar-extended]').uncheck();assert.equal(await page.locator('.operational-grid .mini-synopsis').count(),0);await checkFullCells();
-  await page.locator('[data-calendar-all=true]').click();assert(!(await page.locator('[data-calendar-extended]').isChecked()));await page.locator('.calendar-view-menu summary').click();
+  await page.locator('#calendarStripPreset').selectOption('compact');assert.equal(await page.locator('.operational-grid .mini-synopsis').count(),0);await checkFullCells();
+  assert.equal(await page.locator('#calendarStripPreset').inputValue(),'compact');await page.locator('#displayDialog [data-overlay-close]').click();
   await page.locator('#workspaceLayout').selectOption('calendar-board');await checkFullCells();
   for(const width of [1200,1201]){await page.setViewportSize({width,height:1000});await page.waitForFunction(width=>document.querySelector('#workspaceLayout').disabled===(width<=1200),width);await checkFullCells()}
   if(process.env.STUDIO_DENSITY_SCREENSHOT)await page.screenshot({path:process.env.STUDIO_DENSITY_SCREENSHOT,fullPage:true});

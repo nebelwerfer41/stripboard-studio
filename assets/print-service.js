@@ -1,7 +1,8 @@
+import {createOverlay} from './overlay-service.js';
 import {DEFAULT_PRINT_SETTINGS,paginateSchedule} from './print-layout.js';
 import {renderDoodPrint,escapeHtml} from './dood-print.js';
 export function createPrintService({getSource,getSettings,onSettings}){
-  const dialog=document.createElement('dialog');dialog.id='studioPrintDialog';dialog.className='studio-print-dialog';
+  const dialog=createOverlay('studioPrintDialog',{className:'studio-print-dialog'}).dialog;
   dialog.innerHTML=`<div class="print-service-header"><h2>Anteprima di stampa</h2><button type="button" data-close>Chiudi</button></div><div class="print-service-controls">
   <label>Carta <select data-setting="paper"><option>A4</option><option>A3</option><option>Letter</option><option>Legal</option></select></label>
   <label>Orientamento <select data-setting="orientation"><option value="landscape">Orizzontale</option><option value="portrait">Verticale</option></select></label>

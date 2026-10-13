@@ -22,20 +22,17 @@ for(const format of ['5','3','hybrid'])test(`${format}: switching calendars keep
  assert.deepEqual(calendarPlanEntries(p,b.name,new Set(['yard']),other.id),[]);
  assert.deepEqual(snapshotProduction(p),initial);assert.deepEqual(await serializeMmsx(p,'noop.mmsx'),bytes);
 });
-for(const format of ['5','3','hybrid'])test(`${format}: rules panel follows the selected calendar and keeps separate start-date drafts`,async()=>{
+for(const format of ['5','3','hybrid'])test(`${format}: calendar rule controls are in the unified overlay and rendering preserves imported data`,async()=>{
  const p=await parseMmsx(await encodeMmsx(fixture(format))),b=p.boards[0],other=p.calendars.find(c=>c.id!==b.calendarId&&c.scope.segmentId==='b');
  editCalendar(p,{calendarId:other.id,weekday:'Tue',off:true});editCalendar(p,{calendarId:other.id,startDate:'2030-01-02'});editCalendar(p,{calendarId:other.id,date:'2026-10-06',type:'travel'});
  const initial=snapshotProduction(p),bytes=await serializeMmsx(p,'rules.mmsx');
  const state={calendar:other.id,board:b.name,visibleSegments:new Set(['a','b']),calendarMonth:'2026-10',calendarDate:'2026-10-06',calendarRulesOpen:true,selectedStripIds:new Set(),calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true]))};
  const helpers={safe:String,shortDate:String,pages:String,specialLabel:()=>'',sceneColors:()=>({})};
- const panel=s=>calendarMarkup(p,s,helpers).split('<aside class="calendar-rules"')[1];
- const selected=panel(state);assert(selected.includes(`<strong>${other.name}</strong>`));assert(selected.includes('value="2030-01-02"'));assert(selected.includes('data-calendar-weekday="Tue" checked'));assert(selected.includes('value="travel" selected'));assert(selected.includes(p.boards[1].name));
- assert(!selected.includes('calendarEditPlan'));assert(!selected.includes('Consulta questo calendario'));
- const drafts=new Map([[other.id,''],[b.calendarId,'2027-05-01']]);
- assert(panel({...state,calendarStartDrafts:drafts}).includes('id="calendarStartDate" type="date" value=""'));
- assert(panel({...state,calendar:b.calendarId,calendarStartDrafts:drafts}).includes('value="2027-05-01"'));
- const yard=p.calendars.find(c=>c.scope.segmentId==='yard'),yardPanel=panel({...state,calendar:yard.id});
- assert(yardPanel.includes(`<strong>${yard.name}</strong>`));assert(yardPanel.includes('Nessun piano associato'));assert(yardPanel.includes('id="calendarReschedule" disabled'));
+ const html=calendarMarkup(p,state,helpers);
+ assert(html.includes('id="calendarRulesToggle"'));
+ assert(!html.includes('calendar-rules'));assert(!html.includes('calendarReschedule'));
+ assert(!html.includes('calendarStartDate'));assert(!html.includes('data-calendar-weekday'));
+ assert(!html.includes('Data inferita'));assert(!html.includes('Proiezione di lettura'));
  assert.deepEqual(snapshotProduction(p),initial);assert.equal(stringifyExact(await decodeMmsx(await serializeMmsx(p,'rules.mmsx'))),stringifyExact(await decodeMmsx(bytes)));
 });
 for(const format of ['5','3','hybrid'])test(`${format}: rule edits, explicit replan, undo/redo and calendar save/reopen preserve opaque data`,async()=>{
@@ -86,7 +83,7 @@ test('custom category identity, order, quantities, properties, unresolved refs a
 test('calendar and breakdown rendering preferences and context are read-only; threshold is strictly over 1200',async()=>{
  const p=await parseMmsx(await encodeMmsx(fixture())),bytes=await serializeMmsx(p,'noop.mmsx'),b=p.boards[0],s={calendar:b.calendarId,board:b.name,visibleSegments:new Set(['a']),calendarMonth:'2026-10',calendarDate:'2026-10-06',selectedStripIds:new Set(),calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true]))};
  const safe=String,helpers={safe,shortDate:safe,pages:safe,specialLabel:()=>'',sceneColors:()=>({}),valueText:safe};
- const html=calendarMarkup(p,s,helpers);assert(html.indexOf('data-scene-strip')<html.indexOf('Banner di prova'));assert(html.includes('Scena di prova'));assert(html.includes('calendar-strip-pages'));assert(!html.includes('class="mini-synopsis"'));const extended=calendarMarkup(p,{...s,calendarExtended:true},helpers);assert(extended.includes('class="mini-synopsis"'));assert(extended.includes('data-calendar-extended checked'));assert(!html.includes('data-calendar-extended checked'));assert(html.includes('calendar-conflict'));assert(html.includes('calendar-event'));
+ const html=calendarMarkup(p,s,helpers);assert(html.indexOf('data-scene-strip')<html.indexOf('Banner di prova'));assert(html.includes('Scena di prova'));assert(html.includes('calendar-strip-pages'));assert(!html.includes('class="mini-synopsis"'));const extended=calendarMarkup(p,{...s,calendarExtended:true},helpers);assert(extended.includes('class="mini-synopsis"'));assert(!extended.includes('calendar-view-menu'));assert(!extended.includes('calendar-strip-menu'));assert(html.includes('data-calendar-multi'));assert(html.includes('calendar-conflict'));assert(html.includes('calendar-event'));
  const preview=breakdownMarkup(p,{...s,activeSceneId:p.scenes[0].id,activeStripId:b.scheduledGroups[0].strips[0].sourceKey},helpers);assert(preview.includes('12 auto'));assert(!preview.includes('element-quantity'));assert(!preview.includes('Carburante:'));assert(preview.includes('title="Riferimento non risolto"'));
  assert.deepEqual(await serializeMmsx(p,'noop.mmsx'),bytes);assert(!canSplit(1199));assert(!canSplit(1200));assert(canSplit(1201));
 });

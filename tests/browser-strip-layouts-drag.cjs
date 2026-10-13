@@ -18,7 +18,7 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-drag-qa';
    assert(a&&b);await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();
    await page.mouse.move(b.x+b.width/2,b.y+b.height*(after?.85:.2),{steps:12});await page.mouse.up();
   };
-  await load();await page.locator('#displayOptions summary').click();
+  await load();await page.locator('#displaySettingsButton').click();
   for(const preset of ['compact','detailed','production']){
    await page.locator('#layoutSelect').selectOption(`studio:${preset}`);
    assert(await page.locator('.standard-strip').count()>0);
@@ -31,18 +31,18 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-drag-qa';
   assert(await page.locator('.standard-strip [data-strip-field="location"]').count()>0);
   assert.equal(await page.locator('.standard-strip [data-strip-field="pages"]').count(),0);
   await page.screenshot({path:path.join(output,'standard-production.png')});
-  await page.locator('#displayOptions summary').click();await page.locator('#calendarNav').click();
-  await page.locator('.calendar-strip-menu summary').click();await page.locator('#calendarStripPreset').selectOption('production');
-  await page.locator('.calendar-strip-menu [data-strip-field-option="location"]').check();
-  await page.locator('.calendar-strip-menu [data-strip-field-option="pages"]').uncheck();
+  await page.locator('#displayDialog [data-overlay-close]').click();await page.locator('#calendarNav').click();
+  await page.locator('#displaySettingsButton').click();await page.locator('#calendarStripPreset').selectOption('production');
+  await page.locator('#displayDialog [data-strip-field-option="location"]').check();
+  await page.locator('#displayDialog [data-strip-field-option="pages"]').uncheck();
   assert.equal(await page.locator('#calendarStripPreset').inputValue(),'custom');
   assert(await page.locator('.operational-grid [data-strip-field="location"]').count()>0);
   assert.equal(await page.locator('.operational-grid [data-strip-field="pages"]').count(),0);
   assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
+  await page.locator('#displayDialog [data-overlay-close]').click();
   const download=page.waitForEvent('download');await page.locator('#saveButton').click();await(await download).saveAs(path.join(output,'display-only.msd'));
   assert.deepEqual(await fs.readFile(path.join(output,'display-only.msd')),await fs.readFile(path.join(__dirname,'../samples/Wonderful Life Demo.msd')));
-  await page.locator('.calendar-strip-menu summary').click();
-  await page.locator('#boardNav').click();await page.locator('#displayOptions summary').click();assert.equal(await page.locator('#layoutSelect').inputValue(),'studio:custom');await page.locator('#displayOptions summary').click();
+  await page.locator('#boardNav').click();await page.locator('#displaySettingsButton').click();assert.equal(await page.locator('#layoutSelect').inputValue(),'studio:custom');await page.locator('#displayDialog [data-overlay-close]').click();
   await page.setViewportSize({width:390,height:844});assert(await page.locator('.standard-strip').first().isVisible());
   const width=await page.locator('.standard-strip').first().evaluate(el=>el.getBoundingClientRect().width);assert(width<=390);
   console.log('PASS three standard layouts, independent custom fields, phone rows and exact display-only save');
@@ -61,8 +61,8 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-drag-qa';
    const a=await source.boundingBox();await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();await page.mouse.move(a.x+50,a.y+60,{steps:5});await page.keyboard.press('Escape');await page.mouse.up();
    assert.deepEqual(await first.locator('[data-strip-key]').evaluateAll(es=>es.map(e=>e.dataset.stripKey)),before);
    await page.locator('#workspaceLayout').selectOption('calendar-board');
-   const boardName=await source.getAttribute('data-board-name');
-   const targetSelector=await page.evaluate(({boardName,targetIndex})=>`#boardView .strip-outer[data-board-name="${CSS.escape(boardName)}"][data-container="scheduledGroups"][data-group-index="${targetIndex}"]`,{boardName,targetIndex});
+   const boardName=await source.getAttribute('data-board-name'),targetBoardName=await second.getAttribute('data-board-name');
+   const targetSelector=await page.evaluate(({boardName,targetIndex})=>`#boardView .strip-outer[data-board-name="${CSS.escape(boardName)}"][data-container="scheduledGroups"][data-group-index="${targetIndex}"]`,{boardName:targetBoardName,targetIndex});
    await drag(source,page.locator(targetSelector).first());assert.equal(await byKey('#calendarView .operational-grid',key),targetIndex);await page.locator('#undoMoveButton').click();
    // Reverse cross-pane direction, preserving the scene identity.
    const boardSourceSelector=await page.evaluate(({boardName})=>`#boardView .strip-outer[data-board-name="${CSS.escape(boardName)}"][data-group-index="0"][data-strip-index="0"]`,{boardName});
@@ -81,7 +81,7 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-drag-qa';
   }
   // Tablet/phone: hold over a navigation tab to reveal the target view during drag.
   for(const size of [{width:1024,height:900},{width:390,height:844}]){
-   await page.setViewportSize(size);await load();await page.locator('#displayOptions summary').click();await page.locator('#layoutSelect').selectOption('studio:compact');await page.locator('#displayOptions summary').click();
+   await page.setViewportSize(size);await load();await page.locator('#displaySettingsButton').click();await page.locator('#layoutSelect').selectOption('studio:compact');await page.locator('#displayDialog [data-overlay-close]').click();
    const source=page.locator('#boardView .strip-outer[data-group-index="0"][data-strip-index="0"]').first();
    const a=await source.boundingBox(),nav=await page.locator('#calendarNav').boundingBox();await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();
    await page.mouse.move(nav.x+nav.width/2,nav.y+nav.height/2,{steps:10});await page.waitForTimeout(650);

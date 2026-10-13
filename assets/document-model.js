@@ -4,7 +4,7 @@ import {standardLayout} from './strip-display.js';
 import {ExactNumber} from './mmsx-codec.js';
 import {validDate} from './production-data.js';
 export const DOCUMENT_KEYS=['title','production','scenes','elements','categorySettings','boards','calendars','events','redFlags','redFlagNames','redFlagSettings','activeBoard','defaultCalendar','studio','documentEditing','stripLayouts','reportLayouts','colors','capabilities'];
-export const SCENE_FIELDS={scene:'Scena',synopsis:'Sinossi',ie:'INT / EXT',dn:'DAY / NIGHT',set:'Set',location:'Location',scriptDay:'Script day',unit:'Unità',sequence:'Sequenza',scriptPageNumbers:'Pagine script',pagesEighths:'Pagine (ottavi)',estimateTimeA:'Tempo stimato',estimateTimeB:'Tempo schermo',comments:'Commenti'};
+export const SCENE_FIELDS={scene:'Scena',synopsis:'Sinossi',ie:'INT / EXT',dn:'DAY / NIGHT',set:'Set',location:'Location',scriptDay:'Script day',unit:'Unità',sequence:'Sequenza',scriptPageNumbers:'Pagine script',pagesEighths:'Pagine',estimateTimeA:'Tempo stimato',estimateTimeB:'Tempo schermo',comments:'Commenti'};
 const uid=kind=>`studio-${kind}:${crypto.randomUUID()}`;
 function clone(value,seen=new Map()){
   if(value instanceof ExactNumber)return new ExactNumber(value.text);

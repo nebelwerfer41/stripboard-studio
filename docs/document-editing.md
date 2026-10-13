@@ -19,24 +19,22 @@ Sono stati letti README e i documenti interni su modello comune, calendari, MSD 
 
 Le fonti documentano scene/schede, categorie/elementi, strip, ottavi, giorni e report derivati. Sono decisioni progettuali locali: conservare le identità durante le rinomine; distinguere quantità assente da zero; permettere numeri scena alfanumerici e duplicati (già presenti nelle fixture); conservare gli intervalli civili dei vincoli durante la ripianificazione; mantenere Boneyard condivisi MMSX; usare lo Studio v2 come documento completo. Derivano dal contratto interno e dai limiti degli adattatori, non da una presunta specifica proprietaria. Cast/personaggi continuano a essere elementi della categoria del file; attori, contatti e altri dati si salvano nelle proprietà, senza introdurre un secondo catalogo di persone.
 
-## Funzioni e uso
+## Funzioni e uso — v1.18
 
-Nel menu del titolo progetto è disponibile **Nuovo progetto**. L’editing è integrato nelle viste del documento:
+Nel menu del titolo progetto è disponibile **Nuovo progetto**. Spoglio modifica direttamente la scena attiva; gli affiancamenti si scelgono nella barra principale oltre 1200 CSS px. Set, Sinossi e Commenti occupano tutta la riga, Location e Sequenza hanno spazio maggiore dei codici numerici; le aree di testo crescono e si adattano al telefono.
 
-- Produzione: titolo e tutte le proprietà, anche aggiuntive.
-- Scene: numero scena, sheet in sola lettura, sinossi, INT/EXT, DAY/NIGHT, set, location, script day, unità, sequenza, pagine script, ottavi, entrambi i tempi, commenti. Collegamento/scollegamento degli elementi e quantità per scheda; quantità vuota significa `null`.
-- Elementi: nome/categoria, Board ID, ordine, note, proprietà, collegamenti. Le rinomine aggiornano associazioni, riferimenti di eventi e vincoli, cataloghi e campi integrati corrispondenti.
-- Categorie: nome, colore e metadati interpretati. La rinomina aggiorna i riferimenti nelle schede e nei campi dei layout, senza cambiarne la geometria, oltre alle regole DOOD.
-- Calendari: creazione, nome, prep/start/end/wrap e opzioni; regole settimanali, eccezioni e ripianificazione restano nei controlli Calendar esistenti. Nessun cambio automatico delle giornate al solo cambio dei metadati.
-- Piani: creazione vuota o copia del piano, descrizione, rinomina e calendario associato.
-- Giornate: creazione e modifica di data/numero. Scene e banner si assegnano con drag o F2; l'ordine effettivo resta quello dei gruppi/strip.
-- Banner: creazione, testo, tempo stimato e gruppo di destinazione.
-- Red Flags: creazione/modifica di nome, tipo, ID tipo sorgente, colore, nota, intervallo e target. Il tipo `unavailable` alimenta anche i conflitti DOOD. Le date restano fisse durante la ripianificazione.
-- Eventi: l'editor condiviso Calendar/DOOD modifica anche gli eventi importati; conserva metadati sconosciuti, target non risolti e tipi sconosciuti, evitando conversioni implicite.
+- **Scene:** numero scena, sheet in sola lettura, sinossi, INT/EXT, D/N, set, location, script day, unità, sequenza, pagine script, pagine in ottavi, tempi e commenti. Le pagine si inseriscono come `2 3/8`, `3/8` o `2`; il modello conserva gli ottavi interi. Tempo stimato `HH:MM`, tempo schermo `MM:SS`. Sheet non modificabile; le nuove scene ricevono automaticamente il numero successivo ai valori numerici esistenti. I valori importati non vengono rinumerati.
+- **Inserimento:** Scena crea una strip dopo quella selezionata e apre il suo Spoglio. Banner crea la strip nella stessa posizione e mostra testo, tempo e dimensione font nella barra del piano. Nessuna schermata di creazione separata.
+- **Fine giornata:** introduce un confine dopo la strip selezionata, senza chiedere data/numero. Le giornate seguono in ordine il calendario del piano, saltando riposi ed eccezioni; la numerazione prosegue dal numero iniziale esistente. Se il punto coincide con un fine giornata esistente non crea un duplicato. Il Boneyard non ha giornate.
+- **Elementi:** catalogo per categoria, ricerca, ordinamento per nome/ID, checkbox e selezione globale. Assegna ID numerici consecutivi con prefisso facoltativo agli elementi selezionati, spostali in un’altra categoria o salva l’ordine visualizzato. Conflitti di nome/ID impediscono l’operazione. Identità, quantità per scena, eventi e vincoli rimangono collegati. Nome/Board ID sono modificabili nella tabella; quantità vuota resta distinta da zero.
+- **Colori strip:** finestra separata con matrice INT/EXT × D/N, colori sfondo/testo e preferenze per banner, fine giornata e selezione. Le combinazioni salvate si applicano alle scene con quei valori; il colore non si modifica dalla singola scheda. Senza modifiche esplicite, i colori nativi importati restano visibili. Indicatori selezione rettangolari rossi, larghi al massimo 4 pixel dello schermo, all’interno della strip; bordi rossi.
+- **Visualizzazione:** overlay con layout/campi Stripboard e Calendar indipendenti, visibilità e stampa. Queste preferenze non modificano il file. I comandi di affiancamento sono nella barra principale.
+- **Piani e calendari:** creazione, proprietà e riordino dentro i rispettivi selettori. Proprietà piano e altri form contestuali usano il sistema condiviso di overlay, chiudibile con ×, Escape o clic esterno. Nuovo piano può essere vuoto o copiare un piano esistente.
+- **Calendario:** proprietà, prep/start/end/wrap, settimana lavorativa ed eccezioni condividono un solo overlay. Salva aggiorna i piani associati in una transazione; cambiare il selettore associa effettivamente quel calendario al piano. Non ci sono anteprime di ripianificazione o etichette di proiezione. Importare non ripianifica le date native. Il Boneyard è escluso dai sub-board calendario; eventuali definizioni sorgente dedicate al Boneyard restano conservate nell’archivio.
+- **Calendar:** selezione multipla con checkbox o modificatori/long press, drag tra date e viste, doppio clic per aprire la strip selezionata in Stripboard. La barra contiene navigazione date, impostazioni, selezione ed eventi; le vecchie voci sovrapposte Vista/Strip sono riunite nell’overlay Visualizzazione.
+- **Produzione, categorie, eventi e Red Flags:** restano modificabili tramite form contestuali condivisi; i riferimenti vengono aggiornati nelle altre viste. Eventi e intervalli civili dei vincoli rimangono alle date originarie durante la ripianificazione. Per ora non si possono aggiungere nuovi campi personalizzati; quelli importati sono conservati.
 
-Spoglio riserva tutta la riga a Set, Sinossi e Commenti; Location e Sequenza hanno più spazio dei campi numerici. Sinossi e Commenti crescono con il testo, fino a un’altezza massima scorrevole. Le stesse proporzioni sono usate per le nuove scene e si adattano ai pannelli stretti e al telefono. Lo sheet è un valore visualizzato, senza controllo di inserimento: i comandi rifiutano le modifiche al suo numero e le nuove scene ricevono automaticamente il numero successivo ai valori numerici già presenti. I numeri importati non vengono rinumerati.
-
-Spoglio modifica i campi direttamente nella scheda, anche accanto alla Stripboard o a Calendar. Gli elementi si scelgono con checkbox e ricerca dentro ciascuna categoria; è possibile crearli nella stessa scheda. Le quantità mantengono la distinzione fra vuoto e zero. Elementi e progetto mostra categorie laterali, ricerca e campi Nome/Board ID modificabili nella tabella. Creazione e proprietà aggiuntive usano form nella vista corrente, senza aprire un editor globale. La Stripboard offre Scena, Banner, Fine giornata e Proprietà piano; selezionando un banner compaiono testo e colori. Visualizzazione contiene i colori INT/EXT × DAY/NIGHT; la scheda scena permette anche colori individuali. Calendar contiene la gestione di calendari, giornate, banner e piani nella propria barra. Annulla/Ripeti sono sempre nella barra superiore. Le modifiche complete usano transazioni con rollback e Undo/Redo; Ctrl/⌘-Z e Ctrl/⌘-Shift-Z funzionano in tutte le viste, fuori dagli input e dalle finestre modali. L'applicazione segnala bozze non applicate, sostituzione di documenti non salvati, errori di caricamento/scrittura e salvataggio in corso.
+Annulla/Ripeti sono nella barra superiore. Le operazioni sui dati sono transazioni con validazione e rollback; Ctrl/⌘-Z e Ctrl/⌘-Shift-Z funzionano fuori dagli input e dagli overlay. La chiusura di un overlay annulla la sua bozza; i campi diretti applicano il valore al cambio del campo. Restano le protezioni per sostituzione di documenti non salvati ed errori di caricamento/scrittura.
 
 ## Persistenza, migrazione e compatibilità
 
@@ -48,46 +46,21 @@ Il salvataggio fotografa il documento all'inizio dell'operazione. Una scrittura 
 
 Le identità, i localizzatori sorgente, dati derivati e geometrie dei layout sono gestiti dai servizi: non sono campi da modificare a mano. I progetti vuoti usano il layout strip standard esistente e la stampa schedule/DOOD; non generano template di report proprietari. I report importati restano utilizzabili e ricevono i dati aggiornati.
 
-## File interessati
+## Implementazione e verifiche
 
-- `assets/document-model.js`: creazione, comandi e validazione, sincronizzazione delle dipendenze, snapshot/rollback.
-- `assets/integrated-editing.js`: campi diretti, categorie, ricerca, catalogo e transazioni.
-- `assets/document-editor.js` e `assets/document-editor.css`: form contestuali, proprietà, riferimenti e bozze; solo Nuovo progetto resta modale.
-- `assets/studio-project.js`: contenitore v2 e lettura v1.
-- `assets/app.js` e `index.html`: collegamenti delle sezioni, cronologia, apertura e salvataggio reali.
-- `assets/production-events.js`: editing degli eventi; `assets/production-data.js`: vincoli anche per i campi integrati.
-- `assets/msd-parser.js`: conserva anche le relazioni `linkedElements` già interpretate; writer MSD e MMSX: protezione contro export completi non supportati.
-- Test del modello, browser e aggiornamento del caso di versione Studio non supportata.
-
-`assets/style.css`, `report-layout.js`, `strip-display.js`, i componenti di stampa e le funzioni di rendering report/stripboard non sono stati modificati.
-
-## Verifiche riproducibili
+`document-model.js` conserva identità e relazioni; `workspace-commands.js` gestisce inserimenti, calendario e operazioni in massa. `entry-format.js` converte frazioni e tempi. `integrated-editing.js` riusa le viste Spoglio/catalogo; `overlay-service.js` fornisce il sistema comune a proprietà, calendari, colori, impostazioni, eventi e stampa. `calendar-editor.js`, `strip-colors.js` e `workspace-ui.css` contengono i relativi controlli e adattamenti responsive. Il contenitore Studio resta v2: v1.18 è la versione dell’applicazione.
 
 ```sh
 node --test tests/*.mjs
-node tests/document-editing.mjs
-CHROME_PATH=/usr/bin/chromium node tests/browser-document-editing.cjs
-CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
-CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-dood-qa node tests/browser-dood.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-workspace-revision.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-calendar-selection.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-calendar-rules.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-responsive.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-strip-layouts-drag.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-dood.cjs
 git diff --check
 ```
 
-Il test browser usa i controlli integrati, verifica l’assenza di finestre modali durante l’editing, filtri, quantità zero, creazione rapida, colori, rinomine e salvataggio/riapertura anche su telefono.
+155 test Node passati: formati, conservazione degli inserimenti, date e riposi/eccezioni, conflitti e relazioni degli elementi, MMSX 3/5/ibrido, snapshot, round-trip e protezione sheet. Le suite Chromium verificano il campione MSD reale, salvataggio/riapertura Studio con archivio originale identico, Undo/Redo, overlay e clic esterno, catalogo in massa, colori, font, selezione, calendario e sette dimensioni fra 320 e 1201 px. Passano anche calendario denso, drag mouse/touch fra viste, gli adattatori HTML nativi e DOOD/anteprima/PDF effettivo.
 
-I test nuovi verificano campi/quantità/proprietà, identità e relazioni dopo le rinomine, vincoli, snapshot, documenti nuovi, calendari/piani, archivio originale MMSX 3/5/ibrido, Boneyard condiviso, formati/versioni non validi e assenza di export nativi silenziosamente incompleti. Il test browser confronta dimensioni, posizioni, font, bordi e padding dei campi report e delle strip prima/dopo l'editing di un MSD reale; copre download/riapertura, authoring da zero, errori di scrittura e aggiornamenti fra viste. Il contenuto può cambiare e continuano a valere le regole preesistenti di crescita/paginazione.
-
-### Esito della verifica finale
-
-- `node --test tests/*.mjs`: **20 file/suite passati**, nessun fallimento.
-- `node tests/document-editing.mjs`: **10 casi passati**, compresi quantità opache/riferimenti non risolti e MMSX esistenti senza calendario.
-- `browser-document-editing.cjs`: passato il ciclo MSD reale → editing → Studio → riapertura, confronto geometrie report/strip, progetto da zero con scheduling/vincoli/eventi/rinomine, errore di scrittura con modifiche conservate e retry, evento nativo MMSX modificato e riaperto con archivio originale conservato.
-- `browser-workspace.cjs`: passati parser, categorie speciali, round-trip, conservazione, calendario, drag tra viste, Undo/Redo, salvataggio nativo senza modifiche e modifica/ripianificazione MSD.
-- `browser-dood.cjs`: passati presenze integrate, regole/eventi, history, conservazione degli export preesistenti MSD/MMSX 5/3/ibrido, anteprima e PDF effettivo con parità di pagine/testo.
-- Confronto testuale con HEAD: invariati `renderBoard`, `renderReport`, `makeStrip`, `makeSpecialStrip`, `createShapes`, `addLines`, `geometry`, `stripMetrics`, `reportBlock`, `fitReportBlocks`; invariati CSS principale e moduli di layout/stampa.
-- `git diff --check`: nessun errore.
-
-Le prove browser sono state eseguite con Chromium Linux su server statico locale. Safari/iPad, picker di sistema effettivo e riapertura degli export con un'installazione di Movie Magic non sono stati verificati in questa sessione. Nessun dato di produzione privato è stato aggiunto.
-
-### Verifica v1.17
-
-147 test Node passati e suite Chromium di authoring integrato, workspace, responsive e DOOD/PDF passate. Le verifiche includono proporzioni dei campi, espansione delle aree di testo, assenza di controlli per modificare lo sheet, protezione nel modello, numerazione automatica, preservazione dei valori importati, Undo/Redo e salvataggio/riapertura.
+Le prove browser usano Chromium Linux su server statico locale. Safari/iPad, picker di sistema e riapertura degli export con Movie Magic non sono stati verificati in questa sessione. Nessun dato di produzione privato è stato aggiunto.

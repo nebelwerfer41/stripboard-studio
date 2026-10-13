@@ -26,10 +26,10 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-responsive-qa';
     const firstScene=page.locator('#boardView .strip-outer[data-item-kind=scene]').first();
     await firstScene.click();
     const selectedLabel=await firstScene.getAttribute('aria-label');
-    await page.locator('#displayOptions>summary').click();
+    await page.locator('#displaySettingsButton').click();
     assert(await firstScene.evaluate(el=>el.classList.contains('strip-selected')));
     await page.locator('#blackWhite').check();assert(await page.locator('#boardView').evaluate(el=>el.classList.contains('is-monochrome')));
-    await page.locator('#blackWhite').uncheck();await page.locator('#displayOptions>summary').click();
+    await page.locator('#blackWhite').uncheck();await page.locator('#displayDialog [data-overlay-close]').click();
     await page.locator('#breakdownNav').click();assert.match(await page.locator('#breakdownPreview h3').innerText(),new RegExp(selectedLabel));
     await checkSingleView();
     const current=await page.locator('#breakdownSceneSelect').inputValue();
@@ -111,10 +111,10 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-responsive-qa';
     // Compact phone strips retain the original reorder and Undo workflow for both source orientations.
     await page.locator('#boardNav').click();
     for(const orientation of ['HORIZONTAL','VERTICAL']){
-      await page.locator('#displayOptions>summary').click();
+      await page.locator('#displaySettingsButton').click();
       const layouts=await page.locator('#layoutSelect option').allTextContents();
       const chosen=orientation==='VERTICAL'?layouts.find(name=>/vertical/i.test(name)):layouts.find(name=>/thin horizontal/i.test(name));
-      assert(chosen);await page.locator('#layoutSelect').selectOption(chosen);await page.locator('#displayOptions>summary').click();
+      assert(chosen);await page.locator('#layoutSelect').selectOption(chosen);await page.locator('#displayDialog [data-overlay-close]').click();
       await page.emulateMedia({media:'print'});
       assert(await page.locator('#boardView .strip-layout').first().isVisible());assert.equal(await page.locator('.strip-mobile-summary:visible').count(),0);
       const sourceWidth=await page.locator('#boardView').evaluate(el=>parseFloat(el.style.getPropertyValue('--print-board-width')));assert(sourceWidth>1);

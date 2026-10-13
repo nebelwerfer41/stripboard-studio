@@ -2,14 +2,14 @@ import {parseMmsx,serializeMmsx} from './mmsx-project.js';
 const parseSchedule=(bytes,name)=>/\.studio\.json$/i.test(name)?parseStudio(bytes):/^(MMS2|MMSX)$/.test(new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4,bytes.byteLength))))?parseMmsx(bytes,name):parseMsd(bytes,name);
 import {parseMsd} from './msd-parser.js';
 import {serializeMsd} from './msd-writer.js';
-import {moveBoardItems,dayBreakKey,snapshotBoardFamily,restoreBoardFamily,dragSummary,createStripboard} from './scheduling.js';
+import {moveBoardItems,dayBreakKey,snapshotBoardFamily,restoreBoardFamily,dragSummary} from './scheduling.js';
 import {boardGroups,boardGroupForPlan,entriesForBoard} from './board-segments.js';
 import {resetDocumentState,documentIsDirty,markDocumentEdited,beginDocumentSave,finishDocumentSave} from './document-state.js';
 import {elementSumText,categoryElementsText,elementLabel,sortCategoryElements} from './element-format.js';
 import {expandReportBoxes} from './report-layout.js';
-import {redFlagsForStrip,redFlagsOnDate,calendarDate,boardWithCalendar,outsideCalendarActivity,findCalendar,eventsOnDate,intervalContains,intervalOverlaps} from './production-data.js';
+import {redFlagsForStrip,redFlagsOnDate,calendarDate,outsideCalendarActivity,findCalendar,eventsOnDate,intervalContains,intervalOverlaps} from './production-data.js';
 import {STRIP_GESTURE,selectStripState,clearStripState,movementIntent} from './strip-interaction.js';
-import {moveCalendarItems,editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction} from './calendar-commands.js';
+import {moveCalendarItems,editCalendar,snapshotProduction,restoreProduction} from './calendar-commands.js';
 import {canSplit} from './calendar-selectors.js';
 import {calendarMarkup,breakdownMarkup,CALENDAR_VISIBILITY} from './workspace-views.js';
 import {STANDARD_PRESETS,standardLayout,presetFields,selectedFields,fieldsMarkup,fieldsPickerMarkup} from './strip-display.js';
@@ -20,6 +20,11 @@ import {createPrintService} from './print-service.js';
 import {createDocumentEditor} from './document-editor.js';
 import {sceneEditingMarkup,elementCatalogMarkup,createIntegratedEditing,fitSceneTextareas} from './integrated-editing.js';
 import {snapshotDocument,restoreDocument,refreshDocument,validateDocument,createPlan} from './document-model.js';
+import {createOverlay,installOverlayDismissal} from './overlay-service.js';
+import {createStripColorEditor,resolveStripColors} from './strip-colors.js';
+import {createCalendarEditor} from './calendar-editor.js';
+import {insertScene,insertBanner,insertEndOfDay,assignPlanCalendar,reschedulePlan,bulkElementIds,moveElementsToCategory,reorderCollection} from './workspace-commands.js';
+import {formatTime,formatPages,parseTime} from './entry-format.js';
 import {createEventManager} from './production-events.js';
 const $ = id => document.getElementById(id);
 const SAMPLES={wonderful:'samples/Wonderful Life Demo.msd'};
@@ -29,7 +34,7 @@ const state = {project:null, mode:'board', board:null, calendar:null, calendarMo
   allReport:false, importedSource:null, printHeader:true,reportOptions:new Map(),
   revision:0,savedRevision:0,serializationState:'idle',moveIntent:null,orderHistory:[],redoHistory:[],
   activeSceneId:null,layoutChoice:'single',previewOpen:false,breakdownReturnMode:'board',splitRatio:55,hideEmptyCategories:true,calendarRulesOpen:false,calendarStartDrafts:new Map(),calendarGoDraft:null,calendarMonthDraft:null,calendarMenuOpen:false,calendarDetailOpen:false,calendarExtended:false,calendarAgenda:true,calendarVisibility:Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,true])),
-  selectedStripIds:new Set(),selectionAnchorId:null,activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
+  boneyardVisible:false,calendarMultiSelect:false,dataQuery:'',dataSelectedElements:new Set(),dataSort:{key:'boardId',direction:1},selectedStripIds:new Set(),selectionAnchorId:null,activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
 const freshDoodUI=()=>({category:'',ruleElement:'',sort:[{key:'id',direction:'asc'}],hideUnused:false,hideOff:false,compact:true,selected:null,rulesOpen:false,goDate:null});
 state.dood=freshDoodUI();
 const SCREEN_PX_PER_INCH=76;
@@ -50,38 +55,45 @@ function visibleSegmentIds(){
 }
 function displayedEntries(){
   const projected=displayedBoard();
-  return entriesForBoard(state.project,state.board,visibleSegmentIds()).map(entry=>entry.board.name===projected?.name&&entry.container==='scheduledGroups'?
+  return entriesForBoard(state.project,state.board,new Set([...visibleSegmentIds(),...(state.mode==='board'&&state.boneyardVisible?selectedBoardGroup().segments.filter(s=>s.type==='boneyard').map(s=>s.id):[])])).map(entry=>entry.board.name===projected?.name&&entry.container==='scheduledGroups'?
     {...entry,board:projected,group:projected.scheduledGroups[entry.groupIndex]}:entry);
 }
 function syncSegmentControls(){
-  const parent=selectedBoardGroup(),ids=visibleSegmentIds();
-  const focused=document.activeElement?.dataset?.segmentId;
-  state.unscheduled=Boolean(parent?.segments.some(s=>s.type==='boneyard'&&ids.has(s.id)));
-  $('toggleUnscheduled').textContent=`Sub-board · ${ids.size}/${parent?.segments.length||0} ▾`;
-  $('subboardMenu').innerHTML=(parent?.segments||[]).map(segment=>`<label><input type="checkbox" data-segment-id="${safe(segment.id)}" ${ids.has(segment.id)?'checked':''}><span>${safe(segment.name)}</span></label>`).join('');
-  if(focused)[...$('subboardMenu').querySelectorAll('input')].find(input=>input.dataset.segmentId===focused)?.focus();
+  const parent=selectedBoardGroup(),ids=visibleSegmentIds(),segments=(parent?.segments||[]).filter(s=>s.type==='normal');
+  state.unscheduled=state.mode==='board'&&state.boneyardVisible;
+  $('toggleUnscheduled').textContent=`Sub-board · ${segments.filter(s=>ids.has(s.id)).length}/${segments.length} ▾`;
+  $('subboardMenu').innerHTML=segments.map(segment=>`<label><input type="checkbox" data-segment-id="${safe(segment.id)}" ${ids.has(segment.id)?'checked':''}><span>${safe(segment.name)}</span></label>`).join('');
+  $('boneyardButton')?.setAttribute('aria-pressed',String(state.boneyardVisible));
 }
+
 function closeSegmentMenu(){$('subboardMenu').hidden=true;$('toggleUnscheduled').setAttribute('aria-expanded','false')}
-const displayedBoard = () => boardWithCalendar(state.project,state.board,state.calendar)||selectedBoard();
+const displayedBoard = () => selectedBoard();
 const selectedProductionCalendar = () => findCalendar(state.project,state.calendar)||state.project.calendars[0];
 function consultCalendar(id){
-  state.calendar=id;$('calendarSelect').value=id;
-  if(state.project.capabilities.calendarProjection){
-    state.calendarGoDraft=null;state.calendarMonthDraft=null;
-    state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||null;
-    state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);
-  }
-  render();
+  if(id==='__new__'){calendarEditor.open(null);$('calendarSelect').value=state.calendar;return}
+  if(id==='__reorder__'){openCollectionOrder('calendar');$('calendarSelect').value=state.calendar;return}
+  if(id==='__edit__'){calendarEditor.open(state.calendar);$('calendarSelect').value=state.calendar;return}
+  if(id===selectedBoard().calendarId)return;
+  try{applyDocumentCommand(()=>assignPlanCalendar(state.project,state.board,id));state.calendar=id;
+    state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||selectedBoard().scheduledGroups.find(g=>g.date)?.date||null;
+    state.calendarMonth=state.calendarDate?.slice(0,7)||state.calendarMonth;render();
+  }catch(error){showStatus(error.message);$('calendarSelect').value=selectedBoard().calendarId}
 }
+function selectableCalendars(){
+  const yards=boardGroups(state.project).flatMap(parent=>parent.segments.filter(s=>s.type==='boneyard').map(s=>[parent.id,s.id]));
+  return state.project.calendars.filter(c=>!yards.some(([board,segment])=>c.scope?.boardId===board&&c.scope?.segmentId===segment)||state.project.boards.some(b=>b.calendarId===c.id));
+}
+function calendarOptions(){return selectableCalendars().map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('')+'<option disabled>──────────</option><option value="__new__">＋ Nuovo calendario…</option><option value="__edit__">Proprietà calendario…</option><option value="__reorder__">Riordina calendari…</option>'}
+
 const selectedBoardLayout=()=>state.boardLayoutChoice?.startsWith('studio:')?standardLayout(state.boardLayoutChoice.slice(7)):state.project.stripLayouts.find(l=>l.name===state.boardLayoutChoice)||state.project.stripLayouts[0];
 const selectedLayout = () => state.mode==='board'?selectedBoardLayout():state.project.reportLayouts.find(l=>l.name===state.layout);
-function syncBoardDisplay(){
+function syncBoardDisplay({force=false}={}){
   const layout=selectedBoardLayout();
-  if(state.mode==='board'){
+  if(state.mode==='board'||force){
     $('layoutSelect').innerHTML=`<optgroup label="Layout standard">${Object.entries(STANDARD_PRESETS).map(([id,p])=>`<option value="studio:${id}">Standard · ${p.label}</option>`).join('')}${state.boardLayoutChoice==='studio:custom'?'<option value="studio:custom">Standard · Personalizzato</option>':''}</optgroup><optgroup label="Layout del file">${state.project.stripLayouts.map(l=>`<option value="${safe(l.name)}">${safe(l.name)}</option>`).join('')}</optgroup>`;
     $('layoutSelect').value=layout.name;state.layout=layout.name;
   }
-  $('boardFieldPicker').hidden=state.mode!=='board'||!layout.standard;
+  $('boardFieldPicker').hidden=(!force&&state.mode!=='board')||!layout.standard;
   if(layout.standard)$('boardFieldPicker').innerHTML=fieldsPickerMarkup(state.project,state.boardFields||presetFields(state.project,layout.preset),{target:'board',safe});
 }
 const groups = b => [...(b?.scheduledGroups||[]),...(state.unscheduled?b?.unscheduledGroups||[]:[])];
@@ -92,7 +104,7 @@ function showStatus(message){$('status').textContent=message;$('status').hidden=
 function isDirty(){return documentIsDirty(state)}
 function updateDocumentStatus(){
   const saving=state.serializationState==='saving';
-  if(state.project)$('saveButton').textContent=state.project.documentEditing||state.project.studio||state.project.studioContainer?'↓ Salva progetto Studio':state.project.format==='mmsx'?'↓ Salva .mmsx':'↓ Salva .msd';
+  if(state.project)$('saveButton').textContent=state.project.documentEditing||state.project.studio||state.project.studioContainer?'↓ Salva Studio':state.project.format==='mmsx'?'↓ Salva .mmsx':'↓ Salva .msd';
   $('dirtyIndicator').textContent=saving?'Salvataggio…':isDirty()?'Modifiche non salvate':'Salvato';
   $('dirtyIndicator').classList.toggle('dirty',isDirty());
   $('saveButton').disabled=saving||!state.project;
@@ -101,19 +113,96 @@ function updateDocumentStatus(){
 function rebuildDocumentIndexes(){
   refreshDocument(state.project);state.sceneMap=sceneIndex();state.elementMap=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e]));state.elementIds=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.categorySettings=new Map(state.project.categorySettings.map(c=>[c.name,c.attributes]));
   if(!state.project.boards.some(b=>b.name===state.board))state.board=state.project.activeBoard||state.project.boards[0].name;
-  $('projectTitle').textContent=state.project.title;refreshBoardOptions();$('calendarCount').textContent=state.project.calendars.length;$('redFlagCount').textContent=state.project.redFlags.length;
-  $('calendarSelect').innerHTML=state.project.calendars.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
+  state.calendar=selectedBoard()?.calendarId||state.calendar;
+  $('projectTitle').textContent=state.project.title;refreshBoardOptions();$('calendarCount').textContent=selectableCalendars().length;$('redFlagCount').textContent=state.project.redFlags.length;
+  $('calendarSelect').innerHTML=calendarOptions();$('calendarSelect').value=state.calendar;
 }
 let preservedEditingView=null;
 function applyDocumentCommand(command,{preserveView=null}={}){
-  const before=snapshotDocument(state.project);
-  try{command();state.project.documentEditing=true;validateDocument(state.project);rebuildDocumentIndexes();state.orderHistory.push({kind:'document',before});state.redoHistory=[];preservedEditingView=preserveView;edited();showStatus('');return true}
+  const before=snapshotDocument(state.project),selectedPlanId=selectedBoard()?.id;
+  try{if(command()===false)return false;state.project.documentEditing=true;validateDocument(state.project);const current=state.project.boards.find(b=>b.id===selectedPlanId);if(current)state.board=current.name;rebuildDocumentIndexes();state.orderHistory.push({kind:'document',before});state.redoHistory=[];preservedEditingView=preserveView;edited();showStatus('');return true}
   catch(error){restoreDocument(state.project,before);rebuildDocumentIndexes();throw error}
   finally{preservedEditingView=null}
 }
-const documentEditor=createDocumentEditor({getContext:()=>({project:state.project,boardName:state.board}),onChange:applyDocumentCommand,onCreate:project=>{setProject(project);state.projectChoice='new';markDocumentEdited(state);updateDocumentStatus();setMode('data')},onRefresh:()=>render()});
+const documentEditor=createDocumentEditor({getContext:()=>({project:state.project,boardName:state.board}),onChange:applyDocumentCommand,onCreate:project=>{setProject(project);state.projectChoice='new';markDocumentEdited(state);updateDocumentStatus();setMode('data')},onRefresh:()=>render(),onSaved:(kind,record)=>{if(kind==='plan'&&record){state.board=record.name;state.calendar=record.calendarId;rebuildDocumentIndexes();clearStripSelection();setMode('board')}}});
 $('newDocumentButton').addEventListener('click',()=>{if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Creare un nuovo progetto?'))return;document.querySelector('.project-heading').open=false;documentEditor.newDocument()});
 const integratedEditing=createIntegratedEditing({getProject:()=>state.project,onChange:applyDocumentCommand,onError:showStatus});
+installOverlayDismissal();
+const colorEditor=createStripColorEditor({getProject:()=>state.project,onChange:applyDocumentCommand});
+const calendarEditor=createCalendarEditor({getContext:()=>({project:state.project,boardName:state.board,date:state.calendarDate}),onChange:applyDocumentCommand,onCreated:id=>{state.calendar=id;state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||state.calendarDate;state.calendarMonth=state.calendarDate?.slice(0,7)||state.calendarMonth;render()}});
+const displayOverlay=createOverlay('displayDialog',{className:'display-settings-overlay'}),boardOptions=document.querySelector('#displayOptions .options-row');
+const collectionOverlay=createOverlay('collectionOrderDialog');
+const bulkOverlay=createOverlay('elementBulkDialog');
+function openDisplaySettings(target=state.mode){
+  if(displayOverlay.dialog.contains(boardOptions))$('displayOptions').append(boardOptions);
+  const calendar=target==='calendar',report=target==='report';
+  displayOverlay.open('Visualizzazione',`<div class="display-targets">${!report?'<button type="button" data-display-target="board">Stripboard</button><button type="button" data-display-target="calendar">Calendario</button>':''}</div><div data-display-content></div>`);
+  const host=displayOverlay.dialog.querySelector('[data-display-content]');
+  if(calendar){
+    host.innerHTML=`<fieldset><legend>Formato delle strip</legend><label>Layout<select id="calendarStripPreset">${Object.entries(STANDARD_PRESETS).map(([id,p])=>`<option value="${id}" ${state.calendarPreset===id?'selected':''}>${safe(p.label)}</option>`).join('')}${state.calendarPreset==='custom'?'<option value="custom" selected>Personalizzato</option>':''}</select></label>${fieldsPickerMarkup(state.project,state.calendarFields||presetFields(state.project,state.calendarPreset,{calendar:true}),{target:'calendar',safe})}</fieldset><fieldset><legend>Contenuti del calendario</legend><div class="calendar-visibility-options">${Object.entries(CALENDAR_VISIBILITY).map(([key,label])=>`<label><input type="checkbox" data-calendar-option="${key}" ${state.calendarVisibility[key]?'checked':''}>${label}</label>`).join('')}</div></fieldset>`;
+  }else{
+    host.append(boardOptions);$('layoutControl').hidden=false;$('printOptions').hidden=report;$('reportOptions').hidden=!report;$('visibilityOptions').hidden=false;$('colorSwitch').style.display=report?'none':'';
+    $('layoutSelect').dataset.displayTarget=report?'report':'board';$('layoutLabel').textContent=report?'MODELLO REPORT':'LAYOUT STRIPBOARD';
+    if(!report)syncBoardDisplay({force:true});else $('boardFieldPicker').hidden=true;
+  }
+}
+displayOverlay.dialog.addEventListener('click',event=>{const button=event.target.closest('[data-display-target]');if(button)openDisplaySettings(button.dataset.displayTarget)});
+displayOverlay.dialog.addEventListener('change',event=>{
+  const t=event.target;if(t.id==='calendarStripPreset'){state.calendarPreset=t.value;state.calendarFields=presetFields(state.project,t.value,{calendar:true});state.calendarExtended=t.value!=='compact';render();openDisplaySettings('calendar')}
+  if(t.dataset.calendarOption){state.calendarVisibility[t.dataset.calendarOption]=t.checked;render()}
+});
+displayOverlay.dialog.addEventListener('close',()=>{if(displayOverlay.dialog.contains(boardOptions))$('displayOptions').append(boardOptions)});
+$('displaySettingsButton').addEventListener('click',()=>openDisplaySettings());$('stripColorsButton').addEventListener('click',()=>colorEditor.open());
+function openCollectionOrder(kind){
+  const list=kind==='calendar'?selectableCalendars():boardGroups(state.project),order=list.map(r=>r.id);
+  function draw(){collectionOverlay.open(kind==='calendar'?'Riordina calendari':'Riordina piani',`<form><div class="collection-order-list">${order.map((id,index)=>`<div><strong>${safe(list.find(r=>r.id===id).name)}</strong><button type="button" data-order-up="${index}" aria-label="Sposta su" ${index===0?'disabled':''}>↑</button><button type="button" data-order-down="${index}" aria-label="Sposta giù" ${index===order.length-1?'disabled':''}>↓</button></div>`).join('')}</div><p data-overlay-error role="alert"></p><div class="dialog-actions"><button type="submit">Salva ordine</button></div></form>`);
+    collectionOverlay.dialog.querySelector('form').onsubmit=event=>{event.preventDefault();try{applyDocumentCommand(()=>reorderCollection(state.project,kind,kind==='calendar'?[...order,...state.project.calendars.filter(c=>!order.includes(c.id)).map(c=>c.id)]:order));collectionOverlay.close()}catch(error){collectionOverlay.dialog.querySelector('[data-overlay-error]').textContent=error.message}};
+    for(const button of collectionOverlay.dialog.querySelectorAll('[data-order-up],[data-order-down]'))button.onclick=()=>{const from=Number(button.dataset.orderUp??button.dataset.orderDown),to=from+(button.hasAttribute('data-order-up')?-1:1);[order[from],order[to]]=[order[to],order[from]];draw()};
+  }draw();
+}
+function selectedElementIds(){return [...$('dataView').querySelectorAll('[data-catalog-element]')].filter(row=>state.dataSelectedElements.has(row.dataset.catalogElement)).map(row=>row.dataset.catalogElement)}
+function openElementBulk(kind){
+  const ids=selectedElementIds();if(!ids.length)return;
+  bulkOverlay.open(kind==='ids'?'Assegna ID agli elementi selezionati':'Sposta gli elementi selezionati',`<form id="elementBulkForm"><p>${ids.length} elementi selezionati</p>${kind==='ids'?'<div class="overlay-form-grid"><label>ID iniziale<input type="number" name="start" min="0" step="1" value="1" required></label><label>Prefisso<input name="prefix" value=""></label></div>':`<label>Categoria di destinazione<select name="category">${state.project.categorySettings.map(c=>`<option value="${safe(c.name)}">${safe(c.name)}</option>`).join('')}</select></label>`}<p data-overlay-error role="alert"></p><div class="dialog-actions"><button type="submit">Applica</button></div></form>`);
+  bulkOverlay.dialog.querySelector('form').onsubmit=event=>{event.preventDefault();const values=new FormData(event.target);try{applyDocumentCommand(()=>{if(kind==='ids')bulkElementIds(state.project,ids,{start:Number(values.get('start')),prefix:String(values.get('prefix'))});else moveElementsToCategory(state.project,ids,String(values.get('category')))});if(kind!=='ids'){state.dataCategory=String(values.get('category'));renderProductionViewer()}bulkOverlay.close()}catch(error){bulkOverlay.dialog.querySelector('[data-overlay-error]').textContent=error.message}};
+}
+function addSceneAtSelection(){
+  try{let result;applyDocumentCommand(()=>{result=insertScene(state.project,{boardName:state.board,key:state.selectionAnchorId})});state.board=result.board.name;
+    state.selectedStripIds=new Set([result.strip.sourceKey]);state.selectionAnchorId=state.activeStripId=result.strip.sourceKey;state.activeSceneId=result.scene.id;
+    const mode=['board','calendar'].includes(state.mode)?state.mode:'board';state.previewOpen=true;state.layoutChoice=canSplit(innerWidth)?`${mode}-breakdown`:'single';
+    if(canSplit(innerWidth))setMode(mode);else{state.breakdownReturnMode=mode;setMode('breakdown')}
+    $('breakdownPreview').querySelector('[data-scene-field=scene]')?.focus();
+  }catch(error){showStatus(error.message)}
+}
+function addBannerAtSelection(){
+  try{let result;applyDocumentCommand(()=>{result=insertBanner(state.project,{boardName:state.board,key:state.selectionAnchorId})});state.board=result.board.name;
+    state.previewOpen=false;if(state.layoutChoice.endsWith('-breakdown'))state.layoutChoice='single';if(!['board','calendar'].includes(state.mode))setMode('board');else render();selectItem(result.strip.sourceKey,{reason:'insert'});
+    $('boardEditingControls').querySelector('[name=text]')?.focus();$('boardEditingControls').querySelector('[name=text]')?.select();
+  }catch(error){showStatus(error.message)}
+}
+function addEndOfDay(){try{const changed=applyDocumentCommand(()=>insertEndOfDay(state.project,{boardName:state.board,key:state.selectionAnchorId}));if(!changed)showStatus('La strip selezionata chiude già una giornata.')}catch(error){showStatus(error.message)}}
+document.addEventListener('click',event=>{
+  if(event.target.closest('[data-insert-scene]'))addSceneAtSelection();
+  if(event.target.closest('[data-insert-banner]'))addBannerAtSelection();
+  if(event.target.closest('[data-insert-day]'))addEndOfDay();
+  if(event.target.closest('#boneyardButton')){state.boneyardVisible=!state.boneyardVisible;render()}
+  if(event.target.closest('[data-elements-ids]'))openElementBulk('ids');
+  if(event.target.closest('[data-elements-move]'))openElementBulk('move');
+  const sort=event.target.closest('[data-elements-sort]');if(sort){state.dataSort={key:sort.dataset.elementsSort,direction:state.dataSort.key===sort.dataset.elementsSort?-state.dataSort.direction:1};renderProductionViewer()}
+  const order=event.target.closest('[data-elements-order]');if(order){const ids=[...$('dataView').querySelectorAll('[data-catalog-element]')].map(r=>r.dataset.catalogElement);try{applyDocumentCommand(()=>{const records=new Map(state.project.elements.map(e=>[e.id,e]));let index=0;state.project.elements=state.project.elements.map(el=>el.category===order.dataset.category?records.get(ids[index++]):el);ids.forEach((id,i)=>{records.get(id).sortOrder=i})})}catch(error){showStatus(error.message)}}
+});
+$('dataView').addEventListener('input',event=>{if(event.target.hasAttribute('data-catalog-search'))state.dataQuery=event.target.value});
+$('dataView').addEventListener('change',event=>{
+  const t=event.target;if(t.dataset.elementSelect){if(t.checked)state.dataSelectedElements.add(t.dataset.elementSelect);else state.dataSelectedElements.delete(t.dataset.elementSelect);renderProductionViewer()}
+  if(t.hasAttribute('data-elements-select-all')){for(const row of $('dataView').querySelectorAll('[data-catalog-element]:not([hidden])')){if(t.checked)state.dataSelectedElements.add(row.dataset.catalogElement);else state.dataSelectedElements.delete(row.dataset.catalogElement)}renderProductionViewer()}
+});
+$('calendarView').addEventListener('change',event=>{const key=event.target.dataset.calendarSelection;if(key&&event.target.checked!==state.selectedStripIds.has(key))selectItem(key,{toggle:true,reason:'calendar-checkbox'})});
+$('calendarView').addEventListener('dblclick',event=>{
+  const strip=event.target.closest('[data-strip-key]');if(!strip)return;const key=strip.dataset.stripKey;
+  state.board=strip.dataset.boardName;state.layoutChoice='single';state.previewOpen=false;setMode('board');selectItem(key,{reason:'calendar-jump'});
+  const outer=[...$('boardView').querySelectorAll('.strip-outer')].find(el=>itemKey(el)===key);outer?.scrollIntoView({block:'center',inline:'nearest'});outer?.focus({preventScroll:true});
+});
+
 function edited(){
   state.project.counts.events=state.project.events.length;
   state.project.counts.scheduleDays=state.project.boards.reduce((n,board)=>n+board.scheduledGroups.filter(group=>group.kind==='ScheduleDay').length,0);
@@ -121,7 +210,7 @@ function edited(){
   markDocumentEdited(state);updateDocumentStatus();render()}
 function refreshBoardOptions(){
   const parents=boardGroups(state.project);
-  $('boardSelect').innerHTML=parents.map(b=>`<option value="${safe(b.id)}">${safe(b.name)}</option>`).join('');
+  $('boardSelect').innerHTML=parents.map(b=>`<option value="${safe(b.id)}">${safe(b.name)}</option>`).join('')+'<option disabled>──────────</option><option value="__new__">＋ Nuova stripboard…</option><option value="__edit__">Proprietà piano…</option><option value="__reorder__">Riordina piani…</option>';
   $('boardSelect').value=selectedBoardGroup()?.id;$('boardCount').textContent=parents.length;
   document.querySelector('label[for="boardSelect"]').textContent=state.project.format==='mmsx'?'BOARD':'PIANO DI LAVORAZIONE';
   $('projectSubtitle').textContent=`${state.project.fileName} · ${state.project.counts.scenes} scene · ${parents.length} ${state.project.format==='mmsx'?'board':'piani disponibili'}`;
@@ -139,7 +228,7 @@ function setProject(data){
   resetDocumentState(state);
   const isMmsx=data.format==='mmsx';
   if(isMmsx||data.format==='studio')state.mode='board';
-  for(const [id,key] of [['reportNav','reports'],['calendarNav','readCalendars'],['redFlagNav','readRedFlags'],['newBoardButton','createBoards']])$(id).disabled=!data.capabilities[key];
+  for(const [id,key] of [['reportNav','reports'],['calendarNav','readCalendars'],['redFlagNav','readRedFlags'],['calendarNav','readCalendars']])$(id).disabled=!data.capabilities[key];
   $('saveButton').textContent=isMmsx?'↓ Salva .mmsx':'↓ Salva .msd';
   state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;state.activeSceneId=null;state.calendarStartDrafts.clear();state.calendarGoDraft=null;state.calendarMonthDraft=null;state.layoutChoice='single';state.previewOpen=false;
   clearStripSelection();
@@ -152,13 +241,13 @@ function setProject(data){
   Object.assign(state,{flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null});
   state.elementMap=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e]));
   state.categorySettings=new Map((data.categorySettings||[]).map(c=>[c.name,c.attributes]));state.reportOptions.clear();
-  state.unscheduled=false;state.segmentVisibility.clear();closeSegmentMenu();state.allReport=false;state.query='';$('search').value='';
+  state.boneyardVisible=false;state.calendarMultiSelect=false;state.dataSelectedElements.clear();state.dataQuery='';state.dataSort={key:'boardId',direction:1};state.unscheduled=false;state.segmentVisibility.clear();closeSegmentMenu();state.allReport=false;state.query='';$('search').value='';
   state.hideBanners=false;state.hideDayBreaks=false;$('hideBanners').checked=false;$('hideDayBreaks').checked=false;
   state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
   $('projectTitle').textContent=data.title;
   refreshBoardOptions();$('reportCount').textContent=data.reportLayouts.length;
-  $('calendarCount').textContent=data.calendars.length;$('redFlagCount').textContent=data.redFlags.length;
-  $('calendarSelect').innerHTML=data.calendars.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');$('calendarSelect').value=state.calendar;
+  $('calendarCount').textContent=selectableCalendars().length;$('redFlagCount').textContent=data.redFlags.length;
+  $('calendarSelect').innerHTML=calendarOptions();$('calendarSelect').value=state.calendar;
   syncSegmentControls();
   showStatus('');updateDocumentStatus();setMode(state.mode);
 }
@@ -178,6 +267,7 @@ function setMode(mode){
     $(id).classList.toggle('active',mode===key);
     if(mode===key)$(id).setAttribute('aria-current','page');else $(id).removeAttribute('aria-current');
   }
+  delete $('layoutSelect').dataset.displayTarget;
   $('layoutLabel').textContent=mode==='board'?'LAYOUT STRIPBOARD':'MODELLO REPORT';
   $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'CALENDAR',breakdown:'SPOGLIO',redflags:'RED FLAG ENTRY',data:'DETTAGLI PROGETTO ED ELEMENTI',dood:'DAY OUT OF DAYS'}[mode];
   $('search').placeholder=mode==='dood'?'Cerca elemento o ID…':mode==='board'?'Cerca scena, set, testo…':'Cerca nei dati del report…';
@@ -186,12 +276,12 @@ function setMode(mode){
   $('printOptions').hidden=mode!=='board';
   $('reportOptions').hidden=mode!=='report';
   $('visibilityOptions').hidden=mode!=='board'&&mode!=='report';
-  $('displayOptions').hidden=mode!=='board'&&mode!=='report';
+  $('displayOptions').hidden=true;
   $('displayOptions').open=false;
   $('boardFieldPicker').hidden=mode!=='board';
   $('boardControl').hidden=mode==='redflags'||mode==='data'||mode==='breakdown';
   $('layoutControl').hidden=mode==='calendar'||mode==='redflags'||mode==='data'||mode==='breakdown'||mode==='dood';
-  $('calendarControl').hidden=(mode==='board'&&!state.project.capabilities.calendarProjection)||(mode!=='board'&&mode!=='calendar');
+  $('calendarControl').hidden=mode!=='board'&&mode!=='calendar';
   $('panelTools').hidden=mode==='redflags'||mode==='data'||mode==='breakdown';$('search').hidden=mode==='calendar';
   $('stats').hidden=mode==='calendar'||mode==='redflags'||mode==='data'||mode==='breakdown'||mode==='dood';
   $('controls').classList.toggle('minimal',mode==='redflags');
@@ -211,7 +301,7 @@ function setMode(mode){
 }
 function render(){
   if(!state.project)return;
-  renderStripColorSettings();
+  document.documentElement.style.setProperty('--selection-color',state.project.colors?.preferences?.Selected?.bg||'#e3312e');
   const savedScroll=Object.fromEntries(['boardView','calendarView','breakdownPreview','doodView'].map(id=>[id,[$(id).scrollTop,$(id).scrollLeft]]));
   const primary=['board','calendar'].includes(state.mode),wide=canSplit(window.innerWidth);
   const split=primary&&wide&&state.layoutChoice!=='single';
@@ -222,10 +312,13 @@ function render(){
   const boardVisible=!previewOnly&&(state.mode==='board'||split&&state.layoutChoice==='calendar-board');
   const calendarVisible=!previewOnly&&(state.mode==='calendar'||split&&state.layoutChoice==='calendar-board');
   for(const [id,visible] of [['boardView',boardVisible],['calendarView',calendarVisible],['breakdownPreview',breakdownVisible],['doodView',state.mode==='dood'],['reportView',state.mode==='report'],['redFlagView',state.mode==='redflags'],['dataView',state.mode==='data']])$(id).hidden=!visible;
-  $('workspaceToolbar').hidden=!primary;
+  $('workspaceToolbar').hidden=!wide||(!primary&&state.mode!=='breakdown');
   $('workspaceLayout').disabled=!wide;$('workspaceLayout').value=state.layoutChoice;
   $('workspaceLayoutControl').hidden=!wide;
-  $('splitHint').textContent='Drag tra le schede';
+  $('previewButton').hidden=true;
+  $('boardEditingControls').hidden=!primary;
+  $('stripColorsButton').hidden=!primary;
+  $('displaySettingsButton').hidden=!primary&&state.mode!=='report';
   $('workspaceSplitter').hidden=!split;
   $('workspaceViews').classList.toggle('split',split);
   $('workspaceViews').classList.toggle('calendar-first',split&&state.layoutChoice==='calendar-board');
@@ -242,17 +335,18 @@ function render(){
   $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
   if(state.mode==='breakdown'){$('viewTitle').textContent='Spoglio';$('viewSubtitle').textContent='Scheda scena e fabbisogni di produzione';return}
   if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, schede ed elementi modificabili';if(preservedEditingView!=='dataView')renderProductionViewer();return}
-  if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();documentEditor.restoreHost($('redFlagView'));$('redFlagView').insertAdjacentHTML('afterbegin','<div class="inline-category-tools"><button type="button" data-edit-document="flag">Modifica Red Flag</button><button type="button" data-edit-document="flag" data-new-record>Nuova Red Flag</button></div>');return}
+  if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();$('redFlagView').insertAdjacentHTML('afterbegin','<div class="inline-category-tools"><button type="button" data-edit-document="flag">Modifica Red Flag</button><button type="button" data-edit-document="flag" data-new-record>Nuova Red Flag</button></div>');return}
   if(state.mode==='dood'){$('viewTitle').textContent='Day Out of Days';$('viewSubtitle').textContent='Presenze derivate dal piano · regole della Sub-board';renderDood();return}
-  if(calendarVisible){renderCalendarViewer();$('calendarView').querySelector('.calendar-toolbar')?.insertAdjacentHTML('beforeend','<details class="calendar-management"><summary>Calendario e piano ▾</summary><div class="inline-category-tools"><button type="button" data-edit-document="calendar">Dettagli calendario</button><button type="button" data-edit-document="calendar" data-new-record>Nuovo calendario</button><button type="button" data-edit-document="day">Giornate</button><button type="button" data-edit-document="banner">Banner</button><button type="button" data-edit-document="plan">Piani</button></div></details>')}
+  if(calendarVisible)renderCalendarViewer();
   if(boardVisible){
-    renderBoard(displayedBoard(),selectedBoardLayout());renderBoardEditingTools();
+    renderBoard(displayedBoard(),selectedBoardLayout());
   }
+  if(primary)renderBoardEditingTools();
   for(const [id,[top,left]] of Object.entries(savedScroll)){$(id).scrollTop=top;$(id).scrollLeft=left}
   if(state.mode==='calendar'){$('viewTitle').textContent='Calendar';$('viewSubtitle').textContent='Piano, date e regole di produzione · scene e banner in ordine';return}
   const board=state.mode==='board'?displayedBoard():selectedBoard(),layout=selectedLayout();if(!board||!layout)return;
   $('viewTitle').textContent=state.mode==='board'?selectedBoardGroup()?.name||board.name:layout.name;
-  $('viewSubtitle').textContent=state.mode==='board'?`${selectedBoardGroup().segments.filter(s=>visibleSegmentIds().has(s.id)).map(s=>s.name).join(', ')||'Nessuna sub-board'}${board.sourceCalendarName?` · Proiezione di lettura; nel file: ${board.sourceCalendarName}`:''}`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':'per scena'}`;
+  $('viewSubtitle').textContent=state.mode==='board'?`${selectedBoardGroup().segments.filter(s=>s.type==='normal'&&visibleSegmentIds().has(s.id)).map(s=>s.name).join(', ')||'Nessuna sub-board'}`:`${layout.sourceType==='BY_CATEGORY'?'Per categoria':'Da stripboard'} · ${layout.recordType==='SCHEDULE_DAY'?'per giornata':'per scena'}`;
   $('viewSubtitle').title=$('viewSubtitle').textContent;
   renderStats(board);
   if(state.mode==='report')renderReport(board,layout);
@@ -266,35 +360,22 @@ function renderBreakdown(){
   }
   $('breakdownPreview').innerHTML=breakdownMarkup(state.project,state,{safe,shortDate,pages,valueText,sceneOrder:breakdownSceneOrder()});
   const scene=state.project.scenes.find(s=>s.id===state.activeSceneId);
-  if(scene){const view=$('breakdownPreview');for(const el of view.querySelectorAll('.breakdown-fields,.breakdown-synopsis,.breakdown-empty-toggle,.breakdown-categories'))el.remove();view.insertAdjacentHTML('beforeend',sceneEditingMarkup(state.project,scene,state));const colors=sceneColors(scene)||{};view.querySelector('.inline-scene-colors').insertAdjacentHTML('beforeend',`<label class="inline-field"><span>Colore strip</span><input type="color" data-scene-color="bg" aria-label="Colore strip scena" value="${safe(colors.bg||'#ffffff')}"></label><label class="inline-field"><span>Colore testo</span><input type="color" data-scene-color="fg" aria-label="Colore testo scena" value="${safe(colors.fg||'#263746')}"></label>`);}
+  if(scene){const view=$('breakdownPreview');for(const el of view.querySelectorAll('.breakdown-fields,.breakdown-synopsis,.breakdown-empty-toggle,.breakdown-categories'))el.remove();view.insertAdjacentHTML('beforeend',sceneEditingMarkup(state.project,scene,state));}
   $('breakdownPreview').insertAdjacentHTML('beforeend','<div class="inline-category-tools"><button type="button" data-inline-new="scene">＋ Nuova scena</button></div><div data-editor-host></div>');
-  documentEditor.restoreHost($('breakdownPreview'));fitSceneTextareas($('breakdownPreview'));
+  fitSceneTextareas($('breakdownPreview'));
 }
 function renderBoardEditingTools(){
-  const view=$('boardView');view.querySelector('.board-edit-toolbar')?.remove();
+  const toolbar=$('boardEditingControls');if(preservedEditingView==='banner')return;
   const key=state.selectedStripIds.has(state.selectionAnchorId)?state.selectionAnchorId:state.activeStripId;
-  const strip=displayedEntries().flatMap(e=>e.group.strips).find(s=>s.sourceKey===key);
-  const banner=strip?.kind==='banner'?strip:null;
-  const toolbar=document.createElement('div');toolbar.className='board-edit-toolbar';
-  toolbar.innerHTML=`<button type="button" data-inline-new="scene">＋ Scena</button><button type="button" data-inline-new="banner">＋ Banner</button><button type="button" data-inline-new="day">＋ Fine giornata</button><button type="button" data-edit-document="plan" data-record-id="${safe(selectedBoard().id)}">Proprietà piano</button>${strip?.kind==='scene'?'<button type="button" data-open-active-scene>Spoglio della scena</button>':''}${banner?`<form data-inline-banner="${safe(banner.sourceKey)}"><label>Banner<input name="text" aria-label="Testo banner selezionato" required value="${safe(banner.text)}"></label><label>Sfondo<input name="backgroundColor" type="color" aria-label="Colore banner" value="${safe(banner.style?.backgroundColor||'#663301')}"></label><label>Testo<input name="fontColor" type="color" aria-label="Colore testo banner" value="${safe(banner.style?.fontColor||'#ffffff')}"></label><button type="submit">Applica</button></form>`:''}`;
-  view.prepend(toolbar);documentEditor.restoreHost(view);
+  const strip=entriesForBoard(state.project,state.board).flatMap(e=>e.group.strips).find(s=>s.sourceKey===key),banner=strip?.kind==='banner'?strip:null;
+  toolbar.innerHTML=`<div class="view-editing-actions"><button type="button" data-insert-scene>＋ Scena</button><button type="button" data-insert-banner>＋ Banner</button><button type="button" data-insert-day>＋ Fine giornata</button><button type="button" id="boneyardButton" aria-pressed="${state.boneyardVisible}" ${state.mode==='calendar'?'hidden':''}>Boneyard</button></div>${banner?`<form data-inline-banner="${safe(banner.sourceKey)}"><label>Banner<input name="text" aria-label="Testo banner selezionato" required value="${safe(banner.text)}"></label><label>Font<input name="fontSize" type="number" min="7" max="72" step="any" aria-label="Dimensione font banner" value="${safe(banner.style?.fontSize||12)}"></label><label>Tempo<input name="estimateTimeA" aria-label="Tempo banner HH:MM" placeholder="HH:MM" value="${safe(formatTime(banner.estimateTimeA))}"></label><button type="submit">Applica</button></form>`:''}`;
 }
-function renderStripColorSettings(){
-  let host=$('stripColorSettings');if(!host){host=document.createElement('details');host.id='stripColorSettings';host.className='strip-color-settings';document.querySelector('#displayOptions .options-row').append(host)}
-  const colors=state.project.colors||{},cells=Object.entries(colors.cells||{}).filter(([key])=>{const [row,col]=key.split(':');return colors.rows?.[row]&&colors.columns?.[col]&&colors.rows[row]!=='Other'&&colors.columns[col]!=='Other'});
-  host.hidden=!cells.length;
-  host.innerHTML=`<summary>Colori strip ▾</summary><div class="flag-table-wrap"><table class="flag-table"><thead><tr><th>INT / EXT</th><th>DAY / NIGHT</th><th>Strip</th><th>Testo</th></tr></thead><tbody>${cells.map(([key,value])=>{const [row,col]=key.split(':');return `<tr><td>${safe(colors.columns[col])}</td><td>${safe(colors.rows[row])}</td><td><input type="color" data-strip-color="${safe(key)}" data-color-channel="bg" aria-label="Colore strip ${safe(colors.columns[col])} ${safe(colors.rows[row])}" value="${safe(value.bg||'#ffffff')}"></td><td><input type="color" data-strip-color="${safe(key)}" data-color-channel="fg" aria-label="Colore testo ${safe(colors.columns[col])} ${safe(colors.rows[row])}" value="${safe(value.fg||'#263746')}"></td></tr>`}).join('')}</tbody></table></div>`;
-}
-document.addEventListener('change',event=>{
-  const key=event.target.dataset.stripColor;if(!key)return;
-  try{applyDocumentCommand(()=>{state.project.colors.cells[key][event.target.dataset.colorChannel]=event.target.value});showStatus('')}catch(error){showStatus(error.message)}
-});
-document.addEventListener('click',event=>{if(event.target.closest('[data-open-active-scene]'))setMode('breakdown')});
 document.addEventListener('submit',event=>{
   if(!event.target.matches('[data-inline-banner]'))return;event.preventDefault();
   const form=event.target,values=new FormData(form);
-  try{applyDocumentCommand(()=>{const banner=displayedEntries().flatMap(e=>e.group.strips).find(s=>s.sourceKey===form.dataset.inlineBanner);if(!banner)throw Error('Banner non trovato');banner.text=String(values.get('text')).trim();if(!banner.text)throw Error('Testo banner obbligatorio');banner.style={...banner.style,backgroundColor:values.get('backgroundColor'),fontColor:values.get('fontColor')};});showStatus('')}catch(error){showStatus(error.message)}
+  try{applyDocumentCommand(()=>{const banner=displayedEntries().flatMap(e=>e.group.strips).find(s=>s.sourceKey===form.dataset.inlineBanner);if(!banner)throw Error('Banner non trovato');const text=String(values.get('text')).trim();if(!text)throw Error('Testo banner obbligatorio');const fontSize=Number(values.get('fontSize'));if(!Number.isFinite(fontSize)||fontSize<7||fontSize>72)throw Error('Dimensione font da 7 a 72');const estimateTimeA=parseTime(values.get('estimateTimeA'));if(banner.text===text&&banner.style?.fontSize===fontSize&&banner.estimateTimeA===estimateTimeA)return false;banner.text=text;banner.style={...banner.style,fontSize,fontSizeEdited:true};banner.estimateTimeA=estimateTimeA;},{preserveView:'banner'});for(const input of form.querySelectorAll('input'))input.defaultValue=input.value;showStatus('')}catch(error){showStatus(error.message)}
 });
+document.addEventListener('change',event=>{const form=event.target.closest('[data-inline-banner]');if(form)form.requestSubmit()});
 function renderStats(board){
   const scheduled=state.mode==='board'?displayedEntries().filter(entry=>entry.container==='scheduledGroups').map(entry=>entry.group):board.scheduledGroups;
   const dated=scheduled.filter(g=>g.kind==='ScheduleDay');
@@ -402,7 +483,7 @@ function fieldValue(shape,ctx){
     const map={SCENES:'scene',SCENE:'scene',SHEET_NUMBER:'sheetNumber',SYNOPSIS:'synopsis',SEQUENCE:'sequence',IE:'ie',DN:'dn',SET:'set',LOCATION:'location',SCRIPT_DAY:'scriptDay',SCRIPT_PAGES:'scriptPageNumbers',SCRIPT_PAGE_NUMBERS:'scriptPageNumbers',UNIT:'unit',ESTIMATE_TIME_A:'estimateTimeA',ESTIMATE_TIME_B:'estimateTimeB',COMMENTS:'comments'};
     if(f==='NUM_SCRIPT_PAGES'||f==='PAGES')return pages(s?.pagesEighths);
     if(f==='DATE')return shortDate(g?.date);
-    return s?.[map[f]]||'';
+    return ['ESTIMATE_TIME_A','ESTIMATE_TIME_B'].includes(f)?formatTime(s?.[map[f]],{screen:f==='ESTIMATE_TIME_B'}):s?.[map[f]]||'';
   }
   return '';
 }
@@ -494,18 +575,8 @@ function stripMetrics(layout){
   if(vertical&&geo.boxes.length){geo.minX=Math.min(...geo.boxes.map(x=>x.r[0]));geo.maxX=Math.max(...geo.boxes.map(x=>x.r[0]+x.r[2]));}
   return {vertical,scale,geo,width:Math.max(1,(geo.maxX-geo.minX)*scale),height:Math.max(1,(geo.maxY-geo.minY)*scale)};
 }
-function matchColorIndex(labels,value){
-  const needle=String(value||'').trim().toLocaleLowerCase();
-  const exact=Object.entries(labels||{}).find(([,label])=>label&&label.trim().toLocaleLowerCase()===needle);
-  return exact?.[0]??Object.entries(labels||{}).find(([,label])=>label==='Other')?.[0]??'11';
-}
-function sceneColors(scene){
-  if(scene.studioColors)return scene.studioColors;
-  if(scene.mmsxColors)return scene.mmsxColors;
-  const colors=state.project.colors||{};
-  const row=matchColorIndex(colors.rows,scene.dn),col=matchColorIndex(colors.columns,scene.ie);
-  return colors.cells?.[`${row}:${col}`];
-}
+function sceneColors(scene){return resolveStripColors(state.project,scene)}
+
 function flagTitle(flag){
   const target=flag.target.kind==='element'?` · ${flag.target.category}: ${flag.target.element}`:'';
   return `${flag.name||'Red Flag'}${target}${flag.note?' · '+flag.note:''}`;
@@ -547,14 +618,14 @@ function makeSpecialStrip(kind,text,layout,metrics,style={}){
   const strip=document.createElement('div');strip.className=`strip-layout strip-special ${kind==='banner'?'banner-strip':'day-break-strip'}`;
   if(layout.standard)outer.classList.add('standard-outer');
   else{strip.style.width=metrics.width+'px';strip.style.height=metrics.height+'px'}
-  const prefs=state.project.colors?.preferences?.[kind==='banner'?'Banner':'DayStrip'];
+  const preferenceName=kind==='banner'?'Banner':'DayStrip',prefs=state.project.colors?.preferences?.[preferenceName],overridePreference=state.project.colors?.overriddenPreferences?.includes(preferenceName);
   if(state.showColors){
-    if(style.backgroundColor||prefs?.bg)strip.style.backgroundColor=style.backgroundColor||prefs.bg;
-    strip.style.color=kind==='banner'?(style.fontColor||prefs?.fg||'#263746'):(prefs?.fg||'#fff');
+    if(style.backgroundColor||prefs?.bg)strip.style.backgroundColor=overridePreference?prefs.bg:style.backgroundColor||prefs.bg;
+    strip.style.color=kind==='banner'?(overridePreference?prefs.fg:style.fontColor||prefs?.fg||'#263746'):(prefs?.fg||'#fff');
   }
   const layoutStyle=kind==='banner'?layout.bannerStyle:layout.dayBreakStyle;
   const size=Number(style.fontSize||layoutStyle?.Size);
-  if(Number.isFinite(size)&&size>0)strip.style.fontSize=Math.max(7,Math.min(20,size*.85))+'px';
+  if(Number.isFinite(size)&&size>0){strip.style.fontSize=Math.max(7,size*.85)+'px';if(style.fontSizeEdited&&!metrics.vertical)strip.style.minHeight=`${Math.max(metrics.height,size*.85*1.3+4)}px`;}
   if(Number(style.fontStyle??layoutStyle?.Style)&1)strip.style.fontWeight='700';
   const family=style.fontName||layoutStyle?.Family;
   if(family)strip.style.fontFamily=`${family}, Arial, sans-serif`;
@@ -593,7 +664,7 @@ function isSceneKey(key){return entriesForBoard(state.project,state.board)
 function selectionChanged(previousActive,reason='selection',open=false){
   const occurrence=entriesForBoard(state.project,state.board).flatMap(e=>e.group.strips).find(strip=>strip.sourceKey===state.activeStripId&&strip.kind==='scene');
   state.activeSceneId=occurrence?state.sceneMap.get(occurrence.bdsId)?.id??null:null;
-  syncStripSelection();if(state.project&&!$('breakdownPreview').hidden)renderBreakdown();if(state.project&&!$('boardView').hidden)renderBoardEditingTools();
+  syncStripSelection();if(state.project&&!$('breakdownPreview').hidden)renderBreakdown();if(state.project&&['board','calendar'].includes(state.mode))renderBoardEditingTools();
   const detail={selectedStripIds:[...state.selectedStripIds],activeStripId:state.activeStripId,activeSceneId:state.activeSceneId,reason};
   $('boardView').dispatchEvent(new CustomEvent('stripselectionchange',{detail}));
   if(previousActive!==state.activeStripId)$('boardView').dispatchEvent(new CustomEvent('stripactivechange',{detail}));
@@ -609,6 +680,7 @@ function syncStripSelection(){
     outer.classList.toggle('strip-active',state.activeStripId===key);
     outer.setAttribute('aria-pressed',String(selected));
   }
+  for(const checkbox of $('calendarView').querySelectorAll('[data-calendar-selection]'))checkbox.checked=state.selectedStripIds.has(checkbox.dataset.calendarSelection);
   for(const strip of $('calendarView').querySelectorAll('[data-strip-key]')){const key=strip.dataset.stripKey;strip.classList.toggle('selected',state.selectedStripIds.has(key));strip.classList.toggle('active',state.activeStripId===key);strip.setAttribute('aria-pressed',String(state.selectedStripIds.has(key)))}
 }
 function selectItem(key,{toggle=false,range=false,reason='selection',open=false}={}){
@@ -766,7 +838,7 @@ function calendarDropPosition(x,y){
     if(!anchor){position.stripIndex=group.strips.length;anchor=strips.at(-1)||null;after=!!anchor}
     return {position,anchor,after,wrap:node,vertical:false,cell};
   }
-  const source=boardAt(stripPointer?.intent?.from),candidates=entriesForBoard(state.project,state.board,visibleSegmentIds()).map(e=>e.board).filter(b=>b.calendarId===state.calendar);
+  const source=boardAt(stripPointer?.intent?.from),candidates=entriesForBoard(state.project,state.board,new Set([...visibleSegmentIds(),...(state.mode==='board'&&state.boneyardVisible?selectedBoardGroup().segments.filter(s=>s.type==='boneyard').map(s=>s.id):[])])).map(e=>e.board).filter(b=>b.calendarId===state.calendar);
   const target=candidates.find(b=>b===source)||candidates.find(b=>b.name===state.board)||candidates[0];
   if(!target)return null;
   return {position:{boardName:target.name,date:cell.dataset.calendarCell,calendarId:state.calendar},wrap:cell.querySelector('.cell-content'),anchor:null,after:false,vertical:false,cell};
@@ -868,7 +940,7 @@ function endStripDrag(event,cancel=false){
     if(pointer.outer){
       if(!pointer.longPress){
         if(pointer.pointerType==='touch'){
-          const toggle=state.touchMultiSelect;
+          const toggle=state.touchMultiSelect||(pointer.origin==='calendar'&&state.calendarMultiSelect);
           selectItem(pointer.key,{toggle,reason:pointer.origin==='calendar'?'calendar-tap':'tap',open:!toggle});
         }else{
           state.touchMultiSelect=false;
@@ -1047,14 +1119,17 @@ function dateRange(item){
 function table(headers,rows){return `<div class="flag-table-wrap"><table class="flag-table"><thead><tr>${headers.map(h=>`<th>${safe(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(value=>`<td>${safe(value)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${headers.length}">Nessun dato presente.</td></tr>`}</tbody></table></div>`}
 function valueText(value){return value?.text??(value==null?'—':typeof value==='object'?JSON.stringify(value):String(value))}
 document.addEventListener('click',event=>{
-  const category=event.target.closest('[data-catalog-category]');if(category){state.dataCategory=category.dataset.catalogCategory;renderProductionViewer();return}
+  const category=event.target.closest('[data-catalog-category]');if(category){state.dataCategory=category.dataset.catalogCategory;state.dataQuery='';state.dataSelectedElements.clear();renderProductionViewer();return}
   const button=event.target.closest('[data-edit-document],[data-inline-new]');if(!button)return;
   const kind=button.dataset.editDocument||button.dataset.inlineNew;
+  if(kind==='calendar'){calendarEditor.open(button.hasAttribute('data-new-record')?null:state.calendar);return}
+  if(kind==='scene'&&(button.dataset.inlineNew||button.hasAttribute('data-new-record'))){addSceneAtSelection();return}
+  if(kind==='banner'&&button.dataset.inlineNew){addBannerAtSelection();return}
+  if(kind==='day'){addEndOfDay();return}
   const id=button.dataset.recordId??(button.hasAttribute('data-new-record')||button.dataset.inlineNew?'':kind==='scene'?(state.mode==='data'?state.dataScene:state.activeSceneId):kind==='element'?state.dataElement:kind==='calendar'?state.calendar:kind==='flag'?state.flagSelectedId:undefined);
   if(kind==='scene'&&id){selectBreakdownScene(id);setMode('breakdown');return}
-  const view=button.closest('.view')||$('boardView');let host=view.querySelector('[data-editor-host]');if(!host){host=document.createElement('div');host.dataset.editorHost='';view.prepend(host)}
-  documentEditor.open(kind,id??undefined,host);
-  if(button.dataset.category){const select=host.querySelector('[name=category]');if(select)select.value=button.dataset.category}
+  documentEditor.open(kind,id??undefined);
+  if(button.dataset.category){const select=$('documentEditor').querySelector('[name=category]');if(select)select.value=button.dataset.category}
 });
 function renderProductionViewer(){
   const p=state.project,scenes=[...p.scenes].sort((a,b)=>Number(!a.scene)-Number(!b.scene)||collator.compare(a.scene||'',b.scene||''));
@@ -1069,14 +1144,14 @@ function renderProductionViewer(){
     <div class="viewer-card"><h3>Quantità per scheda</h3><button type="button" data-edit-document="scene">Modifica scena e quantità</button><button type="button" data-edit-document="scene" data-new-record>Nuova scena</button><label class="viewer-label" for="dataSceneSelect">Scheda</label><select id="dataSceneSelect">${scenes.map(s=>`<option value="${safe(s.bdsId)}" ${s===scene?'selected':''}>${safe(s.scene||'Senza numero')} · ${safe(s.synopsis)}</option>`).join('')}</select>
       ${table(['Categoria','Elemento','Quantità','Stato'],(scene?.elementRefs||[]).map(ref=>[ref.category,ref.name,valueText(ref.quantity),!ref.resolved?'Riferimento non risolto':ref.quantityOrigin==='stored'?'Quantità salvata':'Quantità non presente']))}</div>
     </div></details>`;
-  documentEditor.restoreHost($('dataView'));
+  const catalogSearch=$('dataView').querySelector('[data-catalog-search]');if(catalogSearch&&state.dataQuery){catalogSearch.value=state.dataQuery;catalogSearch.dispatchEvent(new Event('input',{bubbles:true}))}
 }
 function renderCalendarViewer(){
   const view=$('calendarView');
   const scroll=view.querySelector('.calendar-grid-scroll'),top=scroll?.scrollTop||0,left=scroll?.scrollLeft||0;
   view.innerHTML=calendarMarkup(state.project,{...state,visibleSegments:visibleSegmentIds()},{safe,shortDate,pages,specialLabel,sceneColors});
-  view.querySelector('.calendar-toolbar')?.insertAdjacentHTML('beforeend','<button type="button" data-event-manager>Eventi di produzione</button>');
-  const next=view.querySelector('.calendar-grid-scroll');if(next){next.scrollTop=top;next.scrollLeft=left}documentEditor.restoreHost(view);
+
+  const next=view.querySelector('.calendar-grid-scroll');if(next){next.scrollTop=top;next.scrollLeft=left}
 }
 
 function flagMatches(flag,{includeDate=true}={}){
@@ -1133,6 +1208,9 @@ $('projectSelect').addEventListener('change',async e=>{
   }catch(error){showStatus(error.message);e.target.value=state.projectChoice}
 });
 $('boardSelect').addEventListener('change',e=>{
+  if(e.target.value==='__new__'){documentEditor.open('plan','');$('boardSelect').value=selectedBoardGroup().id;return}
+  if(e.target.value==='__edit__'){documentEditor.open('plan',selectedBoard().id);$('boardSelect').value=selectedBoardGroup().id;return}
+  if(e.target.value==='__reorder__'){openCollectionOrder('board');$('boardSelect').value=selectedBoardGroup().id;return}
   clearStripSelection();
   const parent=boardGroups(state.project).find(item=>item.id===e.target.value);if(!parent)return;
   state.board=parent.plans[0].name;closeSegmentMenu();syncSegmentControls();
@@ -1142,21 +1220,6 @@ $('boardSelect').addEventListener('change',e=>{
   state.calendarMonth=state.calendarDate?.slice(0,7)||new Date().toISOString().slice(0,7);
   state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
   state.dood.selected=null;state.dood.ruleElement='';state.dood.goDate=null;render();
-});
-$('newBoardButton').addEventListener('click',()=>{
-  $('newBoardName').value=`${state.board} copia`;$('newBoardDialog').showModal();$('newBoardName').focus();$('newBoardName').select();
-});
-$('newBoardForm').addEventListener('submit',event=>{
-  event.preventDefault();
-  if(event.submitter?.value!=='create'){$('newBoardDialog').close();return}
-  try{
-    let board;
-    if(state.project.documentEditing)applyDocumentCommand(()=>{board=createPlan(state.project,{name:$('newBoardName').value,calendarId:selectedBoard().calendarId,copyFrom:selectedBoard().id})});
-    else board=createStripboard(state.project,{name:$('newBoardName').value,sourceBoardName:state.board});
-    clearStripSelection();
-    state.board=board.name;state.calendar=board.calendarId;state.printHeader=board.attributes.HideStripBoardHeader!=='1';
-    $('calendarSelect').value=state.calendar;syncPrintOptions();refreshBoardOptions();showStatus('');$('newBoardDialog').close();setMode('board');edited();
-  }catch(error){showStatus(error.message)}
 });
 const isMac=/Mac|iPhone|iPad|iPod/i.test(navigator.userAgentData?.platform||navigator.platform||'');
 function isToggleGesture(event){return isMac?event.metaKey:event.ctrlKey}
@@ -1208,7 +1271,7 @@ document.addEventListener('pointerdown',event=>{
   stripPointer={pointerId:event.pointerId,pointerType:event.pointerType,origin:calendar?'calendar':'board',outer,empty,
     key:outer&&itemKey(outer),from,fromKind:outer&&(outer.dataset.itemKind||stripAt(from)?.kind),
     wasSelected:!!outer&&state.selectedStripIds.has(itemKey(outer)),
-    toggle:isToggleGesture(event),range:event.shiftKey,startX:event.clientX,startY:event.clientY,active:false,longPress:false,scrolling:false};
+    toggle:isToggleGesture(event)||(Boolean(calendar)&&state.calendarMultiSelect),range:event.shiftKey,startX:event.clientX,startY:event.clientY,active:false,longPress:false,scrolling:false};
   if(event.pointerType==='touch'&&outer){
     const pointer=stripPointer;
     pointer.longPressTimer=setTimeout(()=>{
@@ -1292,7 +1355,7 @@ $('saveButton').addEventListener('click',async()=>{
 });
 window.addEventListener('beforeunload',event=>{if(isDirty()||documentEditor.hasDraft()||integratedEditing.hasDraft()||eventManager.hasDraft()){event.preventDefault();event.returnValue=''}});
 $('layoutSelect').addEventListener('change',e=>{
-  if(state.mode==='board'){
+  if(state.mode==='board'||e.target.dataset.displayTarget==='board'){
     state.boardLayoutChoice=e.target.value;
     if(e.target.value.startsWith('studio:'))state.boardFields=presetFields(state.project,e.target.value.slice(7));
     syncBoardDisplay();
@@ -1307,9 +1370,10 @@ document.addEventListener('change',event=>{
   if(!keys.length)return;
   state[property]=[...new Set(keys)];
   if(calendar){state.calendarPreset='custom';state.calendarStripMenuOpen=true}
-  else{state.boardLayoutChoice='studio:custom';syncBoardDisplay()}
+  else{state.boardLayoutChoice='studio:custom';syncBoardDisplay({force:$('layoutSelect').dataset.displayTarget==='board'})}
   render();
-  const picker=calendar?$('calendarView'):$('boardFieldPicker');
+  if(calendar)openDisplaySettings('calendar');
+  const picker=calendar?displayOverlay.dialog:$('boardFieldPicker');
   [...picker.querySelectorAll('[data-strip-field-option]')].find(el=>el.dataset.stripFieldOption===input.dataset.stripFieldOption)?.focus();
 });
 $('calendarSelect').addEventListener('change',e=>{
@@ -1339,9 +1403,10 @@ $('calendarView').addEventListener('click',event=>{
   }
   const all=event.target.closest('[data-calendar-all]');
   if(all){state.calendarVisibility=Object.fromEntries(Object.keys(CALENDAR_VISIBILITY).map(k=>[k,all.dataset.calendarAll==='true']));state.calendarMenuOpen=true;render();return}
-  if(event.target.closest('#calendarRulesToggle')){state.calendarRulesOpen=!state.calendarRulesOpen;render();return}
+  if(event.target.closest('#calendarRulesToggle')){calendarEditor.open(state.calendar);return}
+  if(event.target.closest('[data-calendar-multi]')){state.calendarMultiSelect=!state.calendarMultiSelect;render();return}
+  if(event.target.closest('[data-calendar-display]')){openDisplaySettings('calendar');return}
   if(event.target.closest('#calendarStartSelected')){applyCalendarCommand(()=>editCalendar(state.project,{calendarId:editingCalendar()?.id,startDate:state.calendarDate}));return}
-  if(event.target.closest('#calendarReschedule')){openReschedulePreview();return}
 
   const go=event.target.closest('[data-go-date]');
   if(go){if(!go.dataset.goDate)return;state.calendarGoDraft=null;state.calendarMonthDraft=null;state.calendarDate=go.dataset.goDate;state.calendarMonth=state.calendarDate.slice(0,7);render();return}
@@ -1428,22 +1493,6 @@ $('printButton').addEventListener('click',()=>{
 function editingCalendar(){
   return findCalendar(state.project,state.calendar);
 }
-function openReschedulePreview(){
-  try{
-    const c=editingCalendar();if(!c)throw Error('Nessun calendario selezionato');
-    if(state.calendarStartDrafts.has(c.id)&&state.calendarStartDrafts.get(c.id)!==c.scheduleDates.ProductionStartDate?.iso)throw Error('Completa e applica il campo Inizio riprese prima di ripianificare');
-    const preview=previewReschedule(state.project,c.id);state.rescheduleIntent={calendarId:c.id,preview};
-    $('rescheduleEffects').innerHTML=`<p><strong>${safe(c.name)}</strong> · ${preview.length} piani/segmenti coinvolti</p>`+
-      preview.map(plan=>`<div class="reschedule-plan"><strong>${safe(plan.boardName)}</strong><p>${plan.changes.length} giornate · ${plan.changes.filter(c=>c.from!==c.to).length} date cambiano · ${shortDate(plan.changes[0]?.to)} → ${shortDate(plan.changes.at(-1)?.to)}</p>${plan.anchorConflict?'<p class="calendar-conflict">L’ancora è non lavorativa o non risolta: la prima giornata resta in questa data.</p>':''}<details><summary>Date prima / dopo</summary>${table(['Giorno','Prima','Dopo'],plan.changes.map(c=>[c.shootingDayNumber,shortDate(c.from),shortDate(c.to)]))}</details></div>`).join('');
-    $('rescheduleDialog').showModal();
-  }catch(error){showStatus(error.message)}
-}
-$('rescheduleForm').addEventListener('submit',event=>{
-  event.preventDefault();if(event.submitter?.value==='apply'){
-    const intent=state.rescheduleIntent;applyCalendarCommand(()=>rescheduleCalendar(state.project,intent.calendarId,intent.preview));
-  }
-  $('rescheduleDialog').close();state.rescheduleIntent=null;
-});
 $('calendarView').addEventListener('toggle',event=>{
   if(event.target.matches('.calendar-view-menu'))state.calendarMenuOpen=event.target.open;
   if(event.target.matches('.calendar-strip-menu'))state.calendarStripMenuOpen=event.target.open;
@@ -1457,7 +1506,7 @@ $('workspaceLayout').addEventListener('change',event=>{
 function closeBreakdown(){
   state.previewOpen=false;if(state.layoutChoice.endsWith('-breakdown'))state.layoutChoice='single';
   if(state.mode==='breakdown')setMode(state.breakdownReturnMode);else render();
-  $('previewButton').focus();
+  (canSplit(innerWidth)?$('workspaceLayout'):$(state.mode==='calendar'?'calendarNav':'boardNav')).focus();
 }
 $('previewButton').addEventListener('click',()=>{
   if(state.previewOpen){closeBreakdown();return}
@@ -1480,7 +1529,7 @@ function selectBreakdownScene(id){
   syncStripSelection();
 }
 $('breakdownPreview').addEventListener('change',event=>{
-  if(event.target.dataset.sceneColor){const scene=state.project.scenes.find(s=>s.id===state.activeSceneId);if(scene)try{applyDocumentCommand(()=>{scene.studioColors={...(sceneColors(scene)||{bg:'#ffffff',fg:'#263746'}),[event.target.dataset.sceneColor]:event.target.value}})}catch(error){showStatus(error.message)}return}
+
   if(event.target.id==='hideEmptyCategories'){state.hideEmptyCategories=event.target.checked;renderBreakdown();$('hideEmptyCategories').focus()}
   if(event.target.id==='breakdownSceneSelect'){selectBreakdownScene(event.target.value);$('breakdownSceneSelect').focus()}
 });

@@ -2,19 +2,15 @@
 
 > **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
-> **Flash common model:** Calendar now combines the monthly plan and calendar rule editing; Anteprima Spoglio follows the active scene. Events, red flags, production data and per-sheet quantities remain inspectable. Imported projects save in their original format; native MMSX dates are never recalculated on import or calendar selection. MMSX boards retain their sub-board hierarchy: use the Sub-board menu to show normal segments and the shared Boneyard together. Segment labels and spacing appear only in the editing UI. See [the common contract and save strategy](docs/flash-common-model.md).
+# Stripboard Studio v1.18
 
-> **Day Out of Days:** DOOD derivato dalle strip correnti, regole per Sub-board/categoria/elemento, eventi condivisi con Calendar, Summary/CSV e anteprima di stampa paginata comune con lo schedule. I nuovi metadati si salvano nel progetto `.studio.json`; l’esportazione nativa MSD/MMSX resta conservativa. Vedi [analisi, interpretazioni e verifiche DOOD](docs/dood.md).
+Editing, selection and scheduling now share the existing workspaces. New scenes are inserted after the selected strip and open directly in Spoglio; banners use compact inline fields, and End of Day inserts a boundary and shifts following shooting dates using the plan calendar. Sheet numbers remain read-only and automatic.
 
-> **Creazione ed editing completo:** nuovi progetti Studio, scene e quantità, elementi/proprietà, categorie, produzione, piani, giorni/banner e vincoli modificabili. Le modifiche complete persistono in `.studio.json` v2, con conservazione dell’archivio importato e lettura dei progetti v1. Layout report e stripboard preservati. Vedi [funzioni, fonti ufficiali, compatibilità e verifiche](docs/document-editing.md).
+Pages are entered as mixed eighth fractions, such as `2 3/8`. Estimated time uses `HH:MM`; screen time uses `MM:SS`. A separate color window edits INT/EXT × D/N combinations, banner/day colors and selection markers. Display settings use a spacious overlay with independent Stripboard and Calendar preferences.
 
-> **Editing integrato:** Spoglio modifica campi, colori, elementi e quantità direttamente nella scheda; Elementi e progetto include un catalogo per categoria. Creazione e proprietà si aprono dentro la vista corrente. Banner e giornate hanno comandi nella Stripboard, Annulla/Ripeti sono sempre nella barra superiore. Le modifiche complete continuano a salvarsi in `.studio.json`.
+The main bar controls paired views. Stripboard actions stay together above the strips; Calendar supports explicit multiselection and double-click navigation to Stripboard. Elements can be sorted, selected, assigned consecutive IDs and moved between categories. Plan and calendar selectors contain creation, properties and reorder actions. Calendar properties, workweek and exceptions share one overlay; changing the calendar changes the plan association and shooting dates. Boneyard remains an unscheduled Stripboard area.
 
-# Stripboard Studio v1.17
-
-Version 1.17 integrates authoring into the existing workspaces. Breakdown entry gives Set, Location, Synopsis and Comments more room, with expanding text areas and a responsive layout shared by new scenes. Sheet numbers are read-only and assigned automatically to new scenes. Elements, quantities, colors and contextual forms support Undo/Redo and save/reopen in Studio v2, preserving imported archives and native export behavior.
-
-Support for MSD **Production Calendars** and **Red Flags** is documented in [docs/msd-production-calendars-red-flags.md](docs/msd-production-calendars-red-flags.md). Calendar supports explicit edits and rescheduling; choosing a calendar or display preference remains read-only. Red Flag Entry remains an inspection view. See [Calendar and breakdown implementation, tests and limits](docs/calendar-workspace.md).
+Complete edits persist in `.studio.json` v2 with the original imported archive retained. Native MSD/MMSX exports remain conservative; an untouched import exports the original bytes. Importing a file does not reschedule its native dates. See [editing and compatibility](docs/document-editing.md), [current calendar behavior](docs/calendar-workspace.md), [the common model](docs/flash-common-model.md), [DOOD](docs/dood.md), and [MSD calendars and Red Flags](docs/msd-production-calendars-red-flags.md).
 
 The editor’s format audit and conservative writing strategy are described in [docs/msd-writer-audit.md](docs/msd-writer-audit.md).
 
@@ -42,27 +38,27 @@ The browser must support `DecompressionStream('deflate-raw')`, `DOMParser`, `XML
 
 Control names below are given in English; some labels in the application are currently in Italian.
 
-- Select a project, shooting schedule, and an imported stripboard layout, or choose **Compatto**, **Dettagliato** or **Produzione** under **Visualizzazione**. Standard layouts let you select scene fields and project categories; Calendar has its own **Strip** menu with independent layout and field preferences. Display changes leave the imported file untouched.
+- Select a project, shooting schedule, and an imported stripboard layout, or choose **Compatto**, **Dettagliato** or **Produzione** under **Visualizzazione**. Standard layouts let you select scene fields and project categories; The Calendar tab in that overlay has independent layout and field preferences. Display changes leave the imported file untouched.
 - Click or tap a scene to select and activate it. Shift-click selects the range from the initial strip, including banners and day breaks; Ctrl/⌘-Shift-click adds that range to the selection. Ctrl/⌘-click adds or removes items. On touch devices, hold a strip to enter multi-selection mode, then tap to add or remove items. Esc or a click in empty space clears the selection. Drag a strip directly; on touch devices, dragging begins after a long press and deliberate movement. If the strip is already selected, the whole group moves while preserving its relative order. The preview shows the scene count, total page eighths, and other items, with a line marking the insertion point. Banners and day breaks can be dragged in the same way, including into and out of the Boneyard. F2 offers the same destinations.
 - **Undo** (Ctrl/⌘-Z) restores the order before the last operation; **Redo** (Ctrl/⌘-Shift-Z) reapplies the undone reorder. From the keyboard, Enter or Space selects a strip and F2 opens the day and position picker. The “At the end” position in a `ScheduleDay` is before the layout-generated day break.
-- **＋** beside the schedule creates a stripboard by copying the current order. The new schedule uses the same scene references and can be edited independently. Its unique name provides the identity expected by the observed format. The selector changes the current schedule and the exported `ActiveStripBoard` value.
+- **Nuova Stripboard** inside the plan selector creates an empty stripboard or copies the current order. **Riordina** in the same selector changes plan ordering. The new schedule uses the same scene references and can be edited independently. Its unique name provides the identity expected by the observed format. The selector changes the current schedule and the exported `ActiveStripBoard` value.
 - **Save .msd** creates a new `-edited.msd` file. The unsaved-changes indicator tracks document revisions; edits remain available if saving fails. If the browser does not provide a file picker with a confirmed save result, a download starts and the state becomes saved when the browser accepts the download.
-- The calendar selector beside the layout displays the same schedule with dates inferred from the selected calendar, without changing the file’s `CalendarName` reference.
+- The calendar selector changes the plan’s calendar association and recalculates shooting dates using its workweek and exceptions. Creation, editing and reorder actions live in the same selector.
 - **Calendar** combines a dense monthly plan with recurring days off, per-date exceptions, production start and explicit rescheduling. Drag scene strips or banners to reorder them within a day, move them to another date, or move between Calendar and Stripboard. An empty date creates a shooting day in the associated visible segment. Undo/Redo covers every move. With one view visible, hold the dragged strip over the other top navigation tab for half a second to reveal it; touch uses a long press before dragging.
-- The top navigation gives direct access to Stripboard, Calendar, Spoglio, Report, Red Flags and project details. Click the project title to switch projects; **Visualizzazione** contains layout, color, visibility and print settings. Compact controls leave more space for the active view, which scrolls independently.
+- The top navigation gives direct access to Stripboard, Calendar, Spoglio, Report, Red Flags and project details. Click the project title to switch projects; **Visualizzazione** opens layout, field, visibility and print settings; **Colori strip** opens the separate combination-color editor. Compact controls leave more space for the active view, which scrolls independently.
 - **Spoglio** follows the active scene from Calendar or Stripboard, including template categories and elements shown by ID (when available) and name. Its scene selector and previous/next buttons also allow direct browsing in plan order. Quantities and properties remain available in project details. Optional resizable pairs are available only above 1200 CSS px, with each pane limited to 25–75% of the usable width; smaller viewports use one full-width view.
 - Phones show readable scene rows and a compact Calendar agenda of shooting days, events and the selected date. **Mostra mese** restores the monthly grid. These display preferences do not change the file or the schedule. Print uses the selected source or standard layout; phone summaries preserve source geometry for printing.
 - The **Red Flag Entry** view includes filters for category, element, type, and date range, along with a monthly grid, list, and flag details. Types come from `RedFlagMgr`; managing and editing flags remain future work.
 - Display scenes, banners, days, dates, and the unscheduled queue, with search and controls for hiding banners and day breaks.
 - Banners and day breaks are drawn as strips with the same width as scene strips.
-- The **Black and white** checkbox beside the display/print options shows strips with white backgrounds and black text. Uncheck it to restore the file’s `INT/EXT` × `Day/Night` colors, plus dedicated banner and day-break colors.
+- The **Black and white** checkbox in the display/print overlay shows strips with white backgrounds and black text. Uncheck it to restore the file’s `INT/EXT` × `Day/Night` colors, plus dedicated banner and day-break colors.
 - Days have no additional heading or trailing space. In vertical layouts, days sit side by side with horizontal scrolling.
 - The horizontal stripboard preview automatically fits the panel width, including when the window is resized.
 - Preview report layouts stored in the file, with fields linked to data and browser printing. Banners and day breaks appear as text rows in the report flow when the template includes them.
 - Print stripboards and DOOD through the shared preview with paper size, orientation, margins and scale. PDF uses the same preview document via the browser’s Save as PDF destination. The application retains options for the header and starting each day on a new page.
 - Import other local `.msd` files compatible with the sample format.
 
-Day dates are derived from calendars by the included parser and marked as estimates. In Stripboard, selecting another calendar changes only the reading projection; Calendar keeps all visible scheduled segments: MSD uses the same read-only date projection as Stripboard, while MMSX retains native dates and the displayed month. Strips, scenes, and schedule order remain intact. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
+MSD dates are initially derived by the parser; MMSX retains native dates on import. Explicit calendar assignment, calendar-rule saving and End of Day creation update the plan using the chosen calendar. Selection, layout and visibility preferences do not change the document. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
 
 ## MSD writer and integrity
 
@@ -98,7 +94,7 @@ Credits: [nebelwerfer41 on GitHub](https://github.com/nebelwerfer41).
 
 [MIT](LICENSE). Copies and derivative works must retain the copyright notice and license text. Dependencies and third-party materials retain their own licenses.
 
-## v1.11 verification
+## Verification commands
 
 `node --test tests/*.mjs` covers display fields, DOOD calculations and pagination, Studio project saving, and native MMSX day creation in formats 5, 3 and hybrid, including conservation and Undo/Redo. `tests/calendar-roundtrip.html` also verifies new civil-date drops and reopening in the included MSD sample.
 
@@ -107,6 +103,7 @@ Credits: [nebelwerfer41 on GitHub](https://github.com/nebelwerfer41).
 Browser suites require Playwright, a local server and optionally `CHROME_PATH`. The DOOD suite also requires `pdfinfo` and `pdftotext` to verify the generated PDF against the preview:
 
 ```sh
+CHROME_PATH=/usr/bin/chromium node tests/browser-workspace-revision.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-dood-qa node tests/browser-dood.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-calendar-density.cjs
@@ -116,7 +113,11 @@ CHROME_PATH=/usr/bin/chromium SYNTHETIC_MMSX=/path/to/fixture.mmsx node tests/br
 
 The DOOD suite checks rules, events, scene navigation, Studio/native round-trips, shared print preview and PDF page/text parity. The last suite checks independent field settings without file changes, calendar reorder, both cross-pane directions, blank-date save/reopen, cancellation, Undo/Redo, tablet/phone navigation during drag and native phone touch multiselection. MMSX uses the synthetic fixture described in [the calendar documentation](docs/calendar-workspace.md); MSD uses the included real sample.
 
-## v1.12 — Calendar fixes
+## Release history
+
+The following entries describe earlier releases; current calendar and editing behavior is documented above.
+
+### v1.12 — Calendar fixes
 
 Changing the selected calendar keeps scene strips and shooting-day summaries visible. Calendar uses the same read-only MSD date projection as Stripboard; MMSX keeps native dates, the displayed month and the selected date.
 
@@ -124,28 +125,34 @@ Changing the selected calendar keeps scene strips and shooting-day summaries vis
 
 Verified with the Node suites and Chromium browser tests for MSD and MMSX 5, 3 and hybrid: calendar switching, targeted edits, save/reopen and Undo. Changing the calendar alone preserves the original file bytes.
 
-## v1.13 — One DOOD category at a time
+### v1.13 — One DOOD category at a time
 
 DOOD selects the first available category on opening and displays only that category’s elements. The category menu has no “All” option; changing the category updates the grid, rules, CSV Summary and print output. Category selection is a display preference and does not modify the project.
 
-## v1.14 — Built-in DOOD attendance
+### v1.14 — Built-in DOOD attendance
 
 DOOD now reads Set, Location, Script Day, Unit, Sequence, DN and INT/EXT from scheduled scenes. MMSX uses native field element IDs; MSD uses scalar scene values and reuses catalog IDs where available. Missing MSD catalog entries appear as derived DOOD rows without changing the imported elements or file. Rules, scene details, CSV and print use the same attendance projection.
 
 Verified against the real MSD sample and synthetic MMSX 5/3/hybrid fixtures, including duplicate names, moves to the Boneyard, save/reopen and byte-identical Undo.
 
-## v1.15 — Consolidated main branch and Home Screen icons
+### v1.15 — Consolidated main branch and Home Screen icons
 
 All branch changes are merged into `main`, including the iOS Home Screen metadata and web app manifest. The referenced Apple touch icon and 192/512 px app icons are included. Use the browser’s Add to Home Screen action to open the site in standalone mode on iOS.
 
-## v1.16 — Document creation and complete editing
+### v1.16 — Document creation and complete editing
 
 Create projects from scratch, edit scene fields and element quantities, manage production properties and linked elements, and update calendars, plans, days, banners, events and availability constraints. Shared references update across breakdown, scheduling, DOOD and reports. Complete edits use the versioned Studio v2 container, retaining original MSD/MMSX archives and compatibility with Studio v1. Validation, Undo/Redo, draft protection and failed-write recovery cover the authoring flows. Report and stripboard geometry and rendering remain unchanged. See [sources, implementation, compatibility limits and verification](docs/document-editing.md).
 
-## v1.17 — Integrated authoring and spacious breakdown entry
+### v1.17 — Integrated authoring and spacious breakdown entry
 
 Edit scene fields and quantities directly in Spoglio, select and create elements inside their categories, and manage the element catalog by category. Scene, banner, day, plan, calendar and constraint controls open in their existing workspaces. Undo/Redo remains available in the top bar.
 
 Set, Synopsis and Comments span the entry panel; Location and Sequence have wider fields than short codes and numbers. Long text expands vertically and the form adapts to narrow split panes and phones. Sheet numbers are displayed in read-only form, preserved on existing scenes and generated automatically for new ones. Studio v2 persistence and the conservative native export contract remain unchanged.
 
 Verified with 147 Node tests and Chromium authoring, responsive, workspace and DOOD/PDF suites, including sheet protection, text expansion, save/reopen and phone authoring.
+
+### v1.18 — Workspace editing and calendar workflow
+
+Unified toolbars, shared overlays with outside-click dismissal, direct scene/banner insertion, automatic End of Day scheduling, fraction/time inputs, separate combination-color editing, red bounded selection markers, Calendar multiselection and double-click navigation, bulk element IDs/category moves, unified calendar editing and selector creation/reordering.
+
+Verified with 155 Node tests and Chromium suites for the new authoring flows, MMSX 3/5/hybrid calendar association and rules, dense calendars, seven responsive viewport sizes, cross-view mouse/touch drag, native round-trips and DOOD/PDF output.

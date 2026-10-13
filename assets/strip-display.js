@@ -1,3 +1,4 @@
+import {formatTime} from './entry-format.js';
 /* Display preferences are independent of the imported document and its report layouts. */
 export const STANDARD_PRESETS={
   compact:{label:'Compatto',fields:['scene','ie','set','dn','pages']},
@@ -45,12 +46,7 @@ export function sceneFieldText(field,scene,{project,group,pages,shortDate,flags=
   if(field.key==='shootDay')return String(group?.shootingDayNumber??'—');
   if(field.key==='shootDate')return group?.date?shortDate(group.date):'—';
   if(field.key==='flags')return flags.length?'⚑ '+flags.map(f=>f.name||'Red Flag').join(', '):'—';
-  if(field.key==='estimate'){
-    const value=scene?.estimateTimeA;
-    if(value==null||value==='')return '—';
-    const minutes=/^\d+$/.test(String(value))?Number(value):null;
-    return minutes==null?String(value):`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
-  }
+  if(field.key==='estimate')return formatTime(scene?.estimateTimeA)||'—';
   return String(scene?.[field.key]??'—')||'—';
 }
 export function fieldsMarkup(fields,scene,helpers,{calendar=false}={}){

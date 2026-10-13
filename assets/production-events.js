@@ -1,11 +1,12 @@
+import {createOverlay} from './overlay-service.js';
 /* One event editor shared by Calendar and DOOD. Full edits persist in Studio documents. */
 import {DOOD_EVENT_TYPES} from './dood-engine.js';
 import {validDate} from './production-data.js';
 import {escapeHtml as e} from './dood-print.js';
 export function createEventManager({getContext,onChange}){
-  const dialog=document.createElement('dialog');dialog.id='productionEventDialog';dialog.className='production-event-dialog';document.body.append(dialog);
+  const dialog=createOverlay('productionEventDialog',{className:'production-event-dialog'}).dialog;
   let context,editing=null,dirty=false;
-  const discard=()=>!dirty||window.confirm('Ci sono modifiche non applicate. Scartarle?');
+  const discard=()=>true;
   dialog.addEventListener('input',()=>{dirty=true});dialog.addEventListener('cancel',event=>{if(!discard())event.preventDefault()});
   function draw(){
     const events=context.project.events.filter(ev=>ev.calendarId===context.calendar?.id),selected=events.find(ev=>ev.id===editing);
