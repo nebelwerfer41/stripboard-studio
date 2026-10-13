@@ -12,7 +12,7 @@ Il selettore calendario contiene **Nuovo calendario**, **Modifica calendario** e
 
 Calendar offre mese precedente/successivo, mese diretto, Vai alla data, Inizio riprese, impostazioni, multiselezione ed eventi. Le checkbox permettono di selezionare più strip; restano disponibili modificatori della tastiera e long press. Doppio clic su una strip apre Stripboard con quella strip selezionata e visibile. Drag, F2, Annulla/Ripeti e trasferimenti fra viste usano la stessa selezione/history. Le celle crescono con il contenuto, senza scroll interno; telefoni usano un’agenda compatta con Mostra mese.
 
-**Visualizzazione** riunisce layout, campi, categorie, visibilità e stampa; le preferenze Stripboard e Calendar sono indipendenti. **Colori strip** è un overlay separato con INT/EXT × D/N e colori speciali. Le preferenze visuali non modificano il documento. Pagine in frazioni di ottavi, tempo stimato HH:MM e tempo schermo MM:SS valgono in Spoglio e nelle viste. Sheet è di sola lettura e automatico.
+**Visualizzazione Stripboard** e **Visualizzazione calendario** aprono finestre separate per layout, campi, categorie e visibilità. Le opzioni header/bianco e nero sono nell’anteprima di stampa dalla v1.19. **Colori strip** è un overlay separato con INT/EXT × D/N e colori speciali. Le preferenze visuali non modificano il documento. Pagine in frazioni di ottavi, tempo stimato HH:MM e tempo schermo MM:SS valgono in Spoglio e nelle viste. Sheet è di sola lettura e automatico.
 
 Gli affiancamenti sono nella barra principale, disponibili oltre 1200 CSS px, con ciascun pannello fra il 25 e il 75% della larghezza. A dimensioni minori rimane una vista intera, con accesso diretto a Spoglio. Il cambio di layout conserva il contesto.
 

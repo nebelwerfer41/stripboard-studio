@@ -28,8 +28,7 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-responsive-qa';
     const selectedLabel=await firstScene.getAttribute('aria-label');
     await page.locator('#displaySettingsButton').click();
     assert(await firstScene.evaluate(el=>el.classList.contains('strip-selected')));
-    await page.locator('#blackWhite').check();assert(await page.locator('#boardView').evaluate(el=>el.classList.contains('is-monochrome')));
-    await page.locator('#blackWhite').uncheck();await page.locator('#displayDialog [data-overlay-close]').click();
+    assert.equal(await page.locator('#displayDialog #blackWhite,#displayDialog #printHeader').count(),0);await page.locator('#displayDialog [data-overlay-close]').click();
     await page.locator('#breakdownNav').click();assert.match(await page.locator('#breakdownPreview h3').innerText(),new RegExp(selectedLabel));
     await checkSingleView();
     const current=await page.locator('#breakdownSceneSelect').inputValue();
@@ -38,13 +37,9 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-responsive-qa';
     await page.locator('#closeBreakdown').click();assert.equal(await page.locator('#boardNav').getAttribute('aria-current'),'page');
     await page.screenshot({path:path.join(output,'desktop-stripboard.png')});
     await page.locator('#redFlagNav').click();
-    const allFlags=await page.locator('#redFlagView [data-flag-id]').count();assert(allFlags>0);
-    await page.locator('#rfFrom').fill('2030-01-01');await page.locator('#rfFrom').dispatchEvent('change');
-    assert.equal(await page.locator('#redFlagView [data-flag-id]').count(),0);
-    await page.locator('#rfClearDates').click();assert.equal(await page.locator('#redFlagView [data-flag-id]').count(),allFlags);
-    await page.locator('#rfCategory').selectOption('__general__');
-    assert.equal(await page.locator('#redFlagView tr[data-flag-id] td:nth-child(2)').evaluateAll(els=>els.every(el=>el.textContent==='—')),true);
-    await page.locator('#rfCategory').selectOption('');await page.locator('#boardNav').click();
+    const allFlags=await page.locator('#redFlagView [data-flag-record]').count();assert(allFlags>0);
+    await page.locator('[data-flag-filter]').selectOption('selected');assert.equal(await page.locator('#redFlagView [data-flag-record]').count(),0);
+    await page.locator('[data-flag-filter]').selectOption('all');assert.equal(await page.locator('#redFlagView [data-flag-record]').count(),allFlags);await page.locator('#boardNav').click();
 
     for(const layout of ['board-breakdown','calendar-breakdown','calendar-board']){
       await page.locator('#workspaceLayout').selectOption(layout);

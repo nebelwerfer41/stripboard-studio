@@ -1,3 +1,5 @@
+> **v1.19:** l’editor Elementi espone le regole DOOD nella propria scheda, con la stessa configurazione del report. Le nuove Red Flags con tipo riconosciuto Unavailable/Travel/Fitting/Rehearsal alimentano gli eventi DOOD; i valori proprietari non riconosciuti restano conservati. L’anteprima di stampa aggiunge scala automatica/manuale per il piano. Vedi [editing corrente](document-editing.md).
+
 > **Editing completo:** le successive funzioni di creazione/modifica e il contenitore Studio v2 sono descritti in [document-editing.md](document-editing.md). Le limitazioni delle fasi precedenti riportate sotto sono storiche.
 
 # Day Out of Days — analisi e contratto

@@ -53,14 +53,22 @@ export function paginateDood(report,settings={}){
   return {...geometry,fontSize,dateWidth,nameWidth,identityWidth,rowHeight,headerHeight,tableHeaderHeight,footerHeight,density,pages:pages.map((p,i)=>({...p,number:i+1,total:pages.length}))};
 }
 export function paginateSchedule(items,settings={}){
-  const g=printGeometry(settings),available=g.contentHeight-17,pages=[];let current=[],used=0;
+  let g=printGeometry(settings);const headerHeight=settings.includeHeader===false?0:10,footerHeight=7;
+  if(settings.scaleMode==='auto'&&items.length){
+    const widest=Math.max(...items.map(item=>item.width));
+    if(!Number.isFinite(widest)||widest<=0)throw Error('Dimensioni strip non valide');
+    const tallest=Math.max(...items.map(item=>item.height));
+    const scale=Math.min((g.width-2*g.settings.margin)/widest,(g.height-2*g.settings.margin)/(tallest+headerHeight+footerHeight));
+    g={...g,settings:{...g.settings,scale},contentWidth:(g.width-2*g.settings.margin)/scale,contentHeight:(g.height-2*g.settings.margin)/scale};
+  }
+  const available=g.contentHeight-headerHeight-footerHeight,pages=[];let current=[],used=0;
   for(const item of items){
     if(!Number.isFinite(item.height)||!Number.isFinite(item.width)||item.height<=0||item.width<=0)throw Error('Dimensioni strip non valide');
-    const fit=Math.min(1,g.contentWidth/item.width,available/item.height),height=item.height*fit;
-    if(height>available)throw Error('Strip più alta della pagina');
+    const fit=settings.scaleMode?1:Math.min(1,g.contentWidth/item.width,available/item.height),height=item.height*fit;
+    if(height>available+.000001)throw Error('Strip più alta della pagina: riduci la scala o scegli un formato più grande');
     if(used+height>available&&current.length){pages.push({kind:'schedule',items:current});current=[];used=0}
     current.push({...item,fit,height});used+=height;
   }
   if(current.length||!pages.length)pages.push({kind:'schedule',items:current});
-  return {...g,pages:pages.map((p,i)=>({...p,number:i+1,total:pages.length}))};
+  return {...g,headerHeight,footerHeight,pages:pages.map((p,i)=>({...p,number:i+1,total:pages.length}))};
 }

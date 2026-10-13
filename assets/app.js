@@ -17,13 +17,16 @@ import {calculateDood,doodElements,sortDoodRows,doodSummaryCsv,effectiveDoodRule
 import {doodMarkup} from './dood-view.js';
 import {ensureStudio,snapshotStudio,restoreStudio,setDoodRules,serializeStudio,parseStudio} from './studio-project.js';
 import {createPrintService} from './print-service.js';
+import {createCatalogEditor} from './catalog-editor.js';
+import {redFlagMarkup,registeredFlagTypes,addElementFlags,deleteFlags,flagCsv} from './red-flag-workspace.js';
+import {elementOptions} from './element-management.js';
 import {createDocumentEditor} from './document-editor.js';
 import {sceneEditingMarkup,elementCatalogMarkup,createIntegratedEditing,fitSceneTextareas} from './integrated-editing.js';
 import {snapshotDocument,restoreDocument,refreshDocument,validateDocument,createPlan} from './document-model.js';
 import {createOverlay,installOverlayDismissal} from './overlay-service.js';
 import {createStripColorEditor,resolveStripColors} from './strip-colors.js';
 import {createCalendarEditor} from './calendar-editor.js';
-import {insertScene,insertBanner,insertEndOfDay,assignPlanCalendar,reschedulePlan,bulkElementIds,moveElementsToCategory,reorderCollection} from './workspace-commands.js';
+import {insertScene,insertBanner,insertEndOfDay,assignPlanCalendar,reschedulePlan,bulkElementIds,moveElementsToCategory,reorderCollection,duplicateStrips,deleteStrips,stripDeletionSummary} from './workspace-commands.js';
 import {formatTime,formatPages,parseTime} from './entry-format.js';
 import {createEventManager} from './production-events.js';
 const $ = id => document.getElementById(id);
@@ -37,6 +40,7 @@ const state = {project:null, mode:'board', board:null, calendar:null, calendarMo
   boneyardVisible:false,calendarMultiSelect:false,dataQuery:'',dataSelectedElements:new Set(),dataSort:{key:'boardId',direction:1},selectedStripIds:new Set(),selectionAnchorId:null,activeStripId:null,draggedStripIds:new Set(),touchMultiSelect:false};
 const freshDoodUI=()=>({category:'',ruleElement:'',sort:[{key:'id',direction:'asc'}],hideUnused:false,hideOff:false,compact:true,selected:null,rulesOpen:false,goDate:null});
 state.dood=freshDoodUI();
+const freshFlags=()=>({category:null,elements:new Set(),dates:new Set(),selected:new Set(),type:null,note:'',month:null,anchor:null,filter:'all',sort:{key:'start',direction:1}});state.flags=freshFlags();
 const SCREEN_PX_PER_INCH=76;
 const collator = new Intl.Collator('it',{numeric:true,sensitivity:'base'});
 const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Senza data';
@@ -126,6 +130,7 @@ function applyDocumentCommand(command,{preserveView=null}={}){
 }
 const documentEditor=createDocumentEditor({getContext:()=>({project:state.project,boardName:state.board}),onChange:applyDocumentCommand,onCreate:project=>{setProject(project);state.projectChoice='new';markDocumentEdited(state);updateDocumentStatus();setMode('data')},onRefresh:()=>render(),onSaved:(kind,record)=>{if(kind==='plan'&&record){state.board=record.name;state.calendar=record.calendarId;rebuildDocumentIndexes();clearStripSelection();setMode('board')}}});
 $('newDocumentButton').addEventListener('click',()=>{if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Creare un nuovo progetto?'))return;document.querySelector('.project-heading').open=false;documentEditor.newDocument()});
+const catalogEditor=createCatalogEditor({getContext:()=>({project:state.project,boardName:state.board}),onChange:applyDocumentCommand,onRefresh:()=>render(),onError:showStatus});
 const integratedEditing=createIntegratedEditing({getProject:()=>state.project,onChange:applyDocumentCommand,onError:showStatus});
 installOverlayDismissal();
 const colorEditor=createStripColorEditor({getProject:()=>state.project,onChange:applyDocumentCommand});
@@ -133,26 +138,34 @@ const calendarEditor=createCalendarEditor({getContext:()=>({project:state.projec
 const displayOverlay=createOverlay('displayDialog',{className:'display-settings-overlay'}),boardOptions=document.querySelector('#displayOptions .options-row');
 const collectionOverlay=createOverlay('collectionOrderDialog');
 const bulkOverlay=createOverlay('elementBulkDialog');
+const deleteOverlay=createOverlay('stripDeleteDialog'),flagDeleteOverlay=createOverlay('flagDeleteDialog');
+function confirmStripDeletion(){
+  const boardName=state.board,keys=[...state.selectedStripIds],summary=stripDeletionSummary(state.project,boardName,keys);if(!keys.length)return;
+  const scenes=state.project.scenes.filter(scene=>summary.sceneIds.includes(scene.bdsId));
+  deleteOverlay.open('Elimina strip e schede di spoglio',`<form><p>${summary.sceneCount?`${summary.sceneCount===1?'Verrà eliminata':'Verranno eliminate'} <strong>${summary.sceneCount} ${summary.sceneCount===1?'scheda':'schede'} di spoglio</strong> e tutte le <strong>${summary.occurrenceCount} occorrenze</strong> da ${summary.planCount} ${summary.planCount===1?'piano':'piani'}, incluso il Boneyard.`:''}${summary.specialCount?` Verranno eliminate anche ${summary.specialCount} strip banner / fine giornata selezionate.`:''}</p>${scenes.length?`<ul>${scenes.map(scene=>`<li>Scena ${safe(scene.scene||'senza numero')} · Sheet ${safe(scene.sheetNumber)} · ${safe(scene.set||scene.synopsis||'')}</li>`).join('')}</ul>`:''}<p>Confermi l’eliminazione? Puoi recuperare i dati con Annulla nella barra principale.</p><p data-delete-error role="alert"></p><div class="dialog-actions"><button type="button" data-delete-cancel>Annulla</button><button type="submit" data-delete-confirm>Elimina da tutti i piani</button></div></form>`);
+  deleteOverlay.dialog.querySelector('[data-delete-cancel]').onclick=()=>deleteOverlay.close();
+  deleteOverlay.dialog.querySelector('form').onsubmit=event=>{event.preventDefault();try{applyDocumentCommand(()=>deleteStrips(state.project,boardName,keys));clearStripSelection();if(!state.sceneMap.has(state.activeSceneId))state.activeSceneId=state.project.scenes[0]?.id||null;deleteOverlay.close();render();showStatus('Schede e strip eliminate da tutti i piani. Annulla ripristina l’operazione.')}catch(error){deleteOverlay.dialog.querySelector('[data-delete-error]').textContent=error.message}};
+}
 function openDisplaySettings(target=state.mode){
   if(displayOverlay.dialog.contains(boardOptions))$('displayOptions').append(boardOptions);
   const calendar=target==='calendar',report=target==='report';
-  displayOverlay.open('Visualizzazione',`<div class="display-targets">${!report?'<button type="button" data-display-target="board">Stripboard</button><button type="button" data-display-target="calendar">Calendario</button>':''}</div><div data-display-content></div>`);
+  displayOverlay.open(calendar?'Visualizzazione calendario':report?'Visualizzazione report':'Visualizzazione Stripboard',`<div class="display-targets"></div><div data-display-content></div>`);
   const host=displayOverlay.dialog.querySelector('[data-display-content]');
   if(calendar){
     host.innerHTML=`<fieldset><legend>Formato delle strip</legend><label>Layout<select id="calendarStripPreset">${Object.entries(STANDARD_PRESETS).map(([id,p])=>`<option value="${id}" ${state.calendarPreset===id?'selected':''}>${safe(p.label)}</option>`).join('')}${state.calendarPreset==='custom'?'<option value="custom" selected>Personalizzato</option>':''}</select></label>${fieldsPickerMarkup(state.project,state.calendarFields||presetFields(state.project,state.calendarPreset,{calendar:true}),{target:'calendar',safe})}</fieldset><fieldset><legend>Contenuti del calendario</legend><div class="calendar-visibility-options">${Object.entries(CALENDAR_VISIBILITY).map(([key,label])=>`<label><input type="checkbox" data-calendar-option="${key}" ${state.calendarVisibility[key]?'checked':''}>${label}</label>`).join('')}</div></fieldset>`;
   }else{
-    host.append(boardOptions);$('layoutControl').hidden=false;$('printOptions').hidden=report;$('reportOptions').hidden=!report;$('visibilityOptions').hidden=false;$('colorSwitch').style.display=report?'none':'';
+    host.append(boardOptions);$('layoutControl').hidden=false;$('reportOptions').hidden=!report;$('visibilityOptions').hidden=false;
     $('layoutSelect').dataset.displayTarget=report?'report':'board';$('layoutLabel').textContent=report?'MODELLO REPORT':'LAYOUT STRIPBOARD';
     if(!report)syncBoardDisplay({force:true});else $('boardFieldPicker').hidden=true;
   }
 }
-displayOverlay.dialog.addEventListener('click',event=>{const button=event.target.closest('[data-display-target]');if(button)openDisplaySettings(button.dataset.displayTarget)});
+displayOverlay.dialog.addEventListener('click',event=>{const button=event.target.closest('button[data-display-target]');if(button)openDisplaySettings(button.dataset.displayTarget)});
 displayOverlay.dialog.addEventListener('change',event=>{
   const t=event.target;if(t.id==='calendarStripPreset'){state.calendarPreset=t.value;state.calendarFields=presetFields(state.project,t.value,{calendar:true});state.calendarExtended=t.value!=='compact';render();openDisplaySettings('calendar')}
   if(t.dataset.calendarOption){state.calendarVisibility[t.dataset.calendarOption]=t.checked;render()}
 });
 displayOverlay.dialog.addEventListener('close',()=>{if(displayOverlay.dialog.contains(boardOptions))$('displayOptions').append(boardOptions)});
-$('displaySettingsButton').addEventListener('click',()=>openDisplaySettings());$('stripColorsButton').addEventListener('click',()=>colorEditor.open());
+$('displaySettingsButton').addEventListener('click',()=>openDisplaySettings(state.mode==='report'?'report':'board'));$('stripColorsButton').addEventListener('click',()=>colorEditor.open());
 function openCollectionOrder(kind){
   const list=kind==='calendar'?selectableCalendars():boardGroups(state.project),order=list.map(r=>r.id);
   function draw(){collectionOverlay.open(kind==='calendar'?'Riordina calendari':'Riordina piani',`<form><div class="collection-order-list">${order.map((id,index)=>`<div><strong>${safe(list.find(r=>r.id===id).name)}</strong><button type="button" data-order-up="${index}" aria-label="Sposta su" ${index===0?'disabled':''}>↑</button><button type="button" data-order-down="${index}" aria-label="Sposta giù" ${index===order.length-1?'disabled':''}>↓</button></div>`).join('')}</div><p data-overlay-error role="alert"></p><div class="dialog-actions"><button type="submit">Salva ordine</button></div></form>`);
@@ -182,6 +195,8 @@ function addBannerAtSelection(){
 }
 function addEndOfDay(){try{const changed=applyDocumentCommand(()=>insertEndOfDay(state.project,{boardName:state.board,key:state.selectionAnchorId}));if(!changed)showStatus('La strip selezionata chiude già una giornata.')}catch(error){showStatus(error.message)}}
 document.addEventListener('click',event=>{
+  if(event.target.closest('[data-duplicate-strips]'))try{let copies;applyDocumentCommand(()=>{copies=duplicateStrips(state.project,state.board,[...state.selectedStripIds]);if(!copies.length)return false});if(copies?.length){state.selectedStripIds=new Set(copies.map(s=>s.sourceKey));state.selectionAnchorId=state.activeStripId=copies[0].sourceKey;state.activeSceneId=copies.find(s=>s.kind==='scene')?.bdsId||state.activeSceneId;render()}}catch(error){showStatus(error.message)}
+  if(event.target.closest('[data-delete-strips]'))confirmStripDeletion();
   if(event.target.closest('[data-insert-scene]'))addSceneAtSelection();
   if(event.target.closest('[data-insert-banner]'))addBannerAtSelection();
   if(event.target.closest('[data-insert-day]'))addEndOfDay();
@@ -194,9 +209,10 @@ document.addEventListener('click',event=>{
 $('dataView').addEventListener('input',event=>{if(event.target.hasAttribute('data-catalog-search'))state.dataQuery=event.target.value});
 $('dataView').addEventListener('change',event=>{
   const t=event.target;if(t.dataset.elementSelect){if(t.checked)state.dataSelectedElements.add(t.dataset.elementSelect);else state.dataSelectedElements.delete(t.dataset.elementSelect);renderProductionViewer()}
-  if(t.hasAttribute('data-elements-select-all')){for(const row of $('dataView').querySelectorAll('[data-catalog-element]:not([hidden])')){if(t.checked)state.dataSelectedElements.add(row.dataset.catalogElement);else state.dataSelectedElements.delete(row.dataset.catalogElement)}renderProductionViewer()}
+  if(t.hasAttribute('data-elements-select-all')){for(const row of [...$('dataView').querySelectorAll('[data-catalog-element]:not([hidden])')].filter(row=>!row.querySelector('[data-element-select]').disabled)){if(t.checked)state.dataSelectedElements.add(row.dataset.catalogElement);else state.dataSelectedElements.delete(row.dataset.catalogElement)}renderProductionViewer()}
 });
 $('calendarView').addEventListener('change',event=>{const key=event.target.dataset.calendarSelection;if(key&&event.target.checked!==state.selectedStripIds.has(key))selectItem(key,{toggle:true,reason:'calendar-checkbox'})});
+$('boardView').addEventListener('dblclick',event=>{const outer=event.target.closest('.strip-outer[data-item-kind=scene]');if(!outer)return;const scene=stripAt(movePositionFrom(outer));if(scene){selectBreakdownScene(scene.bdsId);state.breakdownReturnMode='board';state.layoutChoice='single';state.previewOpen=true;setMode('breakdown')}});
 $('calendarView').addEventListener('dblclick',event=>{
   const strip=event.target.closest('[data-strip-key]');if(!strip)return;const key=strip.dataset.stripKey;
   state.board=strip.dataset.boardName;state.layoutChoice='single';state.previewOpen=false;setMode('board');selectItem(key,{reason:'calendar-jump'});
@@ -223,7 +239,7 @@ async function loadSample(id){
   catch(e){showStatus(e.message);$('projectTitle').textContent=state.project?.title||'Importa un progetto .msd'}
 }
 function setProject(data){
-  documentEditor.reset();
+  documentEditor.reset();catalogEditor.reset();deleteOverlay.close();flagDeleteOverlay.close();state.flags=freshFlags();
   document.querySelector('.project-heading').open=false;
   resetDocumentState(state);
   const isMmsx=data.format==='mmsx';
@@ -241,7 +257,7 @@ function setProject(data){
   Object.assign(state,{flagCalendar:'',flagCategory:'',flagElement:'',flagName:'',flagStart:'',flagEnd:'',flagSelectedId:null});
   state.elementMap=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e]));
   state.categorySettings=new Map((data.categorySettings||[]).map(c=>[c.name,c.attributes]));state.reportOptions.clear();
-  state.boneyardVisible=false;state.calendarMultiSelect=false;state.dataSelectedElements.clear();state.dataQuery='';state.dataSort={key:'boardId',direction:1};state.unscheduled=false;state.segmentVisibility.clear();closeSegmentMenu();state.allReport=false;state.query='';$('search').value='';
+  state.boneyardVisible=false;state.calendarMultiSelect=false;state.dataSelectedElements.clear();state.dataCategoryGroup='custom';state.dataQuery='';state.dataSort={key:'boardId',direction:1};state.unscheduled=false;state.segmentVisibility.clear();closeSegmentMenu();state.allReport=false;state.query='';$('search').value='';
   state.hideBanners=false;state.hideDayBreaks=false;$('hideBanners').checked=false;$('hideDayBreaks').checked=false;
   state.printHeader=selectedBoard()?.attributes?.HideStripBoardHeader!=='1';syncPrintOptions();
   $('projectTitle').textContent=data.title;
@@ -272,8 +288,6 @@ function setMode(mode){
   $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'CALENDAR',breakdown:'SPOGLIO',redflags:'RED FLAG ENTRY',data:'DETTAGLI PROGETTO ED ELEMENTI',dood:'DAY OUT OF DAYS'}[mode];
   $('search').placeholder=mode==='dood'?'Cerca elemento o ID…':mode==='board'?'Cerca scena, set, testo…':'Cerca nei dati del report…';
   $('toggleUnscheduled').style.display=mode==='board'||mode==='calendar'?'':'none';
-  $('colorSwitch').style.display=mode==='board'?'':'none';
-  $('printOptions').hidden=mode!=='board';
   $('reportOptions').hidden=mode!=='report';
   $('visibilityOptions').hidden=mode!=='board'&&mode!=='report';
   $('displayOptions').hidden=true;
@@ -318,7 +332,7 @@ function render(){
   $('previewButton').hidden=true;
   $('boardEditingControls').hidden=!primary;
   $('stripColorsButton').hidden=!primary;
-  $('displaySettingsButton').hidden=!primary&&state.mode!=='report';
+  $('displaySettingsButton').hidden=!boardVisible&&state.mode!=='report';$('displaySettingsButton').textContent=state.mode==='report'?'Visualizzazione report…':'Visualizzazione Stripboard…';
   $('workspaceSplitter').hidden=!split;
   $('workspaceViews').classList.toggle('split',split);
   $('workspaceViews').classList.toggle('calendar-first',split&&state.layoutChoice==='calendar-board');
@@ -335,7 +349,7 @@ function render(){
   $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
   if(state.mode==='breakdown'){$('viewTitle').textContent='Spoglio';$('viewSubtitle').textContent='Scheda scena e fabbisogni di produzione';return}
   if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, schede ed elementi modificabili';if(preservedEditingView!=='dataView')renderProductionViewer();return}
-  if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();$('redFlagView').insertAdjacentHTML('afterbegin','<div class="inline-category-tools"><button type="button" data-edit-document="flag">Modifica Red Flag</button><button type="button" data-edit-document="flag" data-new-record>Nuova Red Flag</button></div>');return}
+  if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();return}
   if(state.mode==='dood'){$('viewTitle').textContent='Day Out of Days';$('viewSubtitle').textContent='Presenze derivate dal piano · regole della Sub-board';renderDood();return}
   if(calendarVisible)renderCalendarViewer();
   if(boardVisible){
@@ -368,7 +382,7 @@ function renderBoardEditingTools(){
   const toolbar=$('boardEditingControls');if(preservedEditingView==='banner')return;
   const key=state.selectedStripIds.has(state.selectionAnchorId)?state.selectionAnchorId:state.activeStripId;
   const strip=entriesForBoard(state.project,state.board).flatMap(e=>e.group.strips).find(s=>s.sourceKey===key),banner=strip?.kind==='banner'?strip:null;
-  toolbar.innerHTML=`<div class="view-editing-actions"><button type="button" data-insert-scene>＋ Scena</button><button type="button" data-insert-banner>＋ Banner</button><button type="button" data-insert-day>＋ Fine giornata</button><button type="button" id="boneyardButton" aria-pressed="${state.boneyardVisible}" ${state.mode==='calendar'?'hidden':''}>Boneyard</button></div>${banner?`<form data-inline-banner="${safe(banner.sourceKey)}"><label>Banner<input name="text" aria-label="Testo banner selezionato" required value="${safe(banner.text)}"></label><label>Font<input name="fontSize" type="number" min="7" max="72" step="any" aria-label="Dimensione font banner" value="${safe(banner.style?.fontSize||12)}"></label><label>Tempo<input name="estimateTimeA" aria-label="Tempo banner HH:MM" placeholder="HH:MM" value="${safe(formatTime(banner.estimateTimeA))}"></label><button type="submit">Applica</button></form>`:''}`;
+  toolbar.innerHTML=`<div class="view-editing-actions"><button type="button" data-insert-scene>＋ Scena</button><button type="button" data-insert-banner>＋ Banner</button><button type="button" data-insert-day>＋ Fine giornata</button><button type="button" data-duplicate-strips ${state.selectedStripIds.size?'':'disabled'}>Duplica</button><button type="button" data-delete-strips ${state.selectedStripIds.size?'':'disabled'}>Elimina</button><button type="button" id="boneyardButton" aria-pressed="${state.boneyardVisible}" ${state.mode==='calendar'?'hidden':''}>Boneyard</button></div>${banner?`<form data-inline-banner="${safe(banner.sourceKey)}"><label>Banner<input name="text" aria-label="Testo banner selezionato" required value="${safe(banner.text)}"></label><label>Font<input name="fontSize" type="number" min="7" max="72" step="any" aria-label="Dimensione font banner" value="${safe(banner.style?.fontSize||12)}"></label><label>Tempo<input name="estimateTimeA" aria-label="Tempo banner HH:MM" placeholder="HH:MM" value="${safe(formatTime(banner.estimateTimeA))}"></label><button type="submit">Applica</button></form>`:''}`;
 }
 document.addEventListener('submit',event=>{
   if(!event.target.matches('[data-inline-banner]'))return;event.preventDefault();
@@ -399,16 +413,15 @@ function formatTemplate(t,ctx){
     return Object.entries(state.project.production).find(([name])=>name.toLowerCase().replace(/[^a-z0-9]/g,'')===key)?.[1]||'';
   });
 }
-function requirementNames(scene,categories){
+function requirementNames(scene,categories,{day=false,forBoard=false}={}){
   if(!scene)return [];
-  if(!categories?.length||categories.some(x=>/all remaining/i.test(x)))return Object.values(scene.requirements||{}).flat();
-  return categories.flatMap(c=>scene.requirements?.[c]||[]);
+  const rows=!categories?.length||categories.some(x=>/all remaining/i.test(x))?Object.entries(scene.requirements||{}):categories.map(c=>[c,scene.requirements?.[c]||[]]);
+  return rows.flatMap(([category,names])=>names.filter(name=>{const options=elementOptions(state.elementMap.get(`${category}\u0000${name}`));return (!day||options.useDailyQuantity)&&(!forBoard||!options.excludeFromBoard)}));
 }
 function contextRequirements(ctx,categories){
-  if(ctx.dayRecord&&ctx.group?.strips?.length){
-    return [...new Set(ctx.group.strips.filter(x=>x.kind==='scene').flatMap(x=>requirementNames(state.sceneMap.get(x.bdsId),categories)))];
-  }
-  return requirementNames(ctx.scene,categories);
+  const forBoard=['board','calendar'].includes(state.mode);
+  if(ctx.dayRecord&&ctx.group?.strips?.length)return [...new Set(ctx.group.strips.filter(x=>x.kind==='scene').flatMap(x=>requirementNames(state.sceneMap.get(x.bdsId),categories,{day:true,forBoard})))];
+  return requirementNames(ctx.scene,categories,{forBoard});
 }
 function contextCategories(ctx){
   const categories=ctx.dayRecord&&ctx.group?.strips?.length?[...new Set(ctx.group.strips.filter(x=>x.kind==='scene').flatMap(x=>Object.keys(state.sceneMap.get(x.bdsId)?.requirements||{})))]:Object.keys(ctx.scene?.requirements||{});
@@ -416,7 +429,7 @@ function contextCategories(ctx){
 }
 function contextElements(ctx,category){
   const elements=contextRequirements(ctx,[category]).map(name=>state.elementMap.get(`${category}\u0000${name}`)||{category,name,boardId:''});
-  return sortCategoryElements(elements,state.categorySettings.get(category));
+  return sortCategoryElements(['board','calendar'].includes(state.mode)?elements.filter(el=>!elementOptions(el).excludeFromBoard):elements,state.categorySettings.get(category));
 }
 function elementDays(element,board){
   if(!element||!board)return [];
@@ -733,7 +746,7 @@ function makeItemInteractive(outer,label){
 function renderBoard(board,layout){
   syncSegmentControls();
   const view=$('boardView');view.replaceChildren();view.style.setProperty('--live-board-zoom','1');const q=state.query.trim().toLocaleLowerCase();
-  view.classList.toggle('is-monochrome',!state.showColors);$('blackWhite').checked=!state.showColors;
+  view.classList.toggle('is-monochrome',!state.showColors);
   $('undoMoveButton').disabled=!state.orderHistory.length;
   $('redoMoveButton').disabled=!state.redoHistory.length;
   const vertical=layout.orientation==='VERTICAL';
@@ -983,7 +996,6 @@ function historyStep(from,to){
 function undoBoardMove(){historyStep(state.orderHistory,state.redoHistory)}
 function redoBoardMove(){historyStep(state.redoHistory,state.orderHistory)}
 function syncPrintOptions(){
-  $('printHeader').checked=state.printHeader;
   document.body.classList.toggle('print-with-header',state.printHeader);
 }
 function reportRecords(board,layout){
@@ -1119,6 +1131,7 @@ function dateRange(item){
 function table(headers,rows){return `<div class="flag-table-wrap"><table class="flag-table"><thead><tr>${headers.map(h=>`<th>${safe(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(value=>`<td>${safe(value)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${headers.length}">Nessun dato presente.</td></tr>`}</tbody></table></div>`}
 function valueText(value){return value?.text??(value==null?'—':typeof value==='object'?JSON.stringify(value):String(value))}
 document.addEventListener('click',event=>{
+  const group=event.target.closest('[data-category-group]');if(group){state.dataCategoryGroup=group.dataset.categoryGroup;state.dataCategory=null;state.dataQuery='';state.dataSelectedElements.clear();renderProductionViewer();return}
   const category=event.target.closest('[data-catalog-category]');if(category){state.dataCategory=category.dataset.catalogCategory;state.dataQuery='';state.dataSelectedElements.clear();renderProductionViewer();return}
   const button=event.target.closest('[data-edit-document],[data-inline-new]');if(!button)return;
   const kind=button.dataset.editDocument||button.dataset.inlineNew;
@@ -1128,6 +1141,7 @@ document.addEventListener('click',event=>{
   if(kind==='day'){addEndOfDay();return}
   const id=button.dataset.recordId??(button.hasAttribute('data-new-record')||button.dataset.inlineNew?'':kind==='scene'?(state.mode==='data'?state.dataScene:state.activeSceneId):kind==='element'?state.dataElement:kind==='calendar'?state.calendar:kind==='flag'?state.flagSelectedId:undefined);
   if(kind==='scene'&&id){selectBreakdownScene(id);setMode('breakdown');return}
+  if(['element','category'].includes(kind)){catalogEditor.open(kind,id??undefined,{categoryName:button.dataset.category});return}
   documentEditor.open(kind,id??undefined);
   if(button.dataset.category){const select=$('documentEditor').querySelector('[name=category]');if(select)select.value=button.dataset.category}
 });
@@ -1164,39 +1178,7 @@ function flagMatches(flag,{includeDate=true}={}){
   if(state.flagName&&flag.name!==state.flagName)return false;
   return !includeDate||intervalOverlaps(flag,state.flagStart,state.flagEnd);
 }
-function renderRedFlagViewer(){
-  const view=$('redFlagView'),project=state.project,month=state.flagMonth||new Date().toISOString().slice(0,7);
-  const categories=[...new Set([...project.elements.map(item=>item.category),...project.redFlags.map(flag=>flag.target.category)].filter(Boolean))].sort(collator.compare);
-  const elements=state.flagCategory&&state.flagCategory!=='__general__'?project.elements.filter(item=>item.category===state.flagCategory).sort((a,b)=>collator.compare(a.name,b.name)):[];
-  const names=[...new Set([...project.redFlagNames.map(item=>item.name),...project.redFlags.map(flag=>flag.name)])].filter(Boolean);
-  const filtered=project.redFlags.filter(flag=>flagMatches(flag)).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.sourceOrder-b.sourceOrder);
-  if(!filtered.some(flag=>flag.id===state.flagSelectedId))state.flagSelectedId=filtered[0]?.id||null;
-  const selected=filtered.find(flag=>flag.id===state.flagSelectedId);
-  const categoryOptions=categories.map(name=>`<option value="${safe(name)}" ${state.flagCategory===name?'selected':''}>${safe(name)}</option>`).join('');
-  const elementOptions=elements.map(element=>`<option value="${safe(element.id)}" ${state.flagElement===element.id?'selected':''}>${safe(element.name)}</option>`).join('');
-  const typeOptions=names.map(name=>`<option value="${safe(name)}" ${state.flagName===name?'selected':''}>${safe(name)}</option>`).join('');
-  const calendarOptions=project.calendars.map(item=>`<option value="${safe(item.id)}" ${state.flagCalendar===item.id?'selected':''}>${safe(item.name)}</option>`).join('');
-  const context=findCalendar(project,state.flagCalendar);
-  const grid=monthGrid(month,state.flagStart&&state.flagStart===state.flagEnd?state.flagStart:null,iso=>{
-    const flags=project.redFlags.filter(flag=>intervalContains(flag,iso)&&flagMatches(flag,{includeDate:false}));
-    const day=context?calendarDate(context,iso):null;
-    const outside=context&&outsideCalendarActivity(context,iso);
-    return {className:`${day?.working===false?'nonworking':''} ${flags.length?'has-flags':''} ${outside?'outside-activity':''}`,
-      meta:flags.length?`⚑ ${flags.length}`:'',title:`${fmtDate(iso)} · ${flags.length} Red Flag${day?` · ${specialLabel(day)}`:''}${outside?' · Fuori dal periodo di attività':''}`};
-  });
-  const rows=filtered.map(flag=>`<tr class="${flag.id===selected?.id?'selected':''}" data-flag-id="${safe(flag.id)}" tabindex="0" aria-selected="${flag.id===selected?.id}">
-    <td>${safe(dateRange(flag))}</td><td>${safe(flag.target.category||'—')}</td><td>${safe(flag.target.element||'—')}</td><td>${safe(flag.name||'—')}</td><td>${safe(flag.note||'')}</td></tr>`).join('');
-  view.innerHTML=`<div class="viewer-intro"><p>Red Flag Entry elenca le segnalazioni salvate nel file. Gli intervalli comprendono tutti i giorni civili, inclusi i weekend. Questa vista è in sola lettura.</p></div>
-    <div class="flag-filter-layout"><div class="viewer-card"><h3>1 · Elemento</h3><label class="viewer-label" for="rfCategory">Categoria</label><select id="rfCategory"><option value="">Tutte le categorie</option><option value="__general__" ${state.flagCategory==='__general__'?'selected':''}>Generali · senza elemento</option>${categoryOptions}</select>
-      <label class="viewer-label" for="rfElement">Elemento</label><select id="rfElement" ${elements.length?'':'disabled'}><option value="">Tutti gli elementi</option>${elementOptions}</select></div>
-      <div class="viewer-card"><h3>2 · Data o intervallo</h3><div class="month-toolbar"><button type="button" data-flag-month-step="-1" aria-label="Mese precedente">‹</button><strong>${safe(monthLabel(month))}</strong><button type="button" data-flag-month-step="1" aria-label="Mese successivo">›</button><input id="rfMonthInput" type="month" value="${month}" aria-label="Vai al mese"></div>${grid}
-        <div class="date-range"><label>Dal <input id="rfFrom" type="date" value="${safe(state.flagStart)}"></label><label>Al <input id="rfTo" type="date" value="${safe(state.flagEnd)}"></label><button id="rfClearDates" type="button">Azzera</button></div>
-        <label class="viewer-label" for="rfCalendar">Contesto calendario</label><select id="rfCalendar"><option value="">Solo Red Flags</option>${calendarOptions}</select></div>
-      <div class="viewer-card"><h3>3 · Tipo di Red Flag</h3><select id="rfType" size="7" aria-label="Tipo di Red Flag"><option value="" ${!state.flagName?'selected':''}>Tutti i tipi</option>${typeOptions}</select><p class="viewer-hint">I vincoli modificati si salvano nel progetto Studio.</p></div></div>
-    <div class="viewer-card flag-results"><div class="results-heading"><h3>Red Flags nel file</h3><span>${filtered.length} di ${project.redFlags.length} voci</span></div>
-      <div class="flag-table-wrap"><table class="flag-table"><thead><tr><th>Data</th><th>Categoria</th><th>Elemento</th><th>Tipo</th><th>Nota</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="no-results">Nessuna Red Flag per questi filtri.</td></tr>'}</tbody></table></div></div>
-    ${selected?`<div class="viewer-card flag-detail"><div><span class="detail-kicker">RED FLAG SELEZIONATA</span><h3>${safe(selected.name||'Red Flag')}</h3><p>${safe(dateRange(selected))} · ${safe(selected.target.kind==='project'?'Intera giornata':selected.target.kind==='unresolved'?'Riferimento non risolto':`${selected.target.category}: ${selected.target.element}`)}</p></div><div><strong>Nota</strong><p>${safe(selected.note||'Nessuna nota')}</p><small>Tipo originale: ${safe(selected.type||selected.name||'—')} · Colore: ${safe(selected.color||'—')} · ${selected.targetResolved?'Riferimento risolto':'Riferimento non risolto'}${selected.doodStatus!=null?` · DOODStatus: ${safe(selected.doodStatus)}`:''}</small></div></div>`:''}`;
-}
+function renderRedFlagViewer(){$('redFlagView').innerHTML=redFlagMarkup(state.project,state.flags)}
 
 $('projectSelect').addEventListener('change',async e=>{
   const choice=e.target.value;
@@ -1261,7 +1243,7 @@ $('boardView').addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('pointerdown',event=>{
-  if(!scheduleInteractionEnabled()||event.button!==0||stripPointer)return;
+  if(document.querySelector('dialog:modal')||!scheduleInteractionEnabled()||event.button!==0||stripPointer)return;
   const calendar=$('calendarView').contains(event.target)?event.target.closest('[data-strip-key]'):null;
   if(!calendar&&event.target.closest(stripInteractionControls))return;
   const outer=calendar||($('boardView').contains(event.target)?event.target.closest('.strip-outer[data-strip-index]'):null);
@@ -1331,7 +1313,7 @@ document.addEventListener('keydown',event=>{
 });
 $('saveButton').addEventListener('click',async()=>{
   if(!state.project||state.serializationState==='saving')return;
-  if(integratedEditing.hasDraft()||documentEditor.hasDraft()||eventManager.hasDraft()){showStatus('Applica o correggi i campi ancora in modifica prima di salvare.');return}
+  if(integratedEditing.hasDraft()||documentEditor.hasDraft()||catalogEditor.hasDraft()||eventManager.hasDraft()){showStatus('Applica o correggi i campi ancora in modifica prima di salvare.');return}
   const token=beginDocumentSave(state),project=token.project;
   const saveProject={...project,...snapshotDocument(project)};
   updateDocumentStatus();showStatus('');
@@ -1438,31 +1420,31 @@ $('calendarView').addEventListener('change',event=>{
     state.calendarMonthDraft=null;state.calendarMonth=event.target.value;state.calendarDate=`${state.calendarMonth}-01`;render();
   }
 });
-$('redFlagView').addEventListener('click',event=>{
-  const step=event.target.closest('[data-flag-month-step]');
-  if(step){state.flagMonth=monthShift(state.flagMonth,Number(step.dataset.flagMonthStep));render();return}
-  const date=event.target.closest('[data-date]');
-  if(date){state.flagStart=date.dataset.date;state.flagEnd=date.dataset.date;render();return}
-  if(event.target.closest('#rfClearDates')){state.flagStart='';state.flagEnd='';render();return}
-  const row=event.target.closest('[data-flag-id]');
-  if(row){state.flagSelectedId=row.dataset.flagId;render()}
-});
-$('redFlagView').addEventListener('keydown',event=>{
-  if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-flag-id]')){
-    event.preventDefault();state.flagSelectedId=event.target.dataset.flagId;render();
-  }
-});
+$('redFlagView').addEventListener('input',event=>{if(event.target.hasAttribute('data-flag-note'))state.flags.note=event.target.value});
 $('redFlagView').addEventListener('change',event=>{
-  const {id,value}=event.target;
-  if(id==='rfCategory'){state.flagCategory=value;state.flagElement=''}
-  else if(id==='rfElement')state.flagElement=value;
-  else if(id==='rfType')state.flagName=value;
-  else if(id==='rfFrom'){state.flagStart=value;if(value)state.flagMonth=value.slice(0,7)}
-  else if(id==='rfTo'){state.flagEnd=value;if(value)state.flagMonth=value.slice(0,7)}
-  else if(id==='rfCalendar')state.flagCalendar=value;
-  else if(id==='rfMonthInput'&&/^\d{4}-\d{2}$/.test(value))state.flagMonth=value;
-  else return;
-  render();
+ const t=event.target,ui=state.flags;
+ if(t.hasAttribute('data-flag-category')){ui.category=t.value;ui.elements.clear()}
+ else if(t.dataset.flagElement){if(t.checked)ui.elements.add(t.dataset.flagElement);else ui.elements.delete(t.dataset.flagElement)}
+ else if(t.hasAttribute('data-flag-all-elements')){for(const el of state.project.elements.filter(el=>el.category===ui.category)){if(t.checked)ui.elements.add(el.id);else ui.elements.delete(el.id)}}
+ else if(t.dataset.flagSelect){if(t.checked)ui.selected.add(t.dataset.flagSelect);else ui.selected.delete(t.dataset.flagSelect)}
+ else if(t.hasAttribute('data-flag-all-records')){for(const row of $('redFlagView').querySelectorAll('[data-flag-record]')){if(t.checked)ui.selected.add(row.dataset.flagRecord);else ui.selected.delete(row.dataset.flagRecord)}}
+ else if(t.hasAttribute('data-flag-type'))ui.type=t.value;
+ else if(t.hasAttribute('data-flag-filter'))ui.filter=t.value;
+ else if(t.hasAttribute('data-flag-month-input'))ui.month=t.value;
+ else return;renderRedFlagViewer();
+});
+$('redFlagView').addEventListener('click',event=>{
+ const ui=state.flags,t=event.target;
+ const day=t.closest('[data-flag-date]');if(day){const value=day.dataset.flagDate;if(event.shiftKey&&ui.anchor){let [start,end]=[value,ui.anchor].sort();for(let n=Date.parse(start+'T00:00:00Z');n<=Date.parse(end+'T00:00:00Z');n+=86400000)ui.dates.add(new Date(n).toISOString().slice(0,10))}else if(ui.dates.has(value))ui.dates.delete(value);else ui.dates.add(value);ui.anchor=value;renderRedFlagViewer();return}
+ const month=t.closest('[data-flag-month]');if(month){ui.month=monthShift(ui.month,Number(month.dataset.flagMonth));renderRedFlagViewer();return}
+ if(t.closest('[data-flag-clear-elements]')){ui.elements.clear();renderRedFlagViewer()}
+ if(t.closest('[data-flag-clear-dates]')){ui.dates.clear();ui.anchor=null;renderRedFlagViewer()}
+ const sort=t.closest('[data-flag-sort]');if(sort){ui.sort={key:sort.dataset.flagSort,direction:ui.sort.key===sort.dataset.flagSort?-ui.sort.direction:1};renderRedFlagViewer()}
+ if(t.closest('[data-flag-add]'))try{applyDocumentCommand(()=>addElementFlags(state.project,{elementIds:[...ui.elements],dates:[...ui.dates],type:registeredFlagTypes(state.project).find(type=>type.id===ui.type),note:ui.note,general:ui.category==='__general__'}));}catch(error){$('redFlagView').querySelector('[data-flag-error]').textContent=error.message}
+ if(t.closest('[data-flag-delete]')){
+  const ids=new Set(ui.selected);flagDeleteOverlay.open('Elimina Red Flags',`<form><p>Eliminare le ${ids.size} Red Flags selezionate?</p><p data-delete-error role="alert"></p><div class="dialog-actions"><button type="button" data-delete-cancel>Annulla</button><button type="submit" data-flag-delete-confirm>Elimina</button></div></form>`);flagDeleteOverlay.dialog.querySelector('[data-delete-cancel]').onclick=()=>flagDeleteOverlay.close();flagDeleteOverlay.dialog.querySelector('form').onsubmit=event=>{event.preventDefault();try{applyDocumentCommand(()=>deleteFlags(state.project,ids));ui.selected.clear();flagDeleteOverlay.close();renderRedFlagViewer()}catch(error){flagDeleteOverlay.dialog.querySelector('[data-delete-error]').textContent=error.message}};
+ }
+ if(t.closest('[data-flag-export]')){const url=URL.createObjectURL(new Blob([flagCsv(state.project,ui.filter==='selected'?new Set(state.project.redFlags.filter(f=>ui.elements.has(f.target.elementId)).map(f=>f.id)):null)],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='red-flags.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 });
 $('search').addEventListener('input',e=>{clearStripSelection();state.query=e.target.value;render()});
 $('toggleUnscheduled').addEventListener('click',()=>{
@@ -1478,10 +1460,8 @@ document.addEventListener('click',event=>{
   if(!event.target.closest('.display-options'))$('displayOptions').open=false;
   if(!event.target.closest('.project-heading'))document.querySelector('.project-heading').open=false;
 });
-$('blackWhite').addEventListener('change',e=>{state.showColors=!e.target.checked;render()});
 $('hideBanners').addEventListener('change',e=>{state.hideBanners=e.target.checked;render()});
 $('hideDayBreaks').addEventListener('change',e=>{state.hideDayBreaks=e.target.checked;render()});
-$('printHeader').addEventListener('change',e=>{state.printHeader=e.target.checked;syncPrintOptions()});
 $('reportSeparateRecords').addEventListener('change',e=>{
   state.reportOptions.set(state.layout,{...state.reportOptions.get(state.layout),SeparateRecordsWithALine:e.target.checked});render();
 });
@@ -1525,8 +1505,10 @@ function selectBreakdownScene(id){
   if(!id||!state.sceneMap.has(id))return;
   state.activeSceneId=state.sceneMap.get(id).id;
   state.activeStripId=displayedEntries().flatMap(e=>e.group.strips).find(s=>s.kind==='scene'&&s.bdsId===id)?.sourceKey||null;
-  renderBreakdown();
-  syncStripSelection();
+  state.selectedStripIds=new Set(state.activeStripId?[state.activeStripId]:[]);state.selectionAnchorId=state.activeStripId;
+  renderBreakdown();syncStripSelection();if(['board','calendar'].includes(state.mode))renderBoardEditingTools();
+  [...$('boardView').querySelectorAll('.strip-outer')].find(el=>itemKey(el)===state.activeStripId)?.scrollIntoView({block:'nearest',inline:'nearest'});
+  if(!$('calendarView').hidden)renderCalendarViewer();
 }
 $('breakdownPreview').addEventListener('change',event=>{
 
@@ -1626,13 +1608,13 @@ $('doodView').addEventListener('change',event=>{
 });
 const eventManager=createEventManager({getContext:()=>({project:state.project,board:state.mode==='calendar'?(selectedBoard().calendarId===state.calendar?selectedBoard():state.project.boards.find(b=>b.calendarId===state.calendar)||selectedBoard()):selectedBoard(),calendar:state.mode==='calendar'?editingCalendar():findCalendar(state.project,selectedBoard().calendarId),date:state.mode==='dood'?state.dood.goDate||state.doodReport.dates[0]?.date:state.calendarDate}),onChange:(command,{native=false}={})=>{if(native||state.project.documentEditing)return applyDocumentCommand(()=>{ensureStudio(state.project);command()});return applyStudioCommand(()=>{ensureStudio(state.project);command()})}});
 const printService=createPrintService({
-  getSource(){
+  getSource(settings={}){
     const metadata={title:state.project.title,boardName:selectedBoardGroup().name,date:new Date().toLocaleDateString('it-IT',{timeZone:'Europe/Rome'}),version:`${state.project.fileName} · revisione ${state.revision}`};
     if(state.mode==='dood')return {kind:'dood',report:currentDoodReport(),metadata};
     const standard=selectedBoardLayout().standard;
     const items=[...$('boardView').querySelectorAll('.strip-outer')].map(outer=>{
       const clone=outer.cloneNode(true),strip=clone.querySelector('.strip-layout'),original=outer.querySelector('.strip-layout');
-      clone.classList.remove('strip-selected');clone.querySelector('.strip-mobile-summary')?.remove();
+      clone.classList.remove('strip-selected','strip-active');for(const el of [clone,...clone.querySelectorAll('*')]){for(const attr of [...el.attributes])if(attr.name.startsWith('data-')||['tabindex','aria-pressed','aria-keyshortcuts','draggable','role'].includes(attr.name))el.removeAttribute(attr.name)}clone.querySelector('.strip-mobile-summary')?.remove();
       // Source geometry remains available when phone summaries hide the original strip.
       const width=!standard&&original?.style.width.endsWith('px')?parseFloat(original.style.width):outer.offsetWidth;
       const height=!standard&&original?.style.height.endsWith('px')?parseFloat(original.style.height):outer.offsetHeight;
@@ -1640,15 +1622,16 @@ const printService=createPrintService({
       if(strip){strip.style.width=width+'px';strip.style.height=height+'px';strip.style.display=standard?'flex':'block'}
       return {width:width*25.4/96,height:height*25.4/96,html:clone.outerHTML};
     });
-    if(state.printHeader){
+    const includeHeader=settings.includeHeader??state.printHeader;
+    if(includeHeader){
       const heading=$('boardView').querySelector('.print-heading').cloneNode(true),width=Math.max(1,...items.map(i=>i.width))*96/25.4;
       if(heading.firstChild?.nodeType===Node.TEXT_NODE)heading.firstChild.remove();
       heading.style.cssText=`display:block;position:fixed;visibility:hidden;width:${width}px;left:-10000px`;
       document.body.append(heading);const height=heading.offsetHeight;heading.remove();heading.style.cssText=`display:block;width:${width}px`;
       if(height)items.unshift({width:width*25.4/96,height:height*25.4/96,html:heading.outerHTML});
     }
-    return {kind:'schedule',metadata,includeHeader:state.printHeader,monochrome:!state.showColors,items};
-  },getSettings:()=>state.project.studio?.print||{},onSettings:settings=>applyStudioCommand(()=>{ensureStudio(state.project).print={...settings}})
+    return {kind:'schedule',metadata,includeHeader,monochrome:settings.monochrome??false,items};
+  },getSettings:()=>({includeHeader:state.printHeader,...state.project.studio?.print}),onSettings:settings=>applyStudioCommand(()=>{ensureStudio(state.project).print={...settings}})
 });
 
 loadSample('wonderful');

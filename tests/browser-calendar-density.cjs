@@ -19,7 +19,7 @@ const base=process.env.STUDIO_URL||'http://127.0.0.1:8766';
   assert.equal(await page.locator('.operational-grid .calendar-strip-pages').first().innerText(),process.env.LONG_DAY_MMSX?'1':'5/8');
   if(process.env.LONG_DAY_MMSX){const long=compact.find(m=>m.count===40);assert(long);assert(long.height>310)}
   await page.locator('.operational-grid .calendar-strip').first().click();const key=await page.locator('.operational-grid .calendar-strip.active').first().getAttribute('data-scene-strip');
-  await page.locator('#displaySettingsButton').click();await page.locator('#calendarStripPreset').selectOption('detailed');
+  await page.locator('[data-calendar-display]').click();await page.locator('#calendarStripPreset').selectOption('detailed');
   assert(await page.locator('.operational-grid .mini-synopsis').count()>0);const extended=await checkFullCells();
   const busiest=compact.reduce((best,m,i)=>m.count>compact[best].count?i:best,0);assert(extended[busiest].height>compact[busiest].height);
   assert.equal(await page.locator('.operational-grid .calendar-strip.active').first().getAttribute('data-scene-strip'),key);assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');

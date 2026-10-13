@@ -32,7 +32,7 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-drag-qa';
   assert.equal(await page.locator('.standard-strip [data-strip-field="pages"]').count(),0);
   await page.screenshot({path:path.join(output,'standard-production.png')});
   await page.locator('#displayDialog [data-overlay-close]').click();await page.locator('#calendarNav').click();
-  await page.locator('#displaySettingsButton').click();await page.locator('#calendarStripPreset').selectOption('production');
+  await page.locator('[data-calendar-display]').click();await page.locator('#calendarStripPreset').selectOption('production');
   await page.locator('#displayDialog [data-strip-field-option="location"]').check();
   await page.locator('#displayDialog [data-strip-field-option="pages"]').uncheck();
   assert.equal(await page.locator('#calendarStripPreset').inputValue(),'custom');

@@ -32,7 +32,8 @@ export function normalizeRules(value={}){
 }
 export function effectiveDoodRules(project,board,element){
   const config=project.studio?.dood?.[doodBoardKey(board)]||{};
-  return normalizeRules({...config.categories?.[element.category],...config.elements?.[element.id]});
+  const authoring=element.authoring||{},rules=Object.fromEntries(['allowHold','allowDrop','minimumCalendarDays'].filter(k=>Object.hasOwn(authoring,k)).map(k=>[k,authoring[k]]));
+  return normalizeRules({...rules,...config.categories?.[element.category],...config.elements?.[element.id]});
 }
 export function doodEventType(event){
   const type=String(event.type??'').toLowerCase().replace(/[ _-]/g,'');
@@ -83,7 +84,7 @@ export function calculateDood({project,board,calendar,elements=doodElements(proj
       const item=day.scenes.get(scene.id||scene.bdsId)||{scene,stripIds:[]};item.stripIds.push(strip.sourceKey);day.scenes.set(scene.id||scene.bdsId,item);
     }
   }
-  const flagEvents=(project.redFlags||[]).filter(f=>f.type==='unavailable').map(f=>({...f,type:'unavailable',targets:f.target?[f.target]:[],derivedRedFlag:true}));
+  const flagEvents=(project.redFlags||[]).filter(f=>Object.hasOwn(DOOD_EVENT_TYPES,f.type)).map(f=>({...f,type:f.type,targets:f.target?[f.target]:[],derivedRedFlag:true}));
   const scoped=[...events,...flagEvents].filter(e=>inScope(e,board,calendar));
   for(const e of scoped)if(!doodEventType(e))diagnostics.push(`Evento ${e.name||e.id}: tipo DOOD non verificato, escluso dai conteggi`);
   for(const e of scoped)if(doodEventType(e)&&(!validDate(e.startDate)||!validDate(e.endDate)||e.endDate<e.startDate))diagnostics.push(`Evento ${e.name||e.id}: intervallo non valido, escluso`);

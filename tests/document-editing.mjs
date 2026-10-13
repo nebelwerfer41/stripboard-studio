@@ -42,7 +42,7 @@ test('calendar and plan renames retain calendar ID, dates and fixed events',()=>
  editCalendarDetails(p,c.id,{name:'Nuovo calendario',options:{},scheduleDates:{ProductionStartDate:{iso:'2026-10-10',origin:'edited'}}});editPlan(p,b.id,{name:'Piano B',calendarId:c.id,description:'Prova'});assert.equal(b.calendarName,c.name);assert.equal(p.events[0].studioBoardName,'Piano B');assert.equal(p.events[0].startDate,'2026-10-13');assert.equal(b.scheduledGroups[0].date,'2026-10-12');
 });
 test('invalid values fail without partial creation; malformed containers fail before loading',async()=>{
- const p=createDocument('Film');assert.throws(()=>editScene(p,null,{scene:'',pagesEighths:2}),/obbligatorio/);assert.throws(()=>editScene(p,null,{scene:'1',pagesEighths:1.5}),/ottavi/);assert.equal(p.scenes.length,0);
+ const p=createDocument('Film');assert.throws(()=>editScene(p,null,{scene:'',pagesEighths:-1}),/intero/);assert.throws(()=>editScene(p,null,{scene:'1',pagesEighths:1.5}),/ottavi/);assert.equal(p.scenes.length,0);
  assert.throws(()=>editElement(p,null,{name:'Anna',category:'Missing',properties:{}}),/Categoria/);assert.throws(()=>addDay(p,p.boards[0].id,{date:'2026-02-30',shootingDayNumber:1}),/valido/);assert.throws(()=>editCategory(p,null,{name:'Cast'}),/presente/);
  const data=JSON.parse(new TextDecoder().decode(await serializeStudio(p)));data.document.boards[0].unscheduledGroups[0].strips=[{kind:'scene',sourceKey:'lost',bdsId:'missing'}];await assert.rejects(()=>parseStudio(new TextEncoder().encode(JSON.stringify(data))),/senza scena/);
  assert.equal(validateDocument(p),p);

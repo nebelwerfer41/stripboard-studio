@@ -1,3 +1,4 @@
+import {elementOptions} from './element-management.js';
 import {formatTime} from './entry-format.js';
 /* Display preferences are independent of the imported document and its report layouts. */
 export const STANDARD_PRESETS={
@@ -37,7 +38,7 @@ export function standardLayout(preset){
 export function sceneFieldText(field,scene,{project,group,pages,shortDate,flags=[]}){
   if(field.category){
     const elements=new Map((project.elements||[]).filter(e=>e.category===field.category).map(e=>[e.name,e]));
-    return (scene?.requirements?.[field.category]||[]).map(name=>{
+    return (scene?.requirements?.[field.category]||[]).filter(name=>!elementOptions(elements.get(name)).excludeFromBoard).map(name=>{
       const element=elements.get(name);
       return element?.boardId!=null&&element.boardId!==''?`${element.boardId}. ${name}`:name;
     }).join(', ');

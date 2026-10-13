@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const path=require('node:path');
 const base=process.env.STUDIO_URL||'http://127.0.0.1:8766';
-const output=process.env.STUDIO_TEST_OUTPUT||'/private/tmp/stripboard-calendar-qa';
+const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-calendar-qa';
 (async()=>{
  await fs.mkdir(output,{recursive:true});
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||undefined,args:['--no-sandbox']});

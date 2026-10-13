@@ -3,6 +3,7 @@ import {completeProjectModel} from './project-model.js';
 import {standardLayout} from './strip-display.js';
 import {ExactNumber} from './mmsx-codec.js';
 import {validDate} from './production-data.js';
+import {isBuiltinCategory,categoryDefaults,elementOptions} from './element-management.js';
 export const DOCUMENT_KEYS=['title','production','scenes','elements','categorySettings','boards','calendars','events','redFlags','redFlagNames','redFlagSettings','activeBoard','defaultCalendar','studio','documentEditing','stripLayouts','reportLayouts','colors','capabilities'];
 export const SCENE_FIELDS={scene:'Scena',synopsis:'Sinossi',ie:'INT / EXT',dn:'DAY / NIGHT',set:'Set',location:'Location',scriptDay:'Script day',unit:'Unità',sequence:'Sequenza',scriptPageNumbers:'Pagine script',pagesEighths:'Pagine',estimateTimeA:'Tempo stimato',estimateTimeB:'Tempo schermo',comments:'Commenti'};
 const uid=kind=>`studio-${kind}:${crypto.randomUUID()}`;
@@ -39,7 +40,7 @@ export function editScene(p,id,values,refs){
   let s=p.scenes.find(x=>x.id===id);if(id&&!s)throw Error('Scena non trovata');
   if(Object.hasOwn(values,'sheetNumber')&&(!s||values.sheetNumber!==s.sheetNumber))throw Error('Il numero sheet non è modificabile');
   const changedFields=s&&['set','location','ie','dn','scriptDay','unit','sequence'].some(k=>Object.hasOwn(values,k)&&s[k]!==values[k]);
-  const next={pagesEighths:null,...s,...values};next.scene=required(next.scene,'Numero scena');
+  const next={pagesEighths:null,...s,...values};next.scene=String(next.scene??'').trim();
   if(next.pagesEighths!==null&&(!Number.isSafeInteger(next.pagesEighths)||next.pagesEighths<0))throw Error('Gli ottavi devono essere un intero non negativo');
   for(const key of ['estimateTimeA','estimateTimeB'])if(next[key]&&typeof next[key]==='string'&&!/^\d+:[0-5]\d$/.test(next[key])&&!/^\d+$/.test(next[key]))throw Error('Tempo non valido: usa ore:minuti o il valore numerico sorgente');
   if(refs){const seen=new Set();next.elementRefs=refs.map(r=>{const key=r.elementId??JSON.stringify([r.category,r.name]);if(seen.has(key))throw Error('Elemento duplicato');seen.add(key);if(!p.elements.some(e=>e.id===r.elementId)&&!s?.elementRefs.some(old=>old.elementId===r.elementId&&!old.resolved))throw Error('Elemento non trovato');if(r.quantity!==null&&(typeof r.quantity!=='number'||!Number.isFinite(r.quantity)||r.quantity<0)&&JSON.stringify(r.quantity)!==JSON.stringify(s?.elementRefs.find(old=>old.elementId===r.elementId)?.quantity))throw Error('Quantità non valida');const old=s?.elementRefs.find(old=>old.elementId===r.elementId&&(r.elementId!==null||old.category===r.category&&old.name===r.name));return {...r,quantityOrigin:old&&JSON.stringify(old.quantity)===JSON.stringify(r.quantity)?old.quantityOrigin:r.quantity===null?'absent':'stored'}})}
@@ -52,9 +53,13 @@ export function editElement(p,id,values){
   requireRecord(values.properties??{},'Proprietà elemento');
   const el=p.elements.find(e=>e.id===id);if(id&&!el)throw Error('Elemento non trovato');const name=required(values.name,'Nome'),category=required(values.category,'Categoria');
   if(!p.categorySettings.some(c=>c.name===category)&&category!==el?.category)throw Error('Categoria non trovata');
+  if(el&&elementOptions(el).lockId&&values.authoring?.lockId!==false&&String(values.boardId??el.boardId??'')!==String(el.boardId??''))throw Error('Il Board ID è bloccato');
+  if(el&&category!==el.category&&isBuiltinCategory(p.categorySettings.find(c=>c.name===el.category)))throw Error('Gli elementi built-in non possono cambiare categoria');
   if(p.elements.some(e=>e!==el&&e.name===name&&e.category===category))throw Error('Elemento già presente nella categoria');
   if(values.linkedElements!==undefined){if(!Array.isArray(values.linkedElements)||values.linkedElements.some(link=>!Array.isArray(link)||link.length!==2||link.some(v=>typeof v!=='string')))throw Error('Collegamenti elemento non validi');for(const link of values.linkedElements)if(!p.elements.some(e=>e.category===link[0]&&e.name===link[1])&&!el?.linkedElements?.some(old=>old[0]===link[0]&&old[1]===link[1]))throw Error('Elemento collegato non trovato')}
-  const old=el?{name:el.name,category:el.category}:null,next={...el,...values,name,category,id:el?.id||uid('element')};
+  const defaults=categoryDefaults(p.categorySettings.find(c=>c.name===category));
+  const old=el?{name:el.name,category:el.category}:null,next={...(!el?{authoring:{excludeFromBoard:defaults.excludeFromBoard,allowHold:defaults.allowHold,useDailyQuantity:defaults.useDailyQuantity}}:{}),...el,...values,name,category,id:el?.id||uid('element')};
+  if(!el&&defaults.autoAssignIds&&!String(next.boardId??'').trim()){let n=1;const used=new Set(p.elements.filter(e=>e.category===category).map(e=>String(e.boardId)));while(used.has(String(n)))n++;next.boardId=String(n)}
   if(el)Object.assign(el,next);else p.elements.push(next);
   if(old){for(const e of p.elements)if(Array.isArray(e.linkedElements))e.linkedElements=e.linkedElements.map(([cat,n])=>cat===old.category&&n===old.name?[category,name]:[cat,n]);const fields=BUILTIN;for(const s of p.scenes){const keys=s.fieldElementIds?.includes(id)?Object.values(fields):[fields[old.category]];for(const key of keys)if(key&&s[key]===old.name&&(s.fieldElementIds?.includes(id)||p.format!=='mmsx'))s[key]=name}for(const flag of p.redFlags)if(flag.target.elementId===id)Object.assign(flag.target,{category,element:name});for(const e of p.events)for(const t of e.targets||[])if(t.elementId===id)Object.assign(t,{category,element:name})}
   refreshDocument(p);return next;
@@ -62,6 +67,7 @@ export function editElement(p,id,values){
 export function editCategory(p,id,values){
   requireRecord(values.attributes??{},'Impostazioni categoria');requireRecord(values.properties??{},'Definizioni proprietà');
   const c=p.categorySettings.find(c=>c.id===id||c.name===id);if(id&&!c)throw Error('Categoria non trovata');const name=required(values.name,'Categoria');uniqueName(p.categorySettings,name,c,'Categoria');
+  if(c&&isBuiltinCategory(c))throw Error('Le categorie built-in non sono modificabili');
   if(c){const old=c.name;for(const layout of [...p.stripLayouts,...p.reportLayouts])for(const shapes of Object.values(layout))if(Array.isArray(shapes))for(const shape of shapes){if(shape.categories)shape.categories=shape.categories.map(n=>n===old?name:n);for(const key of ['Category','CategoryName'])if(shape.a?.[key]===old)shape.a[key]=name}
     for(const el of p.elements)if(Array.isArray(el.linkedElements))el.linkedElements=el.linkedElements.map(([cat,n])=>[cat===old?name:cat,n]);
     Object.assign(c,values,{name});for(const e of p.elements)if(e.category===old)e.category=name;for(const s of p.scenes)for(const r of s.elementRefs)if(r.category===old)r.category=name;for(const f of p.redFlags)if(f.target.category===old)f.target.category=name;

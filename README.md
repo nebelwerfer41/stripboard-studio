@@ -2,15 +2,19 @@
 
 > **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
-# Stripboard Studio v1.18
+# Stripboard Studio v1.19
 
-Editing, selection and scheduling now share the existing workspaces. New scenes are inserted after the selected strip and open directly in Spoglio; banners use compact inline fields, and End of Day inserts a boundary and shifts following shooting dates using the plan calendar. Sheet numbers remain read-only and automatic.
+Print preview now offers **Fit to width** or manual scale. Print headers and black-and-white output live in that window, and preview strips have no selection controls. The automatic scale is shared by all strips and also keeps tall source layouts inside the page.
 
-Pages are entered as mixed eighth fractions, such as `2 3/8`. Estimated time uses `HH:MM`; screen time uses `MM:SS`. A separate color window edits INT/EXT × D/N combinations, banner/day colors and selection markers. Display settings use a spacious overlay with independent Stripboard and Calendar preferences.
+Breakdown navigation updates Stripboard selection, and double-clicking a scene strip opens its Spoglio. New scenes have a blank scene number and an automatic read-only sheet. **Duplica** creates independent scene copies with new sheets; **Elimina** asks for confirmation, then removes each selected scene’s breakdown sheet and every occurrence from all plans and Boneyards. Both support Undo/Redo.
 
-The main bar controls paired views. Stripboard actions stay together above the strips; Calendar supports explicit multiselection and double-click navigation to Stripboard. Elements can be sorted, selected, assigned consecutive IDs and moved between categories. Plan and calendar selectors contain creation, properties and reorder actions. Calendar properties, workweek and exceptions share one overlay; changing the calendar changes the plan association and shooting dates. Boneyard remains an unscheduled Stripboard area.
+Stripboard and Calendar have separate display controls, with no cross-workspace tabs in their settings overlays. The source-layout dropdown remains open when clicked. Banner/day visibility appears before the field picker; field choices and the color matrix use a more compact layout.
 
-Complete edits persist in `.studio.json` v2 with the original imported archive retained. Native MSD/MMSX exports remain conservative; an untouched import exports the original bytes. Importing a file does not reschedule its native dates. See [editing and compatibility](docs/document-editing.md), [current calendar behavior](docs/calendar-workspace.md), [the common model](docs/flash-common-model.md), [DOOD](docs/dood.md), and [MSD calendars and Red Flags](docs/msd-production-calendars-red-flags.md).
+The element catalog sorts by ID, name, **Occorrenze**, **Start**, **End** and **Pose**. Category editing exposes defaults for new elements and ordered property definitions with single-line/multiline types. Element editing includes ID locking, board exclusion, DOOD rules, linked elements and properties; Scenes, Red Flags and Days & Dates are calculated read-only tabs. Built-in categories are protected; missing scalar built-in values appear as read-only catalog projections until their element properties are explicitly saved. Images are omitted.
+
+Red Flag Entry uses element and date multiselection, type/note entry, batch creation, sortable records, deletion and CSV export. Existing native intervals and unresolved targets remain visible. Calendar rules, direct insertion, fraction/time entry, red selection markers and plan/calendar selector actions from v1.18 remain available.
+
+Complete edits persist in `.studio.json` v2 with the original imported archive retained. Native MSD/MMSX exports remain conservative; an untouched import exports the original bytes. See [editing and compatibility](docs/document-editing.md), [Calendar](docs/calendar-workspace.md), [the common model](docs/flash-common-model.md), [DOOD](docs/dood.md), and [MSD calendars and Red Flags](docs/msd-production-calendars-red-flags.md).
 
 The editor’s format audit and conservative writing strategy are described in [docs/msd-writer-audit.md](docs/msd-writer-audit.md).
 
@@ -48,14 +52,14 @@ Control names below are given in English; some labels in the application are cur
 - The top navigation gives direct access to Stripboard, Calendar, Spoglio, Report, Red Flags and project details. Click the project title to switch projects; **Visualizzazione** opens layout, field, visibility and print settings; **Colori strip** opens the separate combination-color editor. Compact controls leave more space for the active view, which scrolls independently.
 - **Spoglio** follows the active scene from Calendar or Stripboard, including template categories and elements shown by ID (when available) and name. Its scene selector and previous/next buttons also allow direct browsing in plan order. Quantities and properties remain available in project details. Optional resizable pairs are available only above 1200 CSS px, with each pane limited to 25–75% of the usable width; smaller viewports use one full-width view.
 - Phones show readable scene rows and a compact Calendar agenda of shooting days, events and the selected date. **Mostra mese** restores the monthly grid. These display preferences do not change the file or the schedule. Print uses the selected source or standard layout; phone summaries preserve source geometry for printing.
-- The **Red Flag Entry** view includes filters for category, element, type, and date range, along with a monthly grid, list, and flag details. Types come from `RedFlagMgr`; managing and editing flags remain future work.
+- The **Red Flag Entry** view supports category selection, multiple elements and civil dates, batch type/note entry, sortable records, editing, deletion and CSV export. Imported types and intervals are preserved.
 - Display scenes, banners, days, dates, and the unscheduled queue, with search and controls for hiding banners and day breaks.
 - Banners and day breaks are drawn as strips with the same width as scene strips.
-- The **Black and white** checkbox in the display/print overlay shows strips with white backgrounds and black text. Uncheck it to restore the file’s `INT/EXT` × `Day/Night` colors, plus dedicated banner and day-break colors.
+- The **Black and white** checkbox in print preview controls monochrome output. Editing views retain the file’s `INT/EXT` × `Day/Night` colors, plus dedicated banner and day-break colors.
 - Days have no additional heading or trailing space. In vertical layouts, days sit side by side with horizontal scrolling.
 - The horizontal stripboard preview automatically fits the panel width, including when the window is resized.
 - Preview report layouts stored in the file, with fields linked to data and browser printing. Banners and day breaks appear as text rows in the report flow when the template includes them.
-- Print stripboards and DOOD through the shared preview with paper size, orientation, margins and scale. PDF uses the same preview document via the browser’s Save as PDF destination. The application retains options for the header and starting each day on a new page.
+- Print stripboards and DOOD through the shared preview with paper size, orientation, margins and scale. Stripboard offers automatic width fitting or manual scaling; header and monochrome options are in the preview. PDF uses the same preview document via the browser’s Save as PDF destination. The application retains options for the header and starting each day on a new page.
 - Import other local `.msd` files compatible with the sample format.
 
 MSD dates are initially derived by the parser; MMSX retains native dates on import. Explicit calendar assignment, calendar-rule saving and End of Day creation update the plan using the chosen calendar. Selection, layout and visibility preferences do not change the document. Report previews reproduce the main fields’ content and geometry, but do not fully replicate Movie Magic’s proprietary pagination features and formulas.
@@ -103,6 +107,7 @@ Credits: [nebelwerfer41 on GitHub](https://github.com/nebelwerfer41).
 Browser suites require Playwright, a local server and optionally `CHROME_PATH`. The DOOD suite also requires `pdfinfo` and `pdftotext` to verify the generated PDF against the preview:
 
 ```sh
+CHROME_PATH=/usr/bin/chromium node tests/browser-refinements.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-workspace-revision.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-dood-qa node tests/browser-dood.cjs
@@ -156,3 +161,9 @@ Verified with 147 Node tests and Chromium authoring, responsive, workspace and D
 Unified toolbars, shared overlays with outside-click dismissal, direct scene/banner insertion, automatic End of Day scheduling, fraction/time inputs, separate combination-color editing, red bounded selection markers, Calendar multiselection and double-click navigation, bulk element IDs/category moves, unified calendar editing and selector creation/reordering.
 
 Verified with 155 Node tests and Chromium suites for the new authoring flows, MMSX 3/5/hybrid calendar association and rules, dense calendars, seven responsive viewport sizes, cross-view mouse/touch drag, native round-trips and DOOD/PDF output.
+
+### v1.19 — Print fitting, strip commands and element/Red Flag management
+
+Automatic or manual print scaling, noninteractive preview, print-only header/monochrome options, separate display settings, stable layout dropdown, selection following Spoglio navigation, blank new scene numbers, duplication and deletion, usage sorting, category defaults/property schemas, element tabs with calculated data, protected built-ins and batch Red Flags.
+
+Verified with 166 Node tests and Chromium suites for authoring/save/reopen, the new refinements, seven responsive sizes, Calendar density, drag between views, native adapter round-trips and DOOD/PDF page/text parity.

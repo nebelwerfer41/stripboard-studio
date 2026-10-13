@@ -10,7 +10,8 @@ export function installOverlayDismissal(){
 export function createOverlay(id,{className=''}={}){
   installOverlayDismissal();const dialog=document.createElement('dialog');dialog.id=id;dialog.className=`studio-overlay ${className}`;document.body.append(dialog);
   return {dialog,show(){if(!dialog.open)dialog.showModal()},close(){dialog.close()},open(title,html,{onMount}={}){
-    dialog.innerHTML=`<header class="overlay-header"><h2>${title}</h2><button type="button" data-overlay-close aria-label="Chiudi">×</button></header><div class="overlay-body">${html}</div>`;
+    const heading=String(title).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    dialog.innerHTML=`<header class="overlay-header"><h2>${heading}</h2><button type="button" data-overlay-close aria-label="Chiudi">×</button></header><div class="overlay-body">${html}</div>`;
     dialog.querySelector('[data-overlay-close]').onclick=()=>dialog.close();onMount?.(dialog);if(!dialog.open)dialog.showModal();
   }};
 }

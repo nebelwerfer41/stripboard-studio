@@ -164,13 +164,13 @@ function buildProject(container){
     if(!roots[name])throw Error(`Missing required manager section: ${name}`);
   }
   const issues={};
-  const categorySettings=paths(roots.CategoryMgr,['CategoryList','Category']).map((x,i)=>({id:`category:${i}`,name:attr(x,'Name'),attributes:attrs(x),color:rgbColor(attr(x,'Color'))})).sort((a,b)=>(Number(a.attributes.SortOrder)||0)-(Number(b.attributes.SortOrder)||0));
+  const categorySettings=paths(roots.CategoryMgr,['CategoryList','Category']).map((x,i)=>({id:`category:${i}`,name:attr(x,'Name'),attributes:attrs(x),properties:Object.fromEntries(paths(x,['PropertyDefinitionList','PropertyDefinition']).sort((a,b)=>Number(attr(a,'SortOrder'))-Number(attr(b,'SortOrder'))).map(def=>[attr(def,'Name'),{name:attr(def,'Name'),type:attr(def,'Type')==='5'?'multiline':'single',attributes:attrs(def)}])),color:rgbColor(attr(x,'Color'))})).sort((a,b)=>(Number(a.attributes.SortOrder)||0)-(Number(b.attributes.SortOrder)||0));
   const categories=categorySettings.map(x=>x.name);
   const categorySet=new Set(categories);
   const elements=paths(roots.ElementMgr,['Elements','Element']).map(node=>{
     const category=attr(node,'CategoryName'),name=attr(node,'Name');
     if(!categorySet.has(category))issue(issues,'MISSING_ELEMENT_CATEGORY');
-    return {category,name,boardId:attr(node,'BoardID'),sortOrder:attr(node,'SortOrder'),
+    return {category,name,attributes:attrs(node),boardId:attr(node,'BoardID'),sortOrder:attr(node,'SortOrder'),
       properties:Object.fromEntries(children(node,'Property').map(x=>[attr(x,'Name'),attr(x,'Value')??x.textContent??''])),
       linkedElements:paths(node,['LinkedElements','LinkedElement']).map(x=>[attr(x,'CategoryName'),attr(x,'Name')])};
   });

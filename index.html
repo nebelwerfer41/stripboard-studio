@@ -56,17 +56,12 @@
           <aside id="breakdownPreview" class="view breakdown-preview" aria-label="Anteprima Spoglio" hidden></aside>
           </div>
         </section>
-        <footer>Stripboard Studio v1.18 <span>·</span> <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41</a><span class="footer-local">File elaborati in locale</span></footer>
+        <footer>Stripboard Studio v1.19 <span>·</span> <a href="https://github.com/nebelwerfer41" target="_blank" rel="noopener noreferrer">nebelwerfer41</a><span class="footer-local">File elaborati in locale</span></footer>
       </div>
     </main>
   </div>
   <div id="displayOptions" hidden><div class="options-row">
           <div class="control" id="layoutControl"><label for="layoutSelect" id="layoutLabel">LAYOUT STRIPBOARD</label><select id="layoutSelect"></select></div>
-          <div id="boardFieldPicker" hidden></div>
-          <section class="print-options" id="printOptions" aria-label="Opzioni di visualizzazione e stampa stripboard">
-            <label><input id="printHeader" type="checkbox"> Header di stampa</label>
-            <label id="colorSwitch"><input id="blackWhite" type="checkbox"> Bianco e nero</label>
-          </section>
           <section class="report-options" id="reportOptions" aria-label="Parametri generali del report" hidden>
             <label title="Separate records with a line"><input id="reportSeparateRecords" type="checkbox"> Separa record con una linea</label>
           </section>
@@ -74,6 +69,7 @@
             <label><input id="hideBanners" type="checkbox"> Nascondi banner</label>
             <label><input id="hideDayBreaks" type="checkbox"> Nascondi fine giornata</label>
           </section>
+          <div id="boardFieldPicker" hidden></div>
         </div></div>
   <dialog class="studio-overlay" id="moveDialog" aria-labelledby="moveTitle"><form method="dialog" id="moveForm"><h2 id="moveTitle">Sposta strip</h2><p id="moveSource"></p><label for="moveGroup">Destinazione</label><select id="moveGroup"></select><label for="movePosition">Posizione</label><select id="movePosition"></select><div class="dialog-actions"><button value="cancel" type="submit">Annulla</button><button value="move" type="submit">Sposta</button></div></form></dialog>
   <script type="module" src="assets/app.js"></script>
