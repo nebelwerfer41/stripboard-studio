@@ -2,7 +2,9 @@
 
 > **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
-# Stripboard Studio v1.19
+# Stripboard Studio v1.20
+
+Spoglio uses searchable dropdowns for **Set, Location, INT/EXT, D/N, Script Day, Unit, Sequence and Episode**, including **Aggiungi** for missing values. The same controls appear directly in the category cards. Choosing or clearing a built-in value updates both places and keeps one value per scene; resource categories retain multiple checkbox selections, quantities and daily-use options. Scene, synopsis, times, page fields and comments retain direct entry; Sheet remains read-only.
 
 Print preview now offers **Fit to width** or manual scale. Print headers and black-and-white output live in that window, and preview strips have no selection controls. The automatic scale is shared by all strips and also keeps tall source layouts inside the page.
 
@@ -10,7 +12,7 @@ Breakdown navigation updates Stripboard selection, and double-clicking a scene s
 
 Stripboard and Calendar have separate display controls, with no cross-workspace tabs in their settings overlays. The source-layout dropdown remains open when clicked. Banner/day visibility appears before the field picker; field choices and the color matrix use a more compact layout.
 
-The element catalog sorts by ID, name, **Occorrenze**, **Start**, **End** and **Pose**. Category editing exposes defaults for new elements and ordered property definitions with single-line/multiline types. Element editing includes ID locking, board exclusion, DOOD rules, linked elements and properties; Scenes, Red Flags and Days & Dates are calculated read-only tabs. Built-in categories are protected; missing scalar built-in values appear as read-only catalog projections until their element properties are explicitly saved. Images are omitted.
+The element catalog sorts by ID, name, **Occorrenze**, **Start**, **End** and **Pose**. Category editing exposes defaults for new elements and ordered property definitions with single-line/multiline types. Element editing includes ID locking, board exclusion, DOOD rules, linked elements and properties; Scenes, Red Flags and Days & Dates are calculated read-only tabs. Built-in categories are protected; scalar-only imported values appear as catalog projections and are registered when assigned to a scene or when their properties are saved. Images are omitted.
 
 Red Flag Entry uses element and date multiselection, type/note entry, batch creation, sortable records, deletion and CSV export. Existing native intervals and unresolved targets remain visible. Calendar rules, direct insertion, fraction/time entry, red selection markers and plan/calendar selector actions from v1.18 remain available.
 
@@ -42,7 +44,7 @@ The browser must support `DecompressionStream('deflate-raw')`, `DOMParser`, `XML
 
 Control names below are given in English; some labels in the application are currently in Italian.
 
-- Select a project, shooting schedule, and an imported stripboard layout, or choose **Compatto**, **Dettagliato** or **Produzione** under **Visualizzazione**. Standard layouts let you select scene fields and project categories; The Calendar tab in that overlay has independent layout and field preferences. Display changes leave the imported file untouched.
+- Select a project, shooting schedule, and an imported stripboard layout, or choose **Compatto**, **Dettagliato** or **Produzione** under **Visualizzazione**. Standard layouts let you select scene fields and project categories; Calendar has its own display overlay and field preferences. Display changes leave the imported file untouched.
 - Click or tap a scene to select and activate it. Shift-click selects the range from the initial strip, including banners and day breaks; Ctrl/⌘-Shift-click adds that range to the selection. Ctrl/⌘-click adds or removes items. On touch devices, hold a strip to enter multi-selection mode, then tap to add or remove items. Esc or a click in empty space clears the selection. Drag a strip directly; on touch devices, dragging begins after a long press and deliberate movement. If the strip is already selected, the whole group moves while preserving its relative order. The preview shows the scene count, total page eighths, and other items, with a line marking the insertion point. Banners and day breaks can be dragged in the same way, including into and out of the Boneyard. F2 offers the same destinations.
 - **Undo** (Ctrl/⌘-Z) restores the order before the last operation; **Redo** (Ctrl/⌘-Shift-Z) reapplies the undone reorder. From the keyboard, Enter or Space selects a strip and F2 opens the day and position picker. The “At the end” position in a `ScheduleDay` is before the layout-generated day break.
 - **Nuova Stripboard** inside the plan selector creates an empty stripboard or copies the current order. **Riordina** in the same selector changes plan ordering. The new schedule uses the same scene references and can be edited independently. Its unique name provides the identity expected by the observed format. The selector changes the current schedule and the exported `ActiveStripBoard` value.
@@ -167,3 +169,9 @@ Verified with 155 Node tests and Chromium suites for the new authoring flows, MM
 Automatic or manual print scaling, noninteractive preview, print-only header/monochrome options, separate display settings, stable layout dropdown, selection following Spoglio navigation, blank new scene numbers, duplication and deletion, usage sorting, category defaults/property schemas, element tabs with calculated data, protected built-ins and batch Red Flags.
 
 Verified with 166 Node tests and Chromium suites for authoring/save/reopen, the new refinements, seven responsive sizes, Calendar density, drag between views, native adapter round-trips and DOOD/PDF page/text parity.
+
+### v1.20 — Searchable Spoglio dropdowns and single built-in values
+
+Search/select/create controls in scene fields and category cards, synchronized single-value built-ins, multi-resource selection with daily-use checkboxes, Episode support and consistent catalog renames. Legacy conflicting built-in associations are reconciled to the scene value in the common model; original imported archives remain intact.
+
+Verified with 182 Node tests and Chromium suites for dropdowns, keyboard and blur behavior, source/save/reopen, authoring, previous refinements, responsive layouts, native round-trips and DOOD/PDF output.

@@ -179,7 +179,7 @@ function buildProject(container){
     linkedCount++;if(!elementIndex.has(JSON.stringify(key)))issue(issues,'MISSING_LINKED_ELEMENT');
   }
   const fieldMap={scene:'Scenes',sheetNumber:'SheetNumber',synopsis:'Synopsis',sequence:'Sequence',ie:'IE',dn:'DN',
-    set:'Set',location:'Location',scriptDay:'ScriptDay',scriptPageNumbers:'ScriptPageNumbers',unit:'Unit',
+    set:'Set',location:'Location',episode:'Episode',scriptDay:'ScriptDay',scriptPageNumbers:'ScriptPageNumbers',unit:'Unit',
     estimateTimeA:'EstimateTimeA',estimateTimeB:'EstimateTimeB',comments:'Comments'};
   let associationCount=0;
   const scenes=paths(roots.BreakdownSheetMgr,['BreakdownSheets','BreakdownSheet']).map(node=>{

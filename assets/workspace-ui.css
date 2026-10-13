@@ -97,3 +97,24 @@
 .red-flag-entry select,.red-flag-entry input[type=month],.red-flag-entry textarea,.flag-results-toolbar select{border:1px solid #c3d4db;border-radius:4px;padding:7px;background:#fff;color:#28414f;font:inherit;font-size:12px}
 .flag-results .flag-table th button{padding:0;border:0;background:transparent;color:inherit;font-weight:700}
 .studio-overlay [data-delete-confirm],.studio-overlay [data-catalog-delete-confirm],.studio-overlay [data-flag-delete-confirm]{background:#b43431!important;border-color:#b43431!important;color:#fff!important}
+/* Shared searchable combobox for scalar fields and category requirements. */
+.scene-choice-control{position:relative;display:flex;align-items:stretch;min-width:0;width:100%;border:1px solid #c2d4dc;border-radius:4px;background:#fff;box-sizing:border-box}
+.inline-scene-fields .scene-choice-control input,.breakdown-category .scene-choice-control input,.document-editor .scene-choice-control input{flex:1;width:0;min-width:0;border:0;border-radius:4px;padding:5px 7px;margin:0;background:transparent;font:inherit;color:#28414f;box-sizing:border-box}
+.scene-choice-control input:focus{outline:none}.scene-choice-control:focus-within{outline:2px solid #78b9ac;outline-offset:1px}
+.scene-choice-control button{flex:none;width:25px;padding:0;border:0;background:transparent;color:#43778e;border-radius:0;font-size:15px;cursor:pointer}
+.scene-choice-control button[hidden]{display:none!important}.scene-choice-control button:hover{background:#e8f2f5}
+.breakdown-category>.scene-choice-control{width:calc(100% - 18px);margin:9px;min-height:30px;font-size:12px}
+.category-quantity-heading{text-align:right;margin:0 11px 5px;font-size:9px;text-transform:uppercase;color:#738993;letter-spacing:.03em}
+.inline-scene .breakdown-element input.daily-quantity-check{width:16px;height:16px;min-width:16px;accent-color:#167f70;padding:0;margin:0 4px}
+.scene-choice-popup{position:fixed;z-index:2000;display:flex;flex-direction:column;background:#fff;border:1px solid #92bfce;border-radius:4px;box-shadow:0 4px 15px #17354035;box-sizing:border-box;overflow:hidden;color:#233c49;font-size:13px}
+.scene-choice-popup[hidden]{display:none!important}.scene-choice-list{overflow:auto;min-height:0;overscroll-behavior:contain}
+.scene-choice-option{border-bottom:1px solid #e7edef}.scene-choice-option.chosen{background:#fffbd4}.scene-choice-option.highlighted{background:#fff8bb}
+.scene-choice-option>button{display:block;width:100%;text-align:left;padding:10px 12px;min-height:38px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;overflow-wrap:anywhere}
+.scene-choice-option>label{display:flex;align-items:center;gap:8px;margin:0;padding:9px 12px;min-height:38px;box-sizing:border-box;cursor:pointer}
+.scene-choice-option input[type=checkbox]{flex:none;width:16px;height:16px;accent-color:#167f70;margin:0}
+.scene-choice-option .scene-choice-add{color:#157b9a;font-weight:600}.scene-choice-empty{font-size:12px;padding:9px 12px;margin:0}
+@media(max-width:620px){.inline-scene-fields .scene-choice-control input,.breakdown-category .scene-choice-control input{font-size:16px;min-height:36px}.scene-choice-control button{width:29px}.scene-choice-popup{font-size:14px}.scene-choice-option>button,.scene-choice-option>label{min-height:42px}.scene-choice-control input{touch-action:manipulation}}
+@media print{.scene-choice-popup{display:none!important}}
+.inline-scene .breakdown-categories{grid-template-columns:repeat(auto-fit,minmax(min(270px,100%),1fr));gap:12px;align-items:start}
+.inline-scene .breakdown-element{flex-wrap:nowrap;gap:7px;align-items:center}.inline-scene .breakdown-element strong{flex:1;min-width:0;overflow-wrap:anywhere}
+.inline-scene .breakdown-element input[type=number]{flex:none;width:43px}.inline-scene .breakdown-element>button{flex:none;width:18px;padding:0}

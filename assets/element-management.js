@@ -1,6 +1,6 @@
 import {validDate} from './production-data.js';
 const fields={set:'set',location:'location',scriptday:'scriptDay',unit:'unit',sequence:'sequence',dn:'dn',daynight:'dn',ie:'ie',intext:'ie',episode:'episode'};
-export const builtinField=name=>fields[String(name??'').toLowerCase().replace(/[^a-z]/g,'')]||null;
+export const builtinField=name=>{const key=String(name??'').toLowerCase().replace(/[^a-z]/g,'');return Object.hasOwn(fields,key)?fields[key]:null};
 export function isBuiltinCategory(category){return Boolean([category?.builtIn,category?.source?.builtIn,category?.source?.isBuiltIn].some(value=>[true,1,'1'].includes(value))||builtinField(category?.name))}
 const bool=(value,fallback=false)=>value==null?fallback:[true,1,'1'].includes(value);
 export function categoryDefaults(category){

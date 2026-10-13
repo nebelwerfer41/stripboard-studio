@@ -2,16 +2,19 @@ import {SCENE_FIELDS,editScene,editElement} from './document-model.js';
 import {breakdownCategories} from './calendar-selectors.js';
 import {escapeHtml as e} from './dood-print.js';
 import {elementUsage,isBuiltinCategory,elementOptions,catalogCategories,catalogElements} from './element-management.js';
+import {SINGLE_SCENE_FIELDS,singleSceneValue} from './scene-values.js';
+import {dropdownMarkup,createSearchDropdown} from './search-dropdown.js';
 import {sceneEntryValue,parseSceneEntry} from './entry-format.js';
 
-const sceneFieldOrder=['scene','sheetNumber','ie','dn','set','synopsis','location','pagesEighths','scriptDay','unit','scriptPageNumbers','sequence','estimateTimeA','estimateTimeB','comments'];
+const sceneFieldOrder=['scene','sheetNumber','ie','dn','set','synopsis','location','pagesEighths','scriptDay','episode','unit','scriptPageNumbers','sequence','estimateTimeA','estimateTimeB','comments'];
 const wideSceneFields=new Set(['set','synopsis','location','sequence','comments']);
-export function sceneFieldsMarkup(scene,{form=false}={}){
-  return `<div class="inline-scene-fields">${sceneFieldOrder.map(key=>{
+export function sceneFieldsMarkup(scene,{form=false,project=null}={}){
+  return `<div class="inline-scene-fields" data-scene-choice-id="${e(scene.id||'')}">${sceneFieldOrder.map(key=>{
     const label=key==='sheetNumber'?'Sheet':SCENE_FIELDS[key];
     const identity=form?`name="${key}"`:`data-scene-field="${key}"`;
     let control;
     if(key==='sheetNumber')control=`<output data-sheet-number aria-label="Sheet" title="Numero assegnato automaticamente">${e(scene.sheetNumber??(form?'Automatico':'—'))}</output>`;
+    else if(SINGLE_SCENE_FIELDS.includes(key))control=dropdownMarkup({identity,field:key,value:project?singleSceneValue(project,scene,key).name:scene[key]||'',label});
     else if(['synopsis','comments'].includes(key))control=`<textarea ${identity} class="scene-textarea" aria-label="${e(label)}" rows="1">${e(scene[key]??'')}</textarea>`;
     else control=`<input ${identity} aria-label="${e(label)}" value="${e(sceneEntryValue(scene,key))}" ${key==='pagesEighths'?'placeholder="2 3/8"':key==='estimateTimeA'?'placeholder="HH:MM"':key==='estimateTimeB'?'placeholder="MM:SS"':''}>`;
     return `<label class="inline-field scene-field scene-field-${key} ${wideSceneFields.has(key)?'scene-field-wide':''}"><span>${e(label)}</span>${control}</label>`;
@@ -24,10 +27,13 @@ export function fitSceneTextareas(root){
 }
 export function sceneEditingMarkup(project,scene,state){
   const categories=breakdownCategories(project,scene,{hideEmpty:false});
-  return `<section class="inline-scene" data-inline-scene="${e(scene.id)}">${sceneFieldsMarkup(scene)}<div class="inline-category-tools"><label class="breakdown-empty-toggle"><input id="hideEmptyCategories" type="checkbox" ${state.hideEmptyCategories?'checked':''}> Nascondi categorie vuote</label><button type="button" data-inline-new="category">＋ Categoria</button></div><div class="breakdown-categories">${categories.map(c=>{
-    const catalog=project.elements.filter(el=>el.category===c.name),selected=new Set(c.items.map(r=>r.elementId));
-    return `<section class="breakdown-category" data-category-id="${e(c.id)}" style="--category-color:${e(c.color||'#0c877c')}" ${state.hideEmptyCategories&&!c.items.length?'hidden':''}><h4>${e(c.name)} <small>${c.items.length}</small></h4><div class="category-selected">${c.items.map(ref=>`<div class="breakdown-element" ${!ref.resolved?'title="Riferimento non risolto"':''}><strong>${e(ref.element?.boardId!=null&&String(ref.element.boardId)!==''?`${ref.element.boardId}. `:'')}${e(ref.name)}</strong><input type="number" min="0" step="any" data-ref-quantity="${e(String(scene.elementRefs.indexOf(scene.elementRefs.find(r=>r.elementId===ref.elementId&&r.category===ref.category&&r.name===ref.name))))}" aria-label="Quantità ${e(ref.name)}" placeholder="Qtà" value="${e(typeof ref.quantity==='number'?ref.quantity:'')}" ${ref.quantity&&typeof ref.quantity==='object'?'disabled title="Quantità importata strutturata"':''}><button type="button" data-ref-remove="${e(String(scene.elementRefs.findIndex(r=>r.elementId===ref.elementId&&r.category===ref.category&&r.name===ref.name)))}" aria-label="Rimuovi ${e(ref.name)}">×</button></div>`).join('')}</div><details class="category-picker" data-picker-category="${e(c.id)}"><summary>Aggiungi / scegli elementi ▾</summary><div class="category-picker-content"><input type="search" data-element-search aria-label="Cerca in ${e(c.name)}" placeholder="Cerca elemento…"><div class="category-choices">${catalog.map(el=>`<label data-element-choice><input type="checkbox" data-ref-element="${e(el.id)}" ${selected.has(el.id)?'checked':''}><span>${e(el.boardId?`${el.boardId}. `:'')}${e(el.name)}</span></label>`).join('')||'<p>Nessun elemento.</p>'}</div><form data-quick-element data-category="${e(c.name)}"><input name="name" required aria-label="Nuovo elemento in ${e(c.name)}" placeholder="Nuovo elemento…"><button type="submit" aria-label="Crea e aggiungi elemento">＋</button></form></div></details></section>`;
-  }).join('')}</div><p class="inline-edit-hint">Le modifiche si applicano quando esci dal campo. Annulla e Ripeti sono disponibili nella barra.</p></section>`;
+  return `<section class="inline-scene" data-inline-scene="${e(scene.id)}">${sceneFieldsMarkup(scene,{project})}<div class="inline-category-tools"><label class="breakdown-empty-toggle"><input id="hideEmptyCategories" type="checkbox" ${state.hideEmptyCategories?'checked':''}> Nascondi categorie vuote</label><button type="button" data-inline-new="category">＋ Categoria</button></div><div class="breakdown-categories">${categories.map(c=>{
+    const single=Boolean(c.sceneField),value=single?singleSceneValue(project,scene,c.sceneField).name:'';
+    return `<section class="breakdown-category" data-category-id="${e(c.id)}" data-category-name="${e(c.name)}" ${single?`data-single-scene-field="${e(c.sceneField)}"`:''} style="--category-color:${e(c.color||'#0c877c')}" ${state.hideEmptyCategories&&!c.items.length?'hidden':''}><h4>${e(c.name)} <small>(${c.items.length})</small></h4>${dropdownMarkup({field:c.sceneField,category:c.name,value,label:single?`${c.name} della scena`:`Elementi ${c.name}`})}${!single&&c.items.length?'<div class="category-quantity-heading">Quantità · uso giornaliero</div>':''}<div class="category-selected">${c.items.map(ref=>{
+      const index=scene.elementRefs.findIndex(r=>r.elementId===ref.elementId&&r.category===ref.category&&r.name===ref.name),opaque=ref.quantity&&typeof ref.quantity==='object';
+      return `<div class="breakdown-element" ${!ref.resolved?'title="Riferimento non risolto"':''}><strong>${e(ref.element?.boardId!=null&&String(ref.element.boardId)!==''?`${ref.element.boardId}. `:'')}${e(ref.name)}</strong>${single?`<button type="button" data-clear-scene-field="${e(c.sceneField)}" aria-label="Svuota ${e(c.name)}">×</button>`:`<input type="number" min="0" step="any" data-ref-quantity="${index}" aria-label="Quantità ${e(ref.name)}" placeholder="Qtà" value="${e(typeof ref.quantity==='number'?ref.quantity:'')}" ${opaque?'disabled title="Quantità importata strutturata"':''}><input class="daily-quantity-check" type="checkbox" data-ref-daily-quantity="${index}" aria-label="Usa ${e(ref.name)} nella quantità giornaliera" ${ref.useDailyQuantity!==false?'checked':''}><button type="button" data-ref-remove="${index}" aria-label="Rimuovi ${e(ref.name)}">×</button>`}</div>`;
+    }).join('')}</div></section>`;
+  }).join('')}</div><p class="inline-edit-hint">Scegli un valore dal dropdown o usa Aggiungi per crearne uno nuovo. I campi built-in ammettono un solo valore per scena.</p></section>`;
 }
 
 export function elementCatalogMarkup(project,state){
@@ -42,45 +48,46 @@ export function elementCatalogMarkup(project,state){
 
 export function createIntegratedEditing({getProject,onChange,onError}){
   const project=()=>getProject();
-  function commit(command,target){
+  function commit(command,target,{syncRelations=false}={}){
     const wasFocused=document.activeElement===target;
     const sceneId=target.closest('[data-inline-scene]')?.dataset.inlineScene,field=target.dataset.sceneField,elementId=target.closest('[data-catalog-element]')?.dataset.catalogElement,elementField=target.dataset.elementField;
-    const root=target.closest('.view'),open=[...root?.querySelectorAll('details[open][data-picker-category]')||[]].map(d=>d.dataset.pickerCategory);
-    const searches=[...root?.querySelectorAll('[data-element-search]')||[]].map(input=>[input.closest('[data-picker-category]').dataset.pickerCategory,input.value]);
-    const catalogSearch=root?.querySelector('[data-catalog-search]')?.value;
-    try{onChange(command,{preserveView:field||elementField?root?.id:null});target.removeAttribute('aria-invalid');onError('');for(const d of root?.querySelectorAll('[data-picker-category]')||[])if(open.includes(d.dataset.pickerCategory))d.open=true;
-      for(const [id,value] of searches){const d=[...root.querySelectorAll('[data-picker-category]')].find(d=>d.dataset.pickerCategory===id),input=d?.querySelector('[data-element-search]');if(input){input.value=value;filterChoices(input)}}
+    const root=target.closest('.view'),catalogSearch=root?.querySelector('[data-catalog-search]')?.value;
+    try{onChange(command,{preserveView:!syncRelations&&(field||elementField)?root?.id:null});target.removeAttribute('aria-invalid');onError('');
       if(catalogSearch){const input=root.querySelector('[data-catalog-search]');if(input){input.value=catalogSearch;input.dispatchEvent(new Event('input',{bubbles:true}))}}
-      const next=[...document.querySelectorAll('[data-inline-scene]')].find(s=>s.dataset.inlineScene===sceneId)?.querySelector(`[data-scene-field="${field}"]`)||[...document.querySelectorAll('[data-catalog-element]')].find(el=>el.dataset.catalogElement===elementId)?.querySelector(`[data-element-field="${elementField}"]`)||[...root?.querySelectorAll('[data-ref-element]')||[]].find(input=>target.dataset.refElement&&input.dataset.refElement===target.dataset.refElement)||[...root?.querySelectorAll('[data-ref-quantity]')||[]].find(input=>target.hasAttribute('data-ref-quantity')&&input.dataset.refQuantity===target.dataset.refQuantity);
-      if(wasFocused&&document.activeElement===document.body&&next)next.focus({preventScroll:true});
-    }catch(error){target.setAttribute('aria-invalid','true');onError(error.message)}
+      dropdown.refresh();
+      const next=[...document.querySelectorAll('[data-inline-scene]')].find(s=>s.dataset.inlineScene===sceneId)?.querySelector(`[data-scene-field="${field}"]`)||[...document.querySelectorAll('[data-catalog-element]')].find(el=>el.dataset.catalogElement===elementId)?.querySelector(`[data-element-field="${elementField}"]`);
+      if(wasFocused&&document.activeElement===document.body&&next)next.focus({preventScroll:true});return true;
+    }catch(error){target.setAttribute('aria-invalid','true');onError(error.message);return false}
   }
-  function filterChoices(input){const term=input.value.toLocaleLowerCase();for(const row of input.closest('.category-picker-content').querySelectorAll('[data-element-choice]'))row.hidden=!row.textContent.toLocaleLowerCase().includes(term)}
+  const dropdown=createSearchDropdown({getProject:project,
+    onField(sceneId,field,value,input){const p=project(),scene=p.scenes.find(s=>s.id===sceneId);return scene&&commit(()=>editScene(p,scene.id,{[field]:value}),input,{syncRelations:true})},
+    onToggle(sceneId,id,checked,input){const p=project(),scene=p.scenes.find(s=>s.id===sceneId),el=p.elements.find(e=>e.id===id);if(!scene||!el)return false;const refs=structuredClone(scene.elementRefs).filter(r=>r.elementId!==id);if(checked)refs.push({elementId:el.id,category:el.category,name:el.name,resolved:true,quantity:null,quantityOrigin:'absent'});return commit(()=>editScene(p,scene.id,{},refs),input)},
+    onCreate(sceneId,category,name,input){const p=project(),scene=p.scenes.find(s=>s.id===sceneId);if(!scene)return false;return commit(()=>{const el=p.elements.find(el=>el.category===category&&el.name.toLocaleLowerCase()===name.toLocaleLowerCase())||editElement(p,null,{name,category,properties:{}});if(!scene.elementRefs.some(r=>r.elementId===el.id))editScene(p,scene.id,{},[...scene.elementRefs,{elementId:el.id,category:el.category,name:el.name,resolved:true,quantity:null,quantityOrigin:'absent'}])},input)}
+  });
   document.addEventListener('input',event=>{
-    const t=event.target;if(t.matches('[data-element-search]'))filterChoices(t);
+    const t=event.target;
     if(t.matches('.scene-textarea'))fitSceneTextareas(t.parentElement);
     if(t.matches('[data-catalog-search]'))for(const row of t.closest('.inline-catalog').querySelectorAll('[data-catalog-element]'))row.hidden=![...row.querySelectorAll('input')].some(i=>i.value.toLocaleLowerCase().includes(t.value.toLocaleLowerCase()));
   });
   document.addEventListener('change',event=>{
     const t=event.target,p=project(),scene=p?.scenes.find(s=>s.id===t.closest('[data-inline-scene]')?.dataset.inlineScene);if(!p)return;
-    if(t.dataset.sceneField&&scene){const key=t.dataset.sceneField;if(!Object.hasOwn(SCENE_FIELDS,key))return;try{if(t.value!==sceneEntryValue(scene,key)){const value=parseSceneEntry(key,t.value);commit(()=>editScene(p,scene.id,{[key]:value}),t);t.value=sceneEntryValue(p.scenes.find(s=>s.id===scene.id),key)}else{t.removeAttribute('aria-invalid');onError('')}}catch(error){t.setAttribute('aria-invalid','true');onError(error.message)}}
-    if(t.dataset.refElement&&scene){const el=p.elements.find(el=>el.id===t.dataset.refElement),refs=structuredClone(scene.elementRefs).filter(r=>r.elementId!==el.id);if(t.checked)refs.push({elementId:el.id,category:el.category,name:el.name,resolved:true,quantity:null,quantityOrigin:'absent'});commit(()=>editScene(p,scene.id,{},refs),t)}
+    if(t.dataset.sceneField&&scene){if(t.dataset.choiceField&&event.isTrusted)return;const key=t.dataset.sceneField;if(!Object.hasOwn(SCENE_FIELDS,key))return;try{if(t.value!==sceneEntryValue(scene,key)){const value=parseSceneEntry(key,t.value);commit(()=>editScene(p,scene.id,{[key]:value}),t,{syncRelations:SINGLE_SCENE_FIELDS.includes(key)});t.value=sceneEntryValue(p.scenes.find(s=>s.id===scene.id),key)}else{t.removeAttribute('aria-invalid');onError('')}}catch(error){t.setAttribute('aria-invalid','true');onError(error.message)}}
     if(t.hasAttribute('data-ref-quantity')&&scene){const refs=structuredClone(scene.elementRefs);refs[Number(t.dataset.refQuantity)].quantity=t.value===''?null:Number(t.value);commit(()=>editScene(p,scene.id,{},refs),t)}
+    if(t.hasAttribute('data-ref-daily-quantity')&&scene){const refs=structuredClone(scene.elementRefs);refs[Number(t.dataset.refDailyQuantity)].useDailyQuantity=t.checked;commit(()=>editScene(p,scene.id,{},refs),t)}
     if(t.dataset.elementField){const el=p.elements.find(el=>el.id===t.closest('[data-catalog-element]')?.dataset.catalogElement);if(el&&el[t.dataset.elementField]!==t.value)commit(()=>editElement(p,el.id,{...el,[t.dataset.elementField]:t.value}),t)}
   });
   document.addEventListener('click',event=>{
+    const clear=event.target.closest('[data-clear-scene-field]');if(clear){const p=project(),scene=p.scenes.find(s=>s.id===clear.closest('[data-inline-scene]').dataset.inlineScene);commit(()=>editScene(p,scene.id,{[clear.dataset.clearSceneField]:''}),clear,{syncRelations:true});dropdown.close(false);return}
     const button=event.target.closest('[data-ref-remove]');if(!button)return;const p=project(),scene=p.scenes.find(s=>s.id===button.closest('[data-inline-scene]').dataset.inlineScene),refs=structuredClone(scene.elementRefs);refs.splice(Number(button.dataset.refRemove),1);commit(()=>editScene(p,scene.id,{},refs),button);
   });
-  document.addEventListener('submit',event=>{
-    const form=event.target;if(!form.matches('[data-quick-element]'))return;event.preventDefault();const p=project(),scene=p.scenes.find(s=>s.id===form.closest('[data-inline-scene]').dataset.inlineScene),name=new FormData(form).get('name').trim();
-    commit(()=>{const el=p.elements.find(el=>el.category===form.dataset.category&&el.name===name)||editElement(p,null,{name,category:form.dataset.category,properties:{}});if(!scene.elementRefs.some(r=>r.elementId===el.id))editScene(p,scene.id,{},[...scene.elementRefs,{elementId:el.id,category:el.category,name:el.name,resolved:true,quantity:null,quantityOrigin:'absent'}])},form);
-  });
-  return {hasDraft(){
+  return {reset:()=>dropdown.close(),hasDraft(){
     const p=project();if(!p)return false;
+    if(document.querySelector('.view:not([hidden]) [aria-invalid="true"]'))return true;
     return [...document.querySelectorAll('.view:not([hidden]) [data-scene-field],.view:not([hidden]) [data-element-field]')].some(input=>{
+      if(input.hasAttribute('data-choice-field')&&input.getAttribute('aria-expanded')==='true')return false;
       const scene=p.scenes.find(s=>s.id===input.closest('[data-inline-scene]')?.dataset.inlineScene);
       const element=p.elements.find(el=>el.id===input.closest('[data-catalog-element]')?.dataset.catalogElement);
       return Boolean(scene||element)&&(scene?sceneEntryValue(scene,input.dataset.sceneField):String(element?.[input.dataset.elementField]??''))!==input.value;
-    })||[...document.querySelectorAll('.view:not([hidden]) [data-quick-element] input[name=name]')].some(input=>input.value.trim())||[...document.querySelectorAll('#boardEditingControls [data-inline-banner] input')].some(input=>input.value.toLocaleLowerCase()!==input.defaultValue.toLocaleLowerCase());
+    })||[...document.querySelectorAll('#boardEditingControls [data-inline-banner] input')].some(input=>input.value.toLocaleLowerCase()!==input.defaultValue.toLocaleLowerCase());
   }};
 }

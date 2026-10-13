@@ -1,4 +1,5 @@
 /* Additive common contract. Source archives belong to adapters, never to views. */
+import {normalizeSceneSingleValues} from './scene-values.js';
 export const modelId=(kind,...parts)=>`${kind}:${JSON.stringify(parts)}`;
 export function completeProjectModel(project){
   project.modelVersion=1;
@@ -14,6 +15,8 @@ export function completeProjectModel(project){
     scene.elementRefs??=Object.entries(scene.requirements||{}).flatMap(([category,names])=>names.map(name=>({
       elementId:elementIndex.get(JSON.stringify([category,name]))?.id??null,category,name,
       quantity:null,quantityOrigin:'absent',resolved:elementIndex.has(JSON.stringify([category,name]))})));
+    normalizeSceneSingleValues(project,scene);
+    const requirements=Object.create(null);for(const ref of scene.elementRefs)(requirements[ref.category]??=[]).push(ref.name);scene.requirements=requirements;
   }
   for(const [i,c] of project.calendars.entries()){
     c.id??=modelId('calendar',i);c.scope??={kind:'project'};

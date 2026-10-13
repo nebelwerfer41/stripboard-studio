@@ -4,6 +4,7 @@ import {escapeHtml as e} from './dood-print.js';
 import {createOverlay} from './overlay-service.js';
 import {parseSceneEntry} from './entry-format.js';
 import {validDate} from './production-data.js';
+import {builtinField} from './element-management.js';
 import {assignPlanCalendar} from './workspace-commands.js';
 const labels={production:'Produzione',scene:'Scene e spoglio',element:'Elementi e proprietà',category:'Categorie',calendar:'Calendari',plan:'Piani',day:'Giornate',banner:'Banner',flag:'Red Flags'};
 const fields=(spec,values)=>spec.map(([key,label,type='text',required=false])=>`<label>${e(label)}${type==='json'?`<textarea name="${key}" data-json rows="5">${e(JSON.stringify(values[key]??{},null,2))}</textarea>`:type==='textarea'?`<textarea name="${key}">${e(values[key]??'')}</textarea>`:`<input name="${key}" type="${type}" ${required?'required':''} ${type==='number'?'min="0" step="1"':''} value="${e(values[key]??'')}">`}</label>`).join('');
@@ -35,7 +36,7 @@ export function createDocumentEditor({getContext,onChange,onCreate,onRefresh,onS
     if(kind==='production')return fields([['title','Titolo progetto','text',true]],p())+propertyFields(p().production,'production');
     if(kind==='scene'){
       draftRefs=structuredClone(r.elementRefs||[]);
-      return sceneFieldsMarkup(r,{form:true})+`<fieldset><legend>Elementi della scena e quantità</legend><div id="editorRefs"></div><label>Aggiungi elemento<select id="editorAddElement"><option value="">Scegli…</option>${options(p().elements,r=>r.id,r=>`${r.category} · ${r.boardId||''} ${r.name}`)}</select></label></fieldset>`;
+      return sceneFieldsMarkup(r,{form:true,project:p()})+`<fieldset><legend>Elementi della scena e quantità</legend><div id="editorRefs"></div><label>Aggiungi elemento<select id="editorAddElement"><option value="">Scegli…</option>${options(p().elements,r=>r.id,r=>`${r.category} · ${r.boardId||''} ${r.name}`)}</select></label></fieldset>`;
     }
     if(kind==='element')return fields([['name','Nome','text',true],['boardId','Board ID'],['sortOrder','Ordine'],['notes','Note','textarea']],{...r,notes:r.notes??r.source?.notes??''})+`<label>Categoria<select name="category">${options([...p().categorySettings,...(r.category&&!p().categorySettings.some(c=>c.name===r.category)?[{name:r.category}]:[])],c=>c.name,c=>c.name)}</select></label>`+propertyFields(r.properties||{},'properties')+`<label>Elementi collegati<select name="linkedElementIds" multiple size="5">${p().elements.filter(el=>el.id!==r.id).map(el=>`<option value="${e(el.id)}" ${(r.linkedElements||[]).some(([cat,name])=>cat===el.category&&name===el.name)?'selected':''}>${e(el.category)} · ${e(el.name)}</option>`).join('')}</select></label>`;
     if(kind==='category')return fields([['name','Nome','text',true],['color','Colore','color']],{...r,color:r.color||'#0c877c'})+propertyFields(r.attributes||{},'attributes')+propertyFields(r.properties||{},'properties');
@@ -52,8 +53,8 @@ export function createDocumentEditor({getContext,onChange,onCreate,onRefresh,onS
   function wireRefs(scene){
     function refs(){dialog.querySelector('#editorRefs').innerHTML=draftRefs.map((ref,i)=>`<div data-ref="${i}"><span>${e(ref.category)} · ${e(ref.name||ref.elementId||'Non risolto')}</span><input aria-label="Quantità ${e(ref.name)}" type="number" min="0" step="any" placeholder="Non specificata" value="${e(typeof ref.quantity==='number'?ref.quantity:'')}" ${ref.quantity&&typeof ref.quantity==='object'?'disabled':''}><button type="button" data-remove-ref="${i}" aria-label="Rimuovi elemento">×</button></div>`).join('')}
     refs();dialog.querySelector('#editorRefs').oninput=event=>{const row=event.target.closest('[data-ref]');if(row)draftRefs[Number(row.dataset.ref)].quantity=event.target.value===''?null:Number(event.target.value)};
-    dialog.querySelector('#editorRefs').onclick=event=>{const button=event.target.closest('[data-remove-ref]');if(button){draftRefs.splice(Number(button.dataset.removeRef),1);dirty=true;refs()}};
-    dialog.querySelector('#editorAddElement').onchange=event=>{const el=p().elements.find(e=>e.id===event.target.value);if(el&&!draftRefs.some(r=>r.elementId===el.id))draftRefs.push({elementId:el.id,category:el.category,name:el.name,resolved:true,quantity:null,quantityOrigin:'absent'});event.target.value='';dirty=true;refs()};
+    dialog.querySelector('#editorRefs').onclick=event=>{const button=event.target.closest('[data-remove-ref]');if(button){const removed=draftRefs.splice(Number(button.dataset.removeRef),1)[0],field=builtinField(removed.category);if(field)dialog.querySelector(`[name="${field}"]`).value='';dirty=true;refs()}};
+    dialog.querySelector('#editorAddElement').onchange=event=>{const el=p().elements.find(e=>e.id===event.target.value);if(el){const field=builtinField(el.category);if(field){draftRefs=draftRefs.filter(ref=>builtinField(ref.category)!==field);dialog.querySelector(`[name="${field}"]`).value=el.name}}if(el&&!draftRefs.some(r=>r.elementId===el.id))draftRefs.push({elementId:el.id,category:el.category,name:el.name,resolved:true,quantity:null,quantityOrigin:'absent'});event.target.value='';dirty=true;refs()};
   }
   function submit(event){
     event.preventDefault();const form=event.target;

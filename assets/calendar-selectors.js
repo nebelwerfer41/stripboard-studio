@@ -1,3 +1,5 @@
+import {catalogCategories,builtinField} from './element-management.js';
+import {singleSceneValue} from './scene-values.js';
 import {entriesForBoard} from './board-segments.js';
 import {calendarDate,eventsOnDate,redFlagsOnDate,redFlagsForStrip,findCalendar,outsideCalendarActivity,boardWithCalendar} from './production-data.js';
 export function calendarPlanEntries(project,boardName,visibleIds,calendarId){
@@ -37,14 +39,16 @@ export function activeSceneContext(project,boardName,sceneId,stripId){
   return {scene,occurrence:occurrence||null};
 }
 export function breakdownCategories(project,scene,{hideEmpty=false}={}){
-  const categories=(project.categorySettings||[]).map((c,i)=>({...c,id:c.id??`category:${JSON.stringify([c.name,i])}`,items:[]}));
+  const chosen=new Map(),categories=catalogCategories(project).filter(c=>{const field=builtinField(c.name);if(!field)return true;const preferred=singleSceneValue(project,scene,field).element?.category;if(preferred&&c.name!==preferred)return false;if(chosen.has(field))return false;chosen.set(field,c.name);return true}).map((c,i)=>({...c,id:c.id??`category:${JSON.stringify([c.name,i])}`,items:[]}));
   const elements=new Map(project.elements.map(e=>[e.id,e]));
   for(const ref of scene?.elementRefs||[]){
+    if(builtinField(elements.get(ref.elementId)?.category||ref.category))continue;
     const element=elements.get(ref.elementId);
     let category=categories.find(c=>ref.categoryId?c.id===ref.categoryId:c.name===ref.category);
     if(!category){category={id:ref.categoryId??`unknown:${JSON.stringify(ref.category)}`,name:ref.category||'Categoria non risolta',unknown:true,items:[]};categories.push(category)}
     category.items.push({...ref,element,properties:element?.properties||{}});
   }
+  for(const category of categories){const field=builtinField(category.name);if(!field)continue;category.sceneField=field;const value=singleSceneValue(project,scene,field);if(value.name)category.items=[{...value.ref,elementId:value.element?.id||null,category:category.name,name:value.name,resolved:true,element:value.element,properties:value.element?.properties||{},single:true}]}
   return hideEmpty?categories.filter(c=>c.items.length):categories;
 }
 export const canSplit=width=>width>1200;

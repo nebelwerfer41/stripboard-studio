@@ -32,7 +32,7 @@ export async function parseStudio(bytes){
   if(data.type==='stripboard-studio'&&data.version===2){
     if(typeof data.fileName!=='string'||!data.fileName)throw Error('Nome file Studio non valido');
     if(!data.document||!data.views||!Array.isArray(data.views.stripLayouts)||!Array.isArray(data.views.reportLayouts))throw Error('Documento Studio non valido');
-    validateDocument(data.document);
+    validateDocument(data.document,{allowLegacySingleValues:true});
     let project;
     if(data.native!==null){
       if(typeof data.native!=='string')throw Error('Archivio sorgente non valido');

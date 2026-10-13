@@ -239,7 +239,7 @@ async function loadSample(id){
   catch(e){showStatus(e.message);$('projectTitle').textContent=state.project?.title||'Importa un progetto .msd'}
 }
 function setProject(data){
-  documentEditor.reset();catalogEditor.reset();deleteOverlay.close();flagDeleteOverlay.close();state.flags=freshFlags();
+  documentEditor.reset();catalogEditor.reset();integratedEditing.reset();deleteOverlay.close();flagDeleteOverlay.close();state.flags=freshFlags();
   document.querySelector('.project-heading').open=false;
   resetDocumentState(state);
   const isMmsx=data.format==='mmsx';
@@ -416,7 +416,7 @@ function formatTemplate(t,ctx){
 function requirementNames(scene,categories,{day=false,forBoard=false}={}){
   if(!scene)return [];
   const rows=!categories?.length||categories.some(x=>/all remaining/i.test(x))?Object.entries(scene.requirements||{}):categories.map(c=>[c,scene.requirements?.[c]||[]]);
-  return rows.flatMap(([category,names])=>names.filter(name=>{const options=elementOptions(state.elementMap.get(`${category}\u0000${name}`));return (!day||options.useDailyQuantity)&&(!forBoard||!options.excludeFromBoard)}));
+  return rows.flatMap(([category,names])=>names.filter(name=>{const options=elementOptions(state.elementMap.get(`${category}\u0000${name}`));return (!day||options.useDailyQuantity&&scene.elementRefs.some(ref=>ref.category===category&&ref.name===name&&ref.useDailyQuantity!==false))&&(!forBoard||!options.excludeFromBoard)}));
 }
 function contextRequirements(ctx,categories){
   const forBoard=['board','calendar'].includes(state.mode);
