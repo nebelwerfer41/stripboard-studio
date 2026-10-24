@@ -180,10 +180,16 @@ function openElementBulk(kind){
   bulkOverlay.dialog.querySelector('form').onsubmit=event=>{event.preventDefault();const values=new FormData(event.target);try{applyDocumentCommand(()=>{if(kind==='ids')bulkElementIds(state.project,ids,{start:Number(values.get('start')),prefix:String(values.get('prefix'))});else moveElementsToCategory(state.project,ids,String(values.get('category')))});if(kind!=='ids'){state.dataCategory=String(values.get('category'));renderProductionViewer()}bulkOverlay.close()}catch(error){bulkOverlay.dialog.querySelector('[data-overlay-error]').textContent=error.message}};
 }
 function addSceneAtSelection(){
+  const fullBreakdown=state.mode==='breakdown';
   try{let result;applyDocumentCommand(()=>{result=insertScene(state.project,{boardName:state.board,key:state.selectionAnchorId})});state.board=result.board.name;
     state.selectedStripIds=new Set([result.strip.sourceKey]);state.selectionAnchorId=state.activeStripId=result.strip.sourceKey;state.activeSceneId=result.scene.id;
-    const mode=['board','calendar'].includes(state.mode)?state.mode:'board';state.previewOpen=true;state.layoutChoice=canSplit(innerWidth)?`${mode}-breakdown`:'single';
-    if(canSplit(innerWidth))setMode(mode);else{state.breakdownReturnMode=mode;setMode('breakdown')}
+    state.previewOpen=true;
+    if(fullBreakdown)setMode('breakdown');
+    else{
+      const mode=['board','calendar'].includes(state.mode)?state.mode:'board';
+      state.layoutChoice=canSplit(innerWidth)?`${mode}-breakdown`:'single';
+      if(canSplit(innerWidth))setMode(mode);else{state.breakdownReturnMode=mode;setMode('breakdown')}
+    }
     $('breakdownPreview').querySelector('[data-scene-field=scene]')?.focus();
   }catch(error){showStatus(error.message)}
 }
@@ -279,13 +285,13 @@ function setMode(mode){
   state.mode=mode;
   document.body.dataset.view=mode;
   if(['board','calendar'].includes(mode)&&state.layoutChoice.endsWith('-breakdown'))state.layoutChoice=`${mode}-breakdown`;
-  for(const [id,key] of [['boardNav','board'],['calendarNav','calendar'],['breakdownNav','breakdown'],['reportNav','report'],['redFlagNav','redflags'],['dataNav','data'],['doodNav','dood']]){
+  for(const [id,key] of [['boardNav','board'],['calendarNav','calendar'],['breakdownNav','breakdown'],['reportNav','report'],['redFlagNav','redflags'],['dataNav','data'],['projectNav','project'],['doodNav','dood']]){
     $(id).classList.toggle('active',mode===key);
     if(mode===key)$(id).setAttribute('aria-current','page');else $(id).removeAttribute('aria-current');
   }
   delete $('layoutSelect').dataset.displayTarget;
   $('layoutLabel').textContent=mode==='board'?'LAYOUT STRIPBOARD':'MODELLO REPORT';
-  $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'CALENDAR',breakdown:'SPOGLIO',redflags:'RED FLAG ENTRY',data:'DETTAGLI PROGETTO ED ELEMENTI',dood:'DAY OUT OF DAYS'}[mode];
+  $('sectionKicker').textContent={board:'PIANO DI LAVORAZIONE',report:'ANTEPRIMA REPORT',calendar:'CALENDAR',breakdown:'BREAKDOWN',redflags:'RED FLAG ENTRY',data:'ELEMENTI',project:'PROGETTO',dood:'DAY OUT OF DAYS'}[mode];
   $('search').placeholder=mode==='dood'?'Cerca elemento o ID…':mode==='board'?'Cerca scena, set, testo…':'Cerca nei dati del report…';
   $('toggleUnscheduled').style.display=mode==='board'||mode==='calendar'?'':'none';
   $('reportOptions').hidden=mode!=='report';
@@ -293,14 +299,14 @@ function setMode(mode){
   $('displayOptions').hidden=true;
   $('displayOptions').open=false;
   $('boardFieldPicker').hidden=mode!=='board';
-  $('boardControl').hidden=mode==='redflags'||mode==='data'||mode==='breakdown';
-  $('layoutControl').hidden=mode==='calendar'||mode==='redflags'||mode==='data'||mode==='breakdown'||mode==='dood';
+  $('boardControl').hidden=mode==='redflags'||mode==='data'||mode==='project'||mode==='breakdown';
+  $('layoutControl').hidden=mode==='calendar'||mode==='redflags'||mode==='data'||mode==='project'||mode==='breakdown'||mode==='dood';
   $('calendarControl').hidden=mode!=='board'&&mode!=='calendar';
-  $('panelTools').hidden=mode==='redflags'||mode==='data'||mode==='breakdown';$('search').hidden=mode==='calendar';
-  $('stats').hidden=mode==='calendar'||mode==='redflags'||mode==='data'||mode==='breakdown'||mode==='dood';
+  $('panelTools').hidden=mode==='redflags'||mode==='data'||mode==='project'||mode==='breakdown';$('search').hidden=mode==='calendar';
+  $('stats').hidden=mode==='calendar'||mode==='redflags'||mode==='data'||mode==='project'||mode==='breakdown'||mode==='dood';
   $('controls').classList.toggle('minimal',mode==='redflags');
   const layouts=mode==='board'?state.project?.stripLayouts:state.project?.reportLayouts;
-  if(mode==='calendar'||mode==='redflags'||mode==='data'||mode==='breakdown'||mode==='dood'){render();return}
+  if(mode==='calendar'||mode==='redflags'||mode==='data'||mode==='project'||mode==='breakdown'||mode==='dood'){render();return}
   if(!layouts)return;
   if(mode==='board'){
     state.boardLayoutChoice??=(layouts.find(l=>l.orientation==='HORIZONTAL'&&l.name.startsWith('*Schedule'))||layouts.find(l=>l.orientation==='HORIZONTAL')||layouts[0])?.name;
@@ -325,7 +331,7 @@ function render(){
   document.querySelector('.page').classList.toggle('breakdown-focus',previewOnly);
   const boardVisible=!previewOnly&&(state.mode==='board'||split&&state.layoutChoice==='calendar-board');
   const calendarVisible=!previewOnly&&(state.mode==='calendar'||split&&state.layoutChoice==='calendar-board');
-  for(const [id,visible] of [['boardView',boardVisible],['calendarView',calendarVisible],['breakdownPreview',breakdownVisible],['doodView',state.mode==='dood'],['reportView',state.mode==='report'],['redFlagView',state.mode==='redflags'],['dataView',state.mode==='data']])$(id).hidden=!visible;
+  for(const [id,visible] of [['boardView',boardVisible],['calendarView',calendarVisible],['breakdownPreview',breakdownVisible],['doodView',state.mode==='dood'],['reportView',state.mode==='report'],['redFlagView',state.mode==='redflags'],['dataView',state.mode==='data'],['projectView',state.mode==='project']])$(id).hidden=!visible;
   $('workspaceToolbar').hidden=!wide||(!primary&&state.mode!=='breakdown');
   $('workspaceLayout').disabled=!wide;$('workspaceLayout').value=state.layoutChoice;
   $('workspaceLayoutControl').hidden=!wide;
@@ -339,7 +345,7 @@ function render(){
   $('workspaceViews').classList.toggle('preview-only',previewOnly);
   $('workspaceViews').style.setProperty('--split-ratio',String(state.splitRatio/100));
   $('previewButton').setAttribute('aria-expanded',String(breakdownVisible));
-  $('previewButton').textContent=previewOnly?`← Torna a ${state.mode==='calendar'?'Calendar':'Stripboard'}`:breakdownVisible?'Chiudi Spoglio':'Anteprima Spoglio';
+  $('previewButton').textContent=previewOnly?`← Torna a ${state.mode==='calendar'?'Calendar':'Stripboard'}`:breakdownVisible?'Chiudi Breakdown':'Anteprima Breakdown';
   for(const [id,key] of [['boardNav','board'],['calendarNav','calendar'],['breakdownNav','breakdown']]){
     const active=key==='breakdown'?previewOnly:state.mode===key&&!previewOnly;
     $(id).classList.toggle('active',active);
@@ -347,8 +353,9 @@ function render(){
   }
   if(breakdownVisible)renderBreakdown();
   $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
-  if(state.mode==='breakdown'){$('viewTitle').textContent='Spoglio';$('viewSubtitle').textContent='Scheda scena e fabbisogni di produzione';return}
-  if(state.mode==='data'){$('viewTitle').textContent='Dettagli progetto ed elementi';$('viewSubtitle').textContent='Dati di produzione, schede ed elementi modificabili';if(preservedEditingView!=='dataView')renderProductionViewer();return}
+  if(state.mode==='breakdown'){$('viewTitle').textContent='Breakdown';$('viewSubtitle').textContent='Scheda scena e fabbisogni di produzione';return}
+  if(state.mode==='data'){$('viewTitle').textContent='Elementi';$('viewSubtitle').textContent='Categorie, elementi e proprietà';if(preservedEditingView!=='dataView')renderProductionViewer();return}
+  if(state.mode==='project'){$('viewTitle').textContent='Progetto';$('viewSubtitle').textContent='Production Info';renderProductionInfo();return}
   if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();return}
   if(state.mode==='dood'){$('viewTitle').textContent='Day Out of Days';$('viewSubtitle').textContent='Presenze derivate dal piano · regole della Sub-board';renderDood();return}
   if(calendarVisible)renderCalendarViewer();
@@ -375,14 +382,14 @@ function renderBreakdown(){
   $('breakdownPreview').innerHTML=breakdownMarkup(state.project,state,{safe,shortDate,pages,valueText,sceneOrder:breakdownSceneOrder()});
   const scene=state.project.scenes.find(s=>s.id===state.activeSceneId);
   if(scene){const view=$('breakdownPreview');for(const el of view.querySelectorAll('.breakdown-fields,.breakdown-synopsis,.breakdown-empty-toggle,.breakdown-categories'))el.remove();view.insertAdjacentHTML('beforeend',sceneEditingMarkup(state.project,scene,state));}
-  $('breakdownPreview').insertAdjacentHTML('beforeend','<div class="inline-category-tools"><button type="button" data-inline-new="scene">＋ Nuova scena</button></div><div data-editor-host></div>');
+  $('breakdownPreview').insertAdjacentHTML('beforeend','<div data-editor-host></div>');
   fitSceneTextareas($('breakdownPreview'));
 }
 function renderBoardEditingTools(){
   const toolbar=$('boardEditingControls');if(preservedEditingView==='banner')return;
   const key=state.selectedStripIds.has(state.selectionAnchorId)?state.selectionAnchorId:state.activeStripId;
   const strip=entriesForBoard(state.project,state.board).flatMap(e=>e.group.strips).find(s=>s.sourceKey===key),banner=strip?.kind==='banner'?strip:null;
-  toolbar.innerHTML=`<div class="view-editing-actions"><button type="button" data-insert-scene>＋ Scena</button><button type="button" data-insert-banner>＋ Banner</button><button type="button" data-insert-day>＋ Fine giornata</button><button type="button" data-duplicate-strips ${state.selectedStripIds.size?'':'disabled'}>Duplica</button><button type="button" data-delete-strips ${state.selectedStripIds.size?'':'disabled'}>Elimina</button><button type="button" id="boneyardButton" aria-pressed="${state.boneyardVisible}" ${state.mode==='calendar'?'hidden':''}>Boneyard</button></div>${banner?`<form data-inline-banner="${safe(banner.sourceKey)}"><label>Banner<input name="text" aria-label="Testo banner selezionato" required value="${safe(banner.text)}"></label><label>Font<input name="fontSize" type="number" min="7" max="72" step="any" aria-label="Dimensione font banner" value="${safe(banner.style?.fontSize||12)}"></label><label>Tempo<input name="estimateTimeA" aria-label="Tempo banner HH:MM" placeholder="HH:MM" value="${safe(formatTime(banner.estimateTimeA))}"></label><button type="submit">Applica</button></form>`:''}`;
+  toolbar.innerHTML=`<div class="view-editing-actions"><button type="button" data-insert-banner>＋ Banner</button><button type="button" data-insert-day>＋ Fine giornata</button><button type="button" data-duplicate-strips ${state.selectedStripIds.size?'':'disabled'}>Duplica</button><button type="button" data-delete-strips ${state.selectedStripIds.size?'':'disabled'}>Elimina</button><button type="button" id="boneyardButton" aria-pressed="${state.boneyardVisible}" ${state.mode==='calendar'?'hidden':''}>Boneyard</button></div>${banner?`<form data-inline-banner="${safe(banner.sourceKey)}"><label>Banner<input name="text" aria-label="Testo banner selezionato" required value="${safe(banner.text)}"></label><label>Font<input name="fontSize" type="number" min="7" max="72" step="any" aria-label="Dimensione font banner" value="${safe(banner.style?.fontSize||12)}"></label><label>Tempo<input name="estimateTimeA" aria-label="Tempo banner HH:MM" placeholder="HH:MM" value="${safe(formatTime(banner.estimateTimeA))}"></label><button type="submit">Applica</button></form>`:''}`;
 }
 document.addEventListener('submit',event=>{
   if(!event.target.matches('[data-inline-banner]'))return;event.preventDefault();
@@ -1146,19 +1153,13 @@ document.addEventListener('click',event=>{
   if(button.dataset.category){const select=$('documentEditor').querySelector('[name=category]');if(select)select.value=button.dataset.category}
 });
 function renderProductionViewer(){
-  const p=state.project,scenes=[...p.scenes].sort((a,b)=>Number(!a.scene)-Number(!b.scene)||collator.compare(a.scene||'',b.scene||''));
-  const scene=scenes.find(s=>s.bdsId===state.dataScene)||scenes[0];
-  const categories=[...new Set([...p.categorySettings.map(c=>c.name),...p.elements.map(e=>e.category)].filter(Boolean))].sort(collator.compare);
-  const elements=p.elements.filter(e=>!state.dataCategory||e.category===state.dataCategory).sort((a,b)=>collator.compare(a.name||'',b.name||''));
-  const element=elements.find(e=>e.id===state.dataElement)||elements.find(e=>e.name)||elements[0];
-  state.dataScene=scene?.bdsId??null;state.dataElement=element?.id??null;
-  const productionLabels={artDirector:'Scenografia',setDresser:'Arredamento set',timing:'Tempi',episode:'Episodio',miscOne:'Informazioni aggiuntive 1',miscTwo:'Informazioni aggiuntive 2',miscThree:'Informazioni aggiuntive 3',miscFour:'Informazioni aggiuntive 4',title:'Titolo',PictureTitle:'Titolo',company:'Società',director:'Regia',producer:'Produttore',upm:'Direttore di produzione',asstDirector:'Aiuto regia',scriptDated:'Data sceneggiatura',prodNo:'Numero produzione',preparer:'Preparato da'};
-  $('dataView').innerHTML=`${elementCatalogMarkup(p,state)}<details class="project-details"><summary>Produzione e quantità per scheda ▾</summary>
-    <div class="production-cards"><div class="viewer-card"><h3>Produzione</h3><button type="button" data-edit-document="production">Modifica produzione</button>${table(['Campo','Valore'],Object.entries(p.production).map(([key,value])=>[productionLabels[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2'),valueText(value)]))}</div>
-    <div class="viewer-card"><h3>Quantità per scheda</h3><button type="button" data-edit-document="scene">Modifica scena e quantità</button><button type="button" data-edit-document="scene" data-new-record>Nuova scena</button><label class="viewer-label" for="dataSceneSelect">Scheda</label><select id="dataSceneSelect">${scenes.map(s=>`<option value="${safe(s.bdsId)}" ${s===scene?'selected':''}>${safe(s.scene||'Senza numero')} · ${safe(s.synopsis)}</option>`).join('')}</select>
-      ${table(['Categoria','Elemento','Quantità','Stato'],(scene?.elementRefs||[]).map(ref=>[ref.category,ref.name,valueText(ref.quantity),!ref.resolved?'Riferimento non risolto':ref.quantityOrigin==='stored'?'Quantità salvata':'Quantità non presente']))}</div>
-    </div></details>`;
+  $('dataView').innerHTML=elementCatalogMarkup(state.project,state);
   const catalogSearch=$('dataView').querySelector('[data-catalog-search]');if(catalogSearch&&state.dataQuery){catalogSearch.value=state.dataQuery;catalogSearch.dispatchEvent(new Event('input',{bubbles:true}))}
+}
+function renderProductionInfo(){
+  const p=state.project;
+  const productionLabels={artDirector:'Scenografia',setDresser:'Arredamento set',timing:'Tempi',episode:'Episodio',miscOne:'Informazioni aggiuntive 1',miscTwo:'Informazioni aggiuntive 2',miscThree:'Informazioni aggiuntive 3',miscFour:'Informazioni aggiuntive 4',title:'Titolo',PictureTitle:'Titolo',company:'Società',director:'Regia',producer:'Produttore',upm:'Direttore di produzione',asstDirector:'Aiuto regia',scriptDated:'Data sceneggiatura',prodNo:'Numero produzione',preparer:'Preparato da'};
+  $('productionInfo').innerHTML=`<div class="viewer-card"><h3>Production Info</h3><button type="button" data-edit-document="production">Modifica produzione</button>${table(['Campo','Valore'],Object.entries(p.production).map(([key,value])=>[productionLabels[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2'),valueText(value)]))}</div>`;
 }
 function renderCalendarViewer(){
   const view=$('calendarView');
@@ -1365,16 +1366,10 @@ $('boardNav').addEventListener('click',()=>setMode('board'));
 $('reportNav').addEventListener('click',()=>setMode('report'));
 $('calendarNav').addEventListener('click',()=>setMode('calendar'));
 $('doodNav').addEventListener('click',()=>setMode('dood'));
-$('breakdownNav').addEventListener('click',()=>{if(!state.activeSceneId)selectBreakdownScene(breakdownSceneOrder()[0]?.bdsId);setMode('breakdown')});
+$('breakdownNav').addEventListener('click',()=>{if(!breakdownSceneOrder().some(s=>s.id===state.activeSceneId)){state.activeSceneId=null;selectBreakdownScene(breakdownSceneOrder()[0]?.bdsId)};setMode('breakdown')});
 $('redFlagNav').addEventListener('click',()=>setMode('redflags'));
 $('dataNav').addEventListener('click',()=>setMode('data'));
-$('dataView').addEventListener('change',event=>{
-  if(!['dataSceneSelect','dataCategorySelect','dataElementSelect'].includes(event.target.id))return;
-  if(event.target.id==='dataSceneSelect')state.dataScene=event.target.value;
-  if(event.target.id==='dataCategorySelect'){state.dataCategory=event.target.value;state.dataElement=null}
-  if(event.target.id==='dataElementSelect')state.dataElement=event.target.value;
-  render();
-});
+$('projectNav').addEventListener('click',()=>setMode('project'));
 $('calendarView').addEventListener('click',event=>{
   if(event.target.closest('[data-event-manager]')){eventManager.open();return}
   if(event.target.closest('#calendarAgendaToggle')){state.calendarAgenda=!state.calendarAgenda;renderCalendarViewer();$('calendarAgendaToggle').focus();return}
@@ -1494,17 +1489,27 @@ $('previewButton').addEventListener('click',()=>{
 });
 $('breakdownPreview').addEventListener('click',event=>{
   if(event.target.closest('#closeBreakdown'))closeBreakdown();
-  const step=event.target.closest('[data-breakdown-step]');
-  if(step){const scenes=breakdownSceneOrder(),index=scenes.findIndex(s=>s.id===state.activeSceneId);selectBreakdownScene(scenes[index+Number(step.dataset.breakdownStep)]?.bdsId);$('breakdownPreview').querySelector(`[data-breakdown-step="${step.dataset.breakdownStep}"]`)?.focus()}
+  const step=event.target.closest('[data-breakdown-step],[data-breakdown-edge]');
+  if(step){
+    const scenes=breakdownSceneOrder(),index=scenes.findIndex(s=>s.id===state.activeSceneId);
+    const next=step.dataset.breakdownEdge==='first'?0:step.dataset.breakdownEdge==='last'?scenes.length-1:index+Number(step.dataset.breakdownStep);
+    selectBreakdownScene(scenes[next]?.bdsId);
+    $('breakdownPreview').querySelector(step.hasAttribute('data-breakdown-edge')?`[data-breakdown-edge="${step.dataset.breakdownEdge}"]`:`[data-breakdown-step="${step.dataset.breakdownStep}"]`)?.focus();
+  }
 });
+function breakdownEntries(){
+  const segments=new Set(visibleSegmentIds());
+  if(state.boneyardVisible)for(const segment of selectedBoardGroup().segments)if(segment.type==='boneyard')segments.add(segment.id);
+  return entriesForBoard(state.project,state.board,segments);
+}
 function breakdownSceneOrder(){
-  const ids=new Set(displayedEntries().flatMap(e=>e.group.strips.filter(s=>s.kind==='scene').map(s=>s.bdsId)));
-  return [...ids].map(id=>state.sceneMap.get(id)).filter(Boolean).concat(state.project.scenes.filter(s=>!ids.has(s.bdsId)));
+  const ids=new Set(breakdownEntries().flatMap(e=>e.group.strips.filter(s=>s.kind==='scene').map(s=>s.bdsId)));
+  return [...ids].map(id=>state.sceneMap.get(id)).filter(Boolean);
 }
 function selectBreakdownScene(id){
   if(!id||!state.sceneMap.has(id))return;
   state.activeSceneId=state.sceneMap.get(id).id;
-  state.activeStripId=displayedEntries().flatMap(e=>e.group.strips).find(s=>s.kind==='scene'&&s.bdsId===id)?.sourceKey||null;
+  state.activeStripId=breakdownEntries().flatMap(e=>e.group.strips).find(s=>s.kind==='scene'&&s.bdsId===id)?.sourceKey||null;
   state.selectedStripIds=new Set(state.activeStripId?[state.activeStripId]:[]);state.selectionAnchorId=state.activeStripId;
   renderBreakdown();syncStripSelection();if(['board','calendar'].includes(state.mode))renderBoardEditingTools();
   [...$('boardView').querySelectorAll('.strip-outer')].find(el=>itemKey(el)===state.activeStripId)?.scrollIntoView({block:'nearest',inline:'nearest'});
@@ -1579,7 +1584,6 @@ $('doodView').addEventListener('click',async event=>{
   if(target.closest('[data-event-manager]')){eventManager.open();return}
   if(target.closest('#doodPrint')){printService.open();return}
   if(target.closest('#doodCsv')){downloadArtifact('\uFEFF'+doodSummaryCsv(currentDoodReport()),'DOOD Summary.csv','text/csv;charset=utf-8');return}
-  if(target.closest('#doodNativeExport')){try{const project=state.project,bytes=project.format==='mmsx'?await serializeMmsx(project,project.fileName):serializeMsd(project);downloadArtifact(bytes,project.fileName.replace(/\.(msd|mmsx)$/i,'')+'-edited.'+project.format)}catch(error){showStatus(error.message)}return}
   if(target.closest('#doodResetRule')){applyStudioCommand(()=>setDoodRules(state.project,state.board,{elementId:state.dood.ruleElement,rules:null}));return}
   const shift=target.closest('[data-dood-shift]');
   if(shift){const d=new Date((state.dood.goDate||state.doodReport.dates[0]?.date)+'T00:00:00Z');if(!Number.isNaN(d.valueOf())){d.setUTCDate(d.getUTCDate()+Number(shift.dataset.doodShift));scrollDoodToDate(d.toISOString().slice(0,10));$('doodGoDate').value=state.dood.goDate}}
