@@ -2,7 +2,7 @@
 
 > **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
-# Stripboard Studio v1.20
+# Stripboard Studio v1.21
 
 Breakdown uses searchable dropdowns for **Set, Location, INT/EXT, D/N, Script Day, Unit, Sequence and Episode**, including **Aggiungi** for missing values. Built-in values appear only in the scene fields, and choosing or clearing one keeps a single value per scene; resource categories retain multiple checkbox selections, quantities and daily-use options. Scene, synopsis, times, page fields and comments retain direct entry; Sheet remains read-only.
 
@@ -176,3 +176,12 @@ Verified with 166 Node tests and Chromium suites for authoring/save/reopen, the 
 Search/select/create controls in scene fields and category cards, synchronized single-value built-ins, multi-resource selection with daily-use checkboxes, Episode support and consistent catalog renames. Legacy conflicting built-in associations are reconciled to the scene value in the common model; original imported archives remain intact.
 
 Verified with 182 Node tests and Chromium suites for dropdowns, keyboard and blur behavior, source/save/reopen, authoring, previous refinements, responsive layouts, native round-trips and DOOD/PDF output.
+
+
+### v1.21 — Breakdown entry, navigation and project organization
+
+Global Quick Add searches existing elements or creates an element and category in one undoable operation. New Scene lives in the Breakdown header alongside first/previous/next/last scene navigation with monochrome icons. Built-in values remain in scene fields, and category properties can hide numeric quantities without discarding saved values.
+
+Navigation is ordered Stripboard, Breakdown, Calendar, DooD, Red Flags, Elementi and Progetto. Production Info moves to Progetto with access to Reports; the scene quantities panel and duplicate DOOD export action are removed. Linked elements are selected through category and text filters, retain selections across categories and can be applied to existing scenes.
+
+Verified with all 23 Node test files and Chromium suites covering Quick Add, navigation/Boneyard, quantity visibility, linked elements, production editing, dropdowns, authoring, workspace refinements, Studio save/reopen, source conservation, mobile layouts and DOOD/PDF output.
