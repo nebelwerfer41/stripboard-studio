@@ -108,6 +108,8 @@
 .inline-scene .breakdown-element input.daily-quantity-check{width:16px;height:16px;min-width:16px;accent-color:#167f70;padding:0;margin:0 4px}
 .scene-choice-popup{position:fixed;z-index:2000;display:flex;flex-direction:column;background:#fff;border:1px solid #92bfce;border-radius:4px;box-shadow:0 4px 15px #17354035;box-sizing:border-box;overflow:hidden;color:#233c49;font-size:13px}
 .scene-choice-popup[hidden]{display:none!important}.scene-choice-list{overflow:auto;min-height:0;overscroll-behavior:contain}
+.scene-choice-popup>[data-choice-more]{flex-shrink:0;width:100%;min-height:32px;border:0;border-top:1px solid #d9e1e5;background:#f3f8f9;color:#0c766a;font:inherit;cursor:pointer}
+.scene-choice-popup>[data-choice-more]:hover{background:#e4f0ee}
 .scene-choice-option{border-bottom:1px solid #e7edef}.scene-choice-option.chosen{background:#fffbd4}.scene-choice-option.highlighted{background:#fff8bb}
 .scene-choice-option>button{display:block;width:100%;text-align:left;padding:10px 12px;min-height:38px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;overflow-wrap:anywhere}
 .scene-choice-option>label{display:flex;align-items:center;gap:8px;margin:0;padding:9px 12px;min-height:38px;box-sizing:border-box;cursor:pointer}
@@ -118,3 +120,15 @@
 .inline-scene .breakdown-categories{grid-template-columns:repeat(auto-fit,minmax(min(270px,100%),1fr));gap:12px;align-items:start}
 .inline-scene .breakdown-element{flex-wrap:nowrap;gap:7px;align-items:center}.inline-scene .breakdown-element strong{flex:1;min-width:0;overflow-wrap:anywhere}
 .inline-scene .breakdown-element input[type=number]{flex:none;width:43px}.inline-scene .breakdown-element>button{flex:none;width:18px;padding:0}
+
+/* Production Info is edited directly, using the workspace field controls. */
+.production-info-panel{padding:20px;max-width:1400px;margin:0 auto;color:#28414f}
+.production-edit-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 28px}
+.production-edit-fields .production-field{display:grid;grid-template-columns:140px minmax(0,1fr);align-items:start;gap:8px;margin:0;min-width:0}
+.production-field>span{padding-top:9px;font-size:11px;color:#627986}
+.production-field input,.production-field select,.production-field textarea{min-height:32px;padding:6px 8px;font:inherit;font-size:13px;box-sizing:border-box;width:100%;min-width:0;border:1px solid #d4dfe3;border-radius:4px;background:#fff;color:#28414f}
+.production-field select:focus{outline:2px solid #78b9ac;outline-offset:1px}
+.production-field textarea{resize:vertical;min-height:72px}
+.production-field [aria-invalid=true]{border-color:#a32626}
+@media(max-width:900px){.production-edit-fields{gap:12px 18px}.production-edit-fields .production-field{grid-template-columns:110px minmax(0,1fr)}}
+@media(max-width:620px){.production-info-panel{padding:12px}.production-edit-fields{grid-template-columns:1fr;gap:12px}.production-edit-fields .production-field{grid-template-columns:1fr;gap:4px}.production-field>span{padding-top:0}.production-field input,.production-field select,.production-field textarea{font-size:16px;min-height:36px}}

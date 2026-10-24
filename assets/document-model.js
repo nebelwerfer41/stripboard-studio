@@ -4,7 +4,7 @@ import {standardLayout} from './strip-display.js';
 import {ExactNumber} from './mmsx-codec.js';
 import {validDate} from './production-data.js';
 import {isBuiltinCategory,categoryDefaults,elementOptions,builtinField,catalogCategories} from './element-management.js';
-import {SINGLE_SCENE_FIELDS,refSceneField,normalizeSceneSingleValues,singleSceneValue,assertSceneSingleValues} from './scene-values.js';
+import {SINGLE_SCENE_FIELDS,refSceneField,normalizeSceneSingleValues,singleSceneValue,assertSceneSingleValues,sceneValueIndex} from './scene-values.js';
 export const DOCUMENT_KEYS=['title','production','scenes','elements','categorySettings','boards','calendars','events','redFlags','redFlagNames','redFlagSettings','activeBoard','defaultCalendar','studio','documentEditing','stripLayouts','reportLayouts','colors','capabilities'];
 export const SCENE_FIELDS={scene:'Scena',synopsis:'Sinossi',ie:'INT / EXT',dn:'DAY / NIGHT',set:'Set',location:'Location',scriptDay:'Script day',episode:'Episodio',unit:'Unità',sequence:'Sequenza',scriptPageNumbers:'Pagine script',pagesEighths:'Pagine',estimateTimeA:'Tempo stimato',estimateTimeB:'Tempo schermo',comments:'Commenti'};
 const uid=kind=>`studio-${kind}:${crypto.randomUUID()}`;
@@ -139,7 +139,7 @@ export function validateDocument(p,{allowLegacySingleValues=false}={}){
   for(const e of p.events)if(!Array.isArray(e.targets))throw Error('Target evento non validi');
   for(const f of p.redFlags)if(!record(f.target))throw Error('Target Red Flag non valido');
   for(const [key,field] of [['scenes','bdsId'],['elements','id'],['boards','id'],['calendars','id']]){const ids=new Set();for(const r of p[key]){if(typeof r[field]!=='string'||ids.has(r[field]))throw Error(`Identità ${key} non valida`);ids.add(r[field])}}
-  if(!allowLegacySingleValues)for(const scene of p.scenes)assertSceneSingleValues(p,scene);
+  if(!allowLegacySingleValues){const index=sceneValueIndex(p);for(const scene of p.scenes)assertSceneSingleValues(p,scene,index)}
   const scenes=new Set(p.scenes.map(s=>s.bdsId));for(const b of p.boards){const keys=new Set();for(const g of [...b.scheduledGroups,...b.unscheduledGroups]){if(!Array.isArray(g.strips))throw Error('Gruppo strip non valido');for(const s of g.strips){if(keys.has(s.sourceKey)||!s.sourceKey)throw Error('Identità strip duplicata');keys.add(s.sourceKey);if(s.kind==='scene'&&!scenes.has(s.bdsId))throw Error('Strip senza scena')}}}
   return p;
 }

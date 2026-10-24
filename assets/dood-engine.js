@@ -100,15 +100,29 @@ export function calculateDood({project,board,calendar,elements=doodElements(proj
     }
   }
   if(dates.some(d=>d.calendar.working===null))diagnostics.push('Calendario non risolto: Hold non assegnato nei giorni ambigui');
+  // Index each scheduled scene once, rather than scanning all its refs for every row.
+  const attendance=new Map(),sceneOrder=new WeakMap();
+  const fieldKey=(field,name)=>JSON.stringify([field,name]);
+  for(const [date,day] of days){
+    const ids=new Map(),fields=new Map();let order=0;
+    const add=(map,key,item)=>{if(!map.has(key))map.set(key,[]);map.get(key).push(item)};
+    for(const item of day.scenes.values()){
+      sceneOrder.set(item,order++);
+      const scene=item.scene,keys=new Set([...(scene.elementRefs||[]).filter(r=>r.resolved).map(r=>r.elementId),...(scene.fieldElementIds||[])]);
+      for(const id of keys)add(ids,id,item);
+      if(project.format==='msd')for(const [field] of SCENE_FIELDS)if(scene[field]!=null)add(fields,fieldKey(field,scene[field]),item);
+    }
+    attendance.set(date,{ids,fields});
+  }
+  const eventTypes=new Map(known.map(e=>[e,doodEventType(e)]));
   const rows=elements.map(element=>{
     const rules=normalizeRules(rulesForElement(element));
     const field=project.format==='msd'?(element.doodField||categoryField(element.category)):null;
+    const elementEvents=known.filter(e=>['holiday','move'].includes(eventTypes.get(e))||targetsElement(e,element));
     const cells=dates.map(day=>{
-      const scenes=[...(days.get(day.date)?.scenes.values()||[])].filter(({scene})=>
-        (scene.elementRefs||[]).some(ref=>ref.resolved&&ref.elementId===element.id)||
-        (scene.fieldElementIds||[]).includes(element.id)||
-        field&&scene[field]===element.name);
-      const matching=known.filter(e=>intervalContains(e,day.date)&&(['holiday','move'].includes(doodEventType(e))||targetsElement(e,element)));
+      const indexed=attendance.get(day.date),direct=indexed?.ids.get(element.id)||[],scalar=field?indexed?.fields.get(fieldKey(field,element.name))||[]:[];
+      const scenes=scalar.length?[...new Set([...direct,...scalar])].sort((a,b)=>sceneOrder.get(a)-sceneOrder.get(b)):direct;
+      const matching=elementEvents.filter(e=>intervalContains(e,day.date));
       const individualTypes=[...new Set(matching.map(doodEventType).filter(t=>Object.hasOwn(ACTIVITY_CODES,t)))];
       const companyTypes=[...new Set(matching.map(doodEventType).filter(t=>Object.hasOwn(COMPANY_CODES,t)))];
       if(day.calendar.specialDay?.attributes?.Holiday==='1'&&!companyTypes.includes('holiday'))companyTypes.push('holiday');

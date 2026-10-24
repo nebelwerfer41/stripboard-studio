@@ -29,7 +29,9 @@ const builtinNames=[['set','Set'],['location','Location'],['dn','D/N'],['ie','I/
 export function catalogCategories(project){
  const list=[...project.categorySettings];for(const [field,name] of builtinNames)if(!list.some(c=>builtinField(c.name)===field))list.push({id:`derived-category:${field}`,name,builtIn:true,attributes:{},properties:{},derived:true});return list;
 }
-export function catalogElements(project){
- const list=[...project.elements],categories=catalogCategories(project);
- for(const [field] of builtinNames){const category=categories.find(c=>builtinField(c.name)===field);for(const scene of project.scenes){const name=scene[field];if(name==null||name==='')continue;if(!list.some(el=>builtinField(el.category)===field&&el.name===name))list.push({id:`derived-element:${JSON.stringify([field,name])}`,name,category:category.name,boardId:'',derived:true})}}return list;
+export function catalogElements(project,onlyField=null){
+ const list=onlyField?project.elements.filter(el=>builtinField(el.category)===onlyField):[...project.elements],categories=catalogCategories(project);
+ const names=new Map(builtinNames.map(([field])=>[field,new Set()]));
+ for(const el of list)names.get(builtinField(el.category))?.add(el.name);
+ for(const [field] of builtinNames){if(onlyField&&field!==onlyField)continue;const category=categories.find(c=>builtinField(c.name)===field),seen=names.get(field);for(const scene of project.scenes){const name=scene[field];if(name==null||name===''||seen.has(name))continue;seen.add(name);list.push({id:`derived-element:${JSON.stringify([field,name])}`,name,category:category.name,boardId:'',derived:true})}}return list;
 }

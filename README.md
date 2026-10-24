@@ -22,6 +22,10 @@ The editor’s format audit and conservative writing strategy are described in [
 
 A static application for viewing and reordering stripboards, creating alternative schedules, and inspecting report templates in Movie Magic Scheduling 6 (`.msd`) files. Parsing, rendering, and writing run in the browser, without a backend, database, or account. Imported files remain in the browser and are not uploaded to a server.
 
+Production Info uses a single, directly editable field grid without categories or an overlay. Changes apply on leaving a field or pressing Enter, support Undo/Redo, and invalid or unfinished fields block saving until corrected or discarded with Escape. Imported field names, custom values and data types are retained. Report is available in the main navigation immediately after Elementi.
+
+Large-project performance: scene-value normalization and validation share operation-scoped element indexes. Searchable dropdowns project only the requested field, reuse choices while searching and show long lists in batches of 100. DOOD indexes scheduled attendance and caches the current category calculation until the document revision, plan or category changes. Large matrices use separate element/date pages with at most 6,000 date cells per screen; totals, CSV and print still use the complete filtered report. A small loading indicator appears before uncached DOOD rendering on projects above 2,000 scenes or elements. Imports and the full DOOD calculation still live in browser memory; paging limits screen rendering, rather than streaming the source archive.
+
 ## GitHub Pages
 
 Upload this folder’s contents to the root of a GitHub repository. In the repository settings, open **Pages**, select **Deploy from a branch**, then `main` and `/ (root)`. The application will be available at the repository’s Pages URL. HTML, CSS, JavaScript, and sample paths are relative, so they also work under a repository path such as `/repository-name/`.
@@ -111,6 +115,8 @@ Browser suites require Playwright, a local server and optionally `CHROME_PATH`. 
 
 ```sh
 CHROME_PATH=/usr/bin/chromium node tests/browser-refinements.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-performance.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-production-info.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-workspace-revision.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-dood-qa node tests/browser-dood.cjs

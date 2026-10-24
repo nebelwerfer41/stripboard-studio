@@ -13,8 +13,10 @@ import {moveCalendarItems,editCalendar,snapshotProduction,restoreProduction} fro
 import {canSplit} from './calendar-selectors.js';
 import {calendarMarkup,breakdownMarkup,CALENDAR_VISIBILITY} from './workspace-views.js';
 import {STANDARD_PRESETS,standardLayout,presetFields,selectedFields,fieldsMarkup,fieldsPickerMarkup} from './strip-display.js';
-import {calculateDood,doodElements,sortDoodRows,doodSummaryCsv,effectiveDoodRules,DEFAULT_DOOD_RULES} from './dood-engine.js';
+import {doodElements,sortDoodRows,doodSummaryCsv,effectiveDoodRules,DEFAULT_DOOD_RULES} from './dood-engine.js';
 import {doodMarkup} from './dood-view.js';
+import {productionInfoMarkup,createProductionEditing} from './production-info.js';
+import {createDoodCache,doodWindow} from './dood-performance.js';
 import {ensureStudio,snapshotStudio,restoreStudio,setDoodRules,serializeStudio,parseStudio} from './studio-project.js';
 import {createPrintService} from './print-service.js';
 import {createCatalogEditor} from './catalog-editor.js';
@@ -115,6 +117,7 @@ function updateDocumentStatus(){
   $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
 }
 function rebuildDocumentIndexes(){
+  doodCache.clear();
   refreshDocument(state.project);state.sceneMap=sceneIndex();state.elementMap=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e]));state.elementIds=new Map(state.project.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.categorySettings=new Map(state.project.categorySettings.map(c=>[c.name,c.attributes]));
   if(!state.project.boards.some(b=>b.name===state.board))state.board=state.project.activeBoard||state.project.boards[0].name;
   state.calendar=selectedBoard()?.calendarId||state.calendar;
@@ -132,6 +135,7 @@ const documentEditor=createDocumentEditor({getContext:()=>({project:state.projec
 $('newDocumentButton').addEventListener('click',()=>{if(isDirty()&&!window.confirm('Ci sono modifiche non salvate. Creare un nuovo progetto?'))return;document.querySelector('.project-heading').open=false;documentEditor.newDocument()});
 const catalogEditor=createCatalogEditor({getContext:()=>({project:state.project,boardName:state.board}),onChange:applyDocumentCommand,onRefresh:()=>render(),onError:showStatus});
 const integratedEditing=createIntegratedEditing({getProject:()=>state.project,onChange:applyDocumentCommand,onError:showStatus});
+const productionEditing=createProductionEditing({getProject:()=>state.project,onChange:applyDocumentCommand,onError:showStatus});
 installOverlayDismissal();
 const colorEditor=createStripColorEditor({getProject:()=>state.project,onChange:applyDocumentCommand});
 const calendarEditor=createCalendarEditor({getContext:()=>({project:state.project,boardName:state.board,date:state.calendarDate}),onChange:applyDocumentCommand,onCreated:id=>{state.calendar=id;state.calendarDate=selectedProductionCalendar()?.scheduleDates.ProductionStartDate?.iso||state.calendarDate;state.calendarMonth=state.calendarDate?.slice(0,7)||state.calendarMonth;render()}});
@@ -355,7 +359,7 @@ function render(){
   $('undoMoveButton').disabled=!state.orderHistory.length;$('redoMoveButton').disabled=!state.redoHistory.length;
   if(state.mode==='breakdown'){$('viewTitle').textContent='Breakdown';$('viewSubtitle').textContent='Scheda scena e fabbisogni di produzione';return}
   if(state.mode==='data'){$('viewTitle').textContent='Elementi';$('viewSubtitle').textContent='Categorie, elementi e proprietà';if(preservedEditingView!=='dataView')renderProductionViewer();return}
-  if(state.mode==='project'){$('viewTitle').textContent='Progetto';$('viewSubtitle').textContent='Production Info';renderProductionInfo();return}
+  if(state.mode==='project'){$('viewTitle').textContent='Progetto';$('viewSubtitle').textContent='Production Info';if(preservedEditingView!=='projectView')renderProductionInfo();return}
   if(state.mode==='redflags'){$('viewTitle').textContent='Red Flag Entry';$('viewSubtitle').textContent='Date, elementi e vincoli di produzione';renderRedFlagViewer();return}
   if(state.mode==='dood'){$('viewTitle').textContent='Day Out of Days';$('viewSubtitle').textContent='Presenze derivate dal piano · regole della Sub-board';renderDood();return}
   if(calendarVisible)renderCalendarViewer();
@@ -1142,6 +1146,7 @@ document.addEventListener('click',event=>{
   const category=event.target.closest('[data-catalog-category]');if(category){state.dataCategory=category.dataset.catalogCategory;state.dataQuery='';state.dataSelectedElements.clear();renderProductionViewer();return}
   const button=event.target.closest('[data-edit-document],[data-inline-new]');if(!button)return;
   const kind=button.dataset.editDocument||button.dataset.inlineNew;
+  if(kind==='production'){setMode('project');return}
   if(kind==='calendar'){calendarEditor.open(button.hasAttribute('data-new-record')?null:state.calendar);return}
   if(kind==='scene'&&(button.dataset.inlineNew||button.hasAttribute('data-new-record'))){addSceneAtSelection();return}
   if(kind==='banner'&&button.dataset.inlineNew){addBannerAtSelection();return}
@@ -1157,9 +1162,7 @@ function renderProductionViewer(){
   const catalogSearch=$('dataView').querySelector('[data-catalog-search]');if(catalogSearch&&state.dataQuery){catalogSearch.value=state.dataQuery;catalogSearch.dispatchEvent(new Event('input',{bubbles:true}))}
 }
 function renderProductionInfo(){
-  const p=state.project;
-  const productionLabels={artDirector:'Scenografia',setDresser:'Arredamento set',timing:'Tempi',episode:'Episodio',miscOne:'Informazioni aggiuntive 1',miscTwo:'Informazioni aggiuntive 2',miscThree:'Informazioni aggiuntive 3',miscFour:'Informazioni aggiuntive 4',title:'Titolo',PictureTitle:'Titolo',company:'Società',director:'Regia',producer:'Produttore',upm:'Direttore di produzione',asstDirector:'Aiuto regia',scriptDated:'Data sceneggiatura',prodNo:'Numero produzione',preparer:'Preparato da'};
-  $('productionInfo').innerHTML=`<div class="viewer-card"><h3>Production Info</h3><button type="button" data-edit-document="production">Modifica produzione</button>${table(['Campo','Valore'],Object.entries(p.production).map(([key,value])=>[productionLabels[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2'),valueText(value)]))}</div>`;
+  $('productionInfo').innerHTML=productionInfoMarkup(state.project);
 }
 function renderCalendarViewer(){
   const view=$('calendarView');
@@ -1314,7 +1317,7 @@ document.addEventListener('keydown',event=>{
 });
 $('saveButton').addEventListener('click',async()=>{
   if(!state.project||state.serializationState==='saving')return;
-  if(integratedEditing.hasDraft()||documentEditor.hasDraft()||catalogEditor.hasDraft()||eventManager.hasDraft()){showStatus('Applica o correggi i campi ancora in modifica prima di salvare.');return}
+  if(productionEditing.hasDraft()||integratedEditing.hasDraft()||documentEditor.hasDraft()||catalogEditor.hasDraft()||eventManager.hasDraft()){showStatus('Applica o correggi i campi ancora in modifica prima di salvare.');return}
   const token=beginDocumentSave(state),project=token.project;
   const saveProject={...project,...snapshotDocument(project)};
   updateDocumentStatus();showStatus('');
@@ -1336,7 +1339,7 @@ $('saveButton').addEventListener('click',async()=>{
   }catch(error){finishDocumentSave(state,token,false);if(error.name!=='AbortError')showStatus(`Salvataggio non riuscito: ${error.message}`)}
   finally{updateDocumentStatus()}
 });
-window.addEventListener('beforeunload',event=>{if(isDirty()||documentEditor.hasDraft()||integratedEditing.hasDraft()||eventManager.hasDraft()){event.preventDefault();event.returnValue=''}});
+window.addEventListener('beforeunload',event=>{if(isDirty()||productionEditing.hasDraft()||documentEditor.hasDraft()||integratedEditing.hasDraft()||eventManager.hasDraft()){event.preventDefault();event.returnValue=''}});
 $('layoutSelect').addEventListener('change',e=>{
   if(state.mode==='board'||e.target.dataset.displayTarget==='board'){
     state.boardLayoutChoice=e.target.value;
@@ -1542,21 +1545,35 @@ $('fileInput').addEventListener('change',async e=>{
     $('projectSelect').value='imported';setProject(data);state.projectChoice='imported';
   }catch(err){showStatus(err.message);$('projectTitle').textContent=state.project?.title||'Importazione non riuscita'}finally{e.target.value=''}
 });
+const doodCache=createDoodCache();
 function currentDoodReport(){
-  const ui=state.dood,elements=doodElements(state.project),categories=[...new Set(elements.map(e=>e.category))];
+  const ui=state.dood,elements=doodCache.elements(state.project,state.revision),categories=[...new Set(elements.map(e=>e.category))];
   if(!categories.includes(ui.category))ui.category=categories[0]??'';
-  const report=calculateDood({project:state.project,board:selectedBoard(),calendar:findCalendar(state.project,selectedBoard().calendarId),elements:elements.filter(e=>e.category===ui.category)});
+  const report={...doodCache.report(state.project,state.revision,selectedBoard(),findCalendar(state.project,selectedBoard().calendarId),ui.category)};
   report.rows=sortDoodRows(report.rows.filter(r=>(!ui.hideUnused||r.totals.worked||r.totals.held)&&(!state.query||`${r.element.boardId||''} ${r.element.name}`.toLocaleLowerCase().includes(state.query.toLocaleLowerCase()))),ui.sort);
   if(ui.hideOff){const indices=report.dates.map((d,i)=>d.calendar.working!==false?i:-1).filter(i=>i>=0);report.dates=indices.map(i=>report.dates[i]);report.rows=report.rows.map(r=>({...r,cells:indices.map(i=>r.cells[i])}))}
   return report;
 }
-function renderDood(){
+let doodRenderToken=0,lastDoodRender=null;
+function renderDood({goDate=false}={}){
+  const token=++doodRenderToken,project=state.project,revision=state.revision;
   const view=$('doodView'),old=view.querySelector('.dood-grid-scroll'),position=old?[old.scrollTop,old.scrollLeft]:[0,0],focus=document.activeElement;
   const focusId=view.contains(focus)?focus.id:null;
-  try{state.doodReport=currentDoodReport();view.innerHTML=doodMarkup(state.project,selectedBoard(),state.doodReport,state.dood,selectedBoardGroup().plans)}
-  catch(error){view.innerHTML=`<p>${safe(error.message)}</p>`;return}
-  const grid=view.querySelector('.dood-grid-scroll');grid.scrollTop=position[0];grid.scrollLeft=position[1];
-  if(focusId)$(focusId)?.focus({preventScroll:true});
+  function draw(){
+    if(token!==doodRenderToken||state.mode!=='dood'||state.project!==project||state.revision!==revision)return;
+    try{state.doodReport=currentDoodReport();view.innerHTML=doodMarkup(project,selectedBoard(),state.doodReport,state.dood,selectedBoardGroup().plans,doodCache.elements(project,revision));
+      lastDoodRender={project,revision,board:state.board,category:state.dood.category};
+      const grid=view.querySelector('.dood-grid-scroll');grid.scrollTop=position[0];grid.scrollLeft=position[1];
+      if(focusId)$(focusId)?.focus({preventScroll:true});
+      if(goDate&&state.dood.goDate)scrollDoodToDate(state.dood.goDate);
+    }catch(error){view.innerHTML=`<p>${safe(error.message)}</p>`}
+    finally{view.removeAttribute('aria-busy')}
+  }
+  const cold=!lastDoodRender||lastDoodRender.project!==project||lastDoodRender.revision!==revision||lastDoodRender.board!==state.board||lastDoodRender.category!==state.dood.category;
+  if(cold&&(project.scenes.length>2000||project.elements.length>2000)){
+    view.setAttribute('aria-busy','true');view.innerHTML='<p class="dood-loading" role="status"><span aria-hidden="true">◌</span> Caricamento DOOD…</p>';
+    requestAnimationFrame(()=>setTimeout(draw,0));
+  }else draw();
 }
 function applyStudioCommand(command){
   const before=snapshotStudio(state.project);
@@ -1569,6 +1586,8 @@ function downloadArtifact(bytes,name,type='application/octet-stream'){
 }
 function scrollDoodToDate(date){
   const dates=state.doodReport.dates,chosen=dates.find(d=>d.date>=date)||dates.at(-1);if(!chosen)return;
+  const window=doodWindow(state.doodReport,state.dood),datePage=Math.floor(dates.indexOf(chosen)/window.dateLimit);
+  if(datePage!==window.datePage){state.dood.datePage=datePage;state.dood.goDate=chosen.date;renderDood({goDate:true});return}
   state.dood.goDate=chosen.date;const cell=$('doodView').querySelector(`[data-dood-date="${chosen.date}"]`),grid=$('doodView').querySelector('.dood-grid-scroll');
   if(cell&&grid){const fixed=grid.querySelector('.dood-held').getBoundingClientRect().right-grid.getBoundingClientRect().left;grid.scrollLeft=Math.max(0,cell.offsetLeft-fixed)}
   $('doodGoDate').value=chosen.date;
@@ -1576,6 +1595,8 @@ function scrollDoodToDate(date){
 $('doodView').addEventListener('toggle',event=>{if(event.target.matches('.dood-rules'))state.dood.rulesOpen=event.target.open},true);
 $('doodView').addEventListener('click',async event=>{
   const target=event.target,cell=target.closest('[data-dood-cell]');
+  const page=target.closest('[data-dood-page]');
+  if(page){const window=doodWindow(state.doodReport,state.dood),rows=page.dataset.doodPage==='rows',key=rows?'rowPage':'datePage';state.dood[key]=window[key]+Number(page.dataset.step);if(!rows)state.dood.goDate=null;renderDood();return}
   if(cell){state.dood.selected={elementId:cell.dataset.doodElement,date:cell.dataset.doodCell};renderDood();$('doodView').querySelector('.dood-cell-detail')?.scrollIntoView({block:'nearest'});return}
   if(target.closest('#doodCloseCell')){state.dood.selected=null;renderDood();return}
   const scene=target.closest('[data-dood-scene]');
@@ -1590,8 +1611,8 @@ $('doodView').addEventListener('click',async event=>{
 });
 $('doodView').addEventListener('change',event=>{
   const input=event.target,ui=state.dood;
-  if(input.id==='doodSubboard'){state.board=input.value;ui.selected=null;ui.ruleElement='';ui.goDate=null;renderDood();return}
-  if(input.id==='doodCategory'){ui.category=input.value;ui.ruleElement='';ui.selected=null;renderDood();return}
+  if(input.id==='doodSubboard'){state.board=input.value;ui.selected=null;ui.ruleElement='';ui.goDate=null;ui.rowPage=ui.datePage=0;renderDood();return}
+  if(input.id==='doodCategory'){ui.category=input.value;ui.ruleElement='';ui.selected=null;ui.rowPage=ui.datePage=0;renderDood();return}
   if(input.id==='doodRuleElement'){ui.ruleElement=input.value;renderDood();return}
   if(input.id==='doodGoDate'){scrollDoodToDate(input.value);return}
   for(const [id,key] of [['doodHideUnused','hideUnused'],['doodHideOff','hideOff'],['doodCompact','compact']])if(input.id===id){ui[key]=input.checked;renderDood();return}

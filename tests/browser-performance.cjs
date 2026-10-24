@@ -1,0 +1,53 @@
+const {chromium}=require('playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises');
+const path=require('node:path');
+const base=process.env.STUDIO_URL||'http://127.0.0.1:8766';
+const out=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-performance-qa';
+(async()=>{
+ await fs.mkdir(out,{recursive:true});
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
+  page.on('pageerror',e=>errors.push(e.stack));page.on('dialog',d=>d.accept());
+  await page.goto(base);await page.waitForSelector('.strip-outer');
+  const bytes=await page.evaluate(async()=>{
+   const {createDocument,editScene,addDay,refreshDocument}=await import('./assets/document-model.js');
+   const {serializeStudio}=await import('./assets/studio-project.js');
+   const p=createDocument('Performance 2400 scene'),board=p.boards[0];
+   editScene(p,null,{scene:'1',ie:'INT',dn:'Day',set:'Set 0'});addDay(p,board.id,{date:'2026-01-01',shootingDayNumber:1});
+   const template=p.scenes[0],group=board.scheduledGroups.find(g=>g.kind==='ScheduleDay');
+   p.elements.push(...Array.from({length:400},(_,i)=>({id:`actor-${i}`,category:'Cast',name:`Actor ${String(i).padStart(3,'0')}`,boardId:String(i+1),properties:{}})));
+   p.scenes=Array.from({length:2400},(_,i)=>({...structuredClone(template),id:`s${i}`,bdsId:`s${i}`,sheetNumber:String(i+1),scene:String(i+1),set:`Set ${i}`,elementRefs:[{elementId:`actor-${i%400}`,category:'Cast',name:`Actor ${String(i%400).padStart(3,'0')}`,resolved:true,quantity:null}],fieldElementIds:template.fieldElementIds.filter(id=>p.elements.find(el=>el.id===id)?.category!=='Set')}));
+   board.unscheduledGroups.forEach(g=>g.strips=[]);
+   board.scheduledGroups=Array.from({length:240},(_,day)=>({...structuredClone(group),id:`day${day}`,date:new Date(Date.UTC(2026,0,day+1)).toISOString().slice(0,10),shootingDayNumber:day+1,strips:p.scenes.slice(day*10,day*10+10).map(s=>({kind:'scene',bdsId:s.bdsId,sourceKey:`strip-${s.id}`}))}));
+   refreshDocument(p);return Array.from(await serializeStudio(p));
+  });
+  await page.locator('#fileInput').setInputFiles({name:'performance.studio.json',mimeType:'application/json',buffer:Buffer.from(bytes)});
+  await page.waitForFunction(()=>document.querySelector('#projectTitle').textContent==='Performance 2400 scene');
+  await page.evaluate(()=>{window.loadingSeen=false;new MutationObserver(()=>{if(document.querySelector('.dood-loading'))window.loadingSeen=true}).observe(document.querySelector('#doodView'),{childList:true,subtree:true})});
+  await page.locator('#doodNav').click();await page.waitForSelector('.dood-grid');
+  await page.locator('#doodCategory').selectOption('Cast');await page.waitForSelector('.dood-pagination');
+  assert(await page.evaluate(()=>window.loadingSeen));
+  assert(await page.locator('[data-dood-cell]').count()<=6000);
+  assert.match(await page.locator('.dood-pagination').innerText(),/400/);
+  await page.screenshot({path:path.join(out,'dood-large.png')});
+  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'dood-mobile.png')});await page.setViewportSize({width:1440,height:1000});
+  const first=await page.locator('.dood-grid tbody .dood-name').first().innerText();
+  await page.locator('[data-dood-page=rows][data-step="1"]').click();assert.notEqual(await page.locator('.dood-grid tbody .dood-name').first().innerText(),first);
+  await page.locator('[data-dood-page=dates][data-step="1"]').click();assert.equal(await page.locator('[data-dood-date]').first().getAttribute('data-dood-date'),'2026-04-01');
+  await page.locator('#doodGoDate').fill('2026-08-28');await page.locator('#doodGoDate').dispatchEvent('change');assert.equal(await page.locator('[data-dood-date="2026-08-28"]').count(),1);
+  await page.locator('[data-dood-cell]').first().click();assert(await page.locator('.dood-cell-detail').isVisible());
+  const download=page.waitForEvent('download');await page.locator('#doodCsv').click();const csv=await(await download).createReadStream();let text='';for await(const chunk of csv)text+=chunk;
+  assert.equal(text.trim().split('\r\n').length,401);assert.match(text,/Actor 399/);
+  assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
+  await page.locator('#breakdownNav').click();const set=page.locator('[data-scene-field=set]');await set.click();
+  assert(await page.locator('#sceneChoiceDropdown [data-choice-index]').count()<=100);
+  await page.screenshot({path:path.join(out,'dropdown-large.png')});
+  await page.locator('[data-choice-more]').click();assert.equal(await page.locator('#sceneChoiceDropdown [data-choice-index]').count(),200);
+  await set.fill('Set 2399');await page.locator('#sceneChoiceDropdown').getByRole('button',{name:'Set 2399',exact:true}).click();assert.equal(await set.inputValue(),'Set 2399');
+  await page.locator('#undoMoveButton').click();assert.equal(await set.inputValue(),'Set 0');await page.locator('#redoMoveButton').click();assert.equal(await set.inputValue(),'Set 2399');
+  assert.deepEqual(errors,[]);
+  console.log('PASS 2400 scenes / 400 actors / 240 dates: bounded DOOD DOM, row/date navigation, go-to-date, full CSV, loading feedback, progressive dropdown search and Undo/Redo');
+ }finally{await browser.close()}
+})().catch(error=>{console.error(error);process.exitCode=1});

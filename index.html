@@ -31,6 +31,7 @@
         <button class="nav" id="doodNav" type="button"><span aria-hidden="true">▦</span> DooD</button>
         <button class="nav" id="redFlagNav" type="button" title="Red Flag Entry"><span aria-hidden="true">⚑</span> Red Flags <em id="redFlagCount">—</em></button>
         <button class="nav" id="dataNav" type="button" title="Elementi e categorie"><span aria-hidden="true">≡</span> Elementi</button>
+        <button class="nav" id="reportNav" type="button"><span aria-hidden="true">▥</span> Report <em id="reportCount">—</em></button>
         <button class="nav" id="projectNav" type="button"><span aria-hidden="true">≡</span> Progetto</button>
       </nav>
     <div class="workspace-toolbar" id="workspaceToolbar"><button type="button" id="previewButton" aria-expanded="false">Breakdown</button><label id="workspaceLayoutControl">Vista <select id="workspaceLayout"><option value="single">Vista singola</option><option value="board-breakdown">Stripboard + Breakdown</option><option value="calendar-breakdown">Calendar + Breakdown</option><option value="calendar-board">Calendar + Stripboard</option></select></label></div></header>
@@ -52,7 +53,7 @@
           <div id="calendarView" class="view" hidden></div>
           <div id="redFlagView" class="view" hidden></div>
           <div id="dataView" class="view" hidden></div>
-          <div id="projectView" class="view" hidden><div class="inline-category-tools"><button id="reportNav" type="button">Report <em id="reportCount">—</em></button></div><div id="productionInfo"></div></div>
+          <div id="projectView" class="view" hidden><div id="productionInfo"></div></div>
           <div id="workspaceSplitter" class="workspace-splitter" role="separator" aria-label="Ridimensiona pannelli" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="55" tabindex="0" hidden></div>
           <aside id="breakdownPreview" class="view breakdown-preview" aria-label="Anteprima Breakdown" hidden></aside>
           </div>

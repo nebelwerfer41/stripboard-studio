@@ -6,7 +6,7 @@ export function dropdownMarkup({identity='',field=null,category=null,value='',la
 }
 export function createSearchDropdown({getProject,onField,onToggle,onCreate}){
  const popup=document.createElement('div');popup.id='sceneChoiceDropdown';popup.className='scene-choice-popup';popup.setAttribute('role','listbox');popup.hidden=true;document.body.append(popup);
- let context=null,query='',active=0,rows=[];
+ let context=null,query='',active=0,rows=[],limit=100;
  const inputs=()=>[...document.querySelectorAll('[data-choice-field],[data-choice-category]')];
  const idFor=input=>input.closest('[data-inline-scene]')?.dataset.inlineScene||input.closest('[data-scene-choice-id]')?.dataset.sceneChoiceId;
  function reconnect(){if(!context)return null;const input=inputs().find(input=>idFor(input)===context.sceneId&&input.dataset.choiceField===context.field&&input.dataset.choiceCategory===context.category&&Boolean(input.name)===context.form);if(input&&input.closest('[hidden]'))return null;return input||null}
@@ -24,31 +24,33 @@ export function createSearchDropdown({getProject,onField,onToggle,onCreate}){
  function draw(){
   if(!context)return;const p=getProject(),s=scene(),input=reconnect();if(!input||!p){close(false);return}
   const single=Boolean(context.field),selected=new Set(s?.elementRefs.map(r=>r.elementId)||[]),value=singleSceneValue(p,s,context.field).name;
-  const options=single?sceneValueChoices(p,context.field):sortCategoryElements(p.elements.filter(el=>el.category===context.category),p.categorySettings.find(c=>c.name===context.category)?.attributes).map(el=>({id:el.id,name:el.name,label:el.boardId?`${el.boardId}. ${el.name}`:el.name}));
+  const options=context.options??=(single?sceneValueChoices(p,context.field):sortCategoryElements(p.elements.filter(el=>el.category===context.category),p.categorySettings.find(c=>c.name===context.category)?.attributes).map(el=>({id:el.id,name:el.name,label:el.boardId?`${el.boardId}. ${el.name}`:el.name})));
   const term=query.trim().toLocaleLowerCase(),filtered=options.filter(o=>`${o.name} ${o.label||''}`.toLocaleLowerCase().includes(term));
   rows=filtered.map(o=>({...o,kind:'option',selected:single?o.name===(context.form?input.value:value):selected.has(o.id)}));
   if(term&&!options.some(o=>o.name.toLocaleLowerCase()===term))rows.push({kind:'create',name:query.trim(),selected:false});
   if(active<0)active=Math.max(0,rows.findIndex(row=>row.selected));active=Math.max(0,Math.min(active,rows.length-1));popup.setAttribute('aria-multiselectable',String(!single));
-  popup.innerHTML=`<div class="scene-choice-list">${rows.map((o,index)=>`<div id="sceneChoiceOption${index}" data-choice-index="${index}" role="option" aria-selected="${o.selected}" class="scene-choice-option ${o.selected?'chosen':''} ${index===active?'highlighted':''}">${o.kind==='create'?`<button type="button" tabindex="-1" class="scene-choice-add">＋ Aggiungi «${e(o.name)}»</button>`:single?`<button type="button" tabindex="-1">${e(o.name)}</button>`:`<label><input type="checkbox" tabindex="-1" data-ref-element="${e(o.id)}" aria-label="Associa ${e(o.name)}" ${o.selected?'checked':''}><span>${e(o.label||o.name)}</span></label>`}</div>`).join('')||'<p class="scene-choice-empty">Nessun elemento. Digita il nome per aggiungerlo.</p>'}</div>`;
+  const start=Math.max(0,active-limit+1);
+  popup.innerHTML=`<div class="scene-choice-list">${rows.slice(start,start+limit).map((o,offset)=>{const index=start+offset;return `<div id="sceneChoiceOption${index}" data-choice-index="${index}" role="option" aria-selected="${o.selected}" class="scene-choice-option ${o.selected?'chosen':''} ${index===active?'highlighted':''}">${o.kind==='create'?`<button type="button" tabindex="-1" class="scene-choice-add">＋ Aggiungi «${e(o.name)}»</button>`:single?`<button type="button" tabindex="-1">${e(o.name)}</button>`:`<label><input type="checkbox" tabindex="-1" data-ref-element="${e(o.id)}" aria-label="Associa ${e(o.name)}" ${o.selected?'checked':''}><span>${e(o.label||o.name)}</span></label>`}</div>`}).join('')||'<p class="scene-choice-empty">Nessun elemento. Digita il nome per aggiungerlo.</p>'}</div>${rows.length>start+limit?`<button type="button" data-choice-more>Mostra altri (${rows.length-start-limit})</button>`:''}`;
   popup.hidden=false;input.setAttribute('aria-expanded','true');if(rows.length)input.setAttribute('aria-activedescendant',`sceneChoiceOption${active}`);else input.removeAttribute('aria-activedescendant');place();
  }
- function open(input,{filter=false}={}){if(context&&context.input!==input)close();context={input,sceneId:idFor(input),field:input.dataset.choiceField,category:input.dataset.choiceCategory,form:Boolean(input.name)};query=filter?input.value:'';active=-1;draw()}
+ function open(input,{filter=false}={}){if(context&&context.input!==input)close();context={input,sceneId:idFor(input),field:input.dataset.choiceField,category:input.dataset.choiceCategory,form:Boolean(input.name)};query=filter?input.value:'';active=-1;limit=100;draw()}
  function choose(index,checked){
   const option=rows[index],input=reconnect();if(!option||!input)return;
   if(context.form){input.value=option.name;input.dispatchEvent(new Event('change',{bubbles:true}));close(false);input.focus();return}
   let ok;if(context.field)ok=onField(context.sceneId,context.field,option.name,input);
   else if(option.kind==='create')ok=onCreate(context.sceneId,context.category,option.name,input);
   else ok=onToggle(context.sceneId,option.id,checked??!option.selected,input);
+  if(context)context.options=null;
   if(ok===false){draw();return}
   const next=reconnect();if(context.field){close(false);next?.focus({preventScroll:true});close(false)}else{if(option.kind==='create')query='';if(next){context.input=next;next.value=query;next.focus({preventScroll:true})}draw()}
  }
  document.addEventListener('focusin',event=>{const input=event.target;if(input.matches('[data-choice-field],[data-choice-category]')&&context?.input!==input)open(input)});
  document.addEventListener('input',event=>{if(event.target.matches('[data-choice-field],[data-choice-category]')){if(!context||context.input!==event.target)open(event.target,{filter:true});query=event.target.value;active=0;draw()}});
  document.addEventListener('pointerdown',event=>{
-  if(popup.contains(event.target)){if(event.target.closest('[data-choice-index]'))event.preventDefault();return}
+  if(popup.contains(event.target)){if(event.target.closest('[data-choice-index],[data-choice-more]'))event.preventDefault();return}
   const wrapper=event.target.closest('.scene-choice-control');if(!wrapper)close();else if(context&&wrapper!==context.input?.closest('.scene-choice-control'))close();
  });
- popup.addEventListener('click',event=>{const row=event.target.closest('[data-choice-index]');if(!row)return;const checkbox=event.target.matches('input[type=checkbox]')?event.target:null;choose(Number(row.dataset.choiceIndex),checkbox?.checked)});
+ popup.addEventListener('click',event=>{if(event.target.closest('[data-choice-more]')){const top=popup.scrollTop;limit+=100;draw();popup.scrollTop=top;return}const row=event.target.closest('[data-choice-index]');if(!row)return;const checkbox=event.target.matches('input[type=checkbox]')?event.target:null;choose(Number(row.dataset.choiceIndex),checkbox?.checked)});
  document.addEventListener('click',event=>{
   if(event.target.matches('[data-choice-field],[data-choice-category]')&&!context)open(event.target);
   const openButton=event.target.closest('[data-choice-open]');if(openButton){const input=openButton.parentElement.querySelector('input');if(context?.input===input){close();return}input.focus();if(!context)open(input)}
@@ -63,5 +65,5 @@ export function createSearchDropdown({getProject,onField,onToggle,onCreate}){
  });
  document.addEventListener('focusout',event=>{if(event.target.matches('[data-choice-field],[data-choice-category]'))queueMicrotask(()=>{if(context&&document.activeElement!==reconnect()&&!popup.contains(document.activeElement))close()})});
  window.addEventListener('resize',()=>{if(context)place()});document.addEventListener('scroll',()=>{if(context)place()},true);
- return {close,refresh(){if(context)draw()}};
+ return {close,refresh(){if(context){context.options=null;draw()}}};
 }
