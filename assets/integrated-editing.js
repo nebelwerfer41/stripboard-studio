@@ -1,3 +1,4 @@
+import {quickAddMarkup,createBreakdownQuickAdd,addBreakdownElement} from './breakdown-quick-add.js';
 import {SCENE_FIELDS,editScene,editElement} from './document-model.js';
 import {breakdownCategories} from './calendar-selectors.js';
 import {escapeHtml as e} from './dood-print.js';
@@ -27,7 +28,7 @@ export function fitSceneTextareas(root){
 }
 export function sceneEditingMarkup(project,scene,state){
   const categories=breakdownCategories(project,scene,{hideEmpty:false});
-  return `<section class="inline-scene" data-inline-scene="${e(scene.id)}">${sceneFieldsMarkup(scene,{project})}<div class="inline-category-tools"><label class="breakdown-empty-toggle"><input id="hideEmptyCategories" type="checkbox" ${state.hideEmptyCategories?'checked':''}> Nascondi categorie vuote</label><button type="button" data-inline-new="category">＋ Categoria</button></div><div class="breakdown-categories">${categories.map(c=>{
+  return `<section class="inline-scene" data-inline-scene="${e(scene.id)}">${sceneFieldsMarkup(scene,{project})}${quickAddMarkup()}<div class="inline-category-tools"><label class="breakdown-empty-toggle"><input id="hideEmptyCategories" type="checkbox" ${state.hideEmptyCategories?'checked':''}> Nascondi categorie vuote</label><button type="button" data-inline-new="category">＋ Categoria</button></div><div class="breakdown-categories">${categories.map(c=>{
     const single=Boolean(c.sceneField),value=single?singleSceneValue(project,scene,c.sceneField).name:'';
     return `<section class="breakdown-category" data-category-id="${e(c.id)}" data-category-name="${e(c.name)}" ${single?`data-single-scene-field="${e(c.sceneField)}"`:''} style="--category-color:${e(c.color||'#0c877c')}" ${state.hideEmptyCategories&&!c.items.length?'hidden':''}><h4>${e(c.name)} <small>(${c.items.length})</small></h4>${dropdownMarkup({field:c.sceneField,category:c.name,value,label:single?`${c.name} della scena`:`Elementi ${c.name}`})}${!single&&c.items.length?'<div class="category-quantity-heading">Quantità · uso giornaliero</div>':''}<div class="category-selected">${c.items.map(ref=>{
       const index=scene.elementRefs.findIndex(r=>r.elementId===ref.elementId&&r.category===ref.category&&r.name===ref.name),opaque=ref.quantity&&typeof ref.quantity==='object';
@@ -64,6 +65,7 @@ export function createIntegratedEditing({getProject,onChange,onError}){
     onToggle(sceneId,id,checked,input){const p=project(),scene=p.scenes.find(s=>s.id===sceneId),el=p.elements.find(e=>e.id===id);if(!scene||!el)return false;const refs=structuredClone(scene.elementRefs).filter(r=>r.elementId!==id);if(checked)refs.push({elementId:el.id,category:el.category,name:el.name,resolved:true,quantity:null,quantityOrigin:'absent'});return commit(()=>editScene(p,scene.id,{},refs),input)},
     onCreate(sceneId,category,name,input){const p=project(),scene=p.scenes.find(s=>s.id===sceneId);if(!scene)return false;return commit(()=>{const el=p.elements.find(el=>el.category===category&&el.name.toLocaleLowerCase()===name.toLocaleLowerCase())||editElement(p,null,{name,category,properties:{}});if(!scene.elementRefs.some(r=>r.elementId===el.id))editScene(p,scene.id,{},[...scene.elementRefs,{elementId:el.id,category:el.category,name:el.name,resolved:true,quantity:null,quantityOrigin:'absent'}])},input)}
   });
+  const quickAdd=createBreakdownQuickAdd({getProject:project,onAdd(sceneId,value,input){return commit(()=>addBreakdownElement(project(),sceneId,value),input,{syncRelations:true})}});
   document.addEventListener('input',event=>{
     const t=event.target;
     if(t.matches('.scene-textarea'))fitSceneTextareas(t.parentElement);
@@ -80,7 +82,7 @@ export function createIntegratedEditing({getProject,onChange,onError}){
     const clear=event.target.closest('[data-clear-scene-field]');if(clear){const p=project(),scene=p.scenes.find(s=>s.id===clear.closest('[data-inline-scene]').dataset.inlineScene);commit(()=>editScene(p,scene.id,{[clear.dataset.clearSceneField]:''}),clear,{syncRelations:true});dropdown.close(false);return}
     const button=event.target.closest('[data-ref-remove]');if(!button)return;const p=project(),scene=p.scenes.find(s=>s.id===button.closest('[data-inline-scene]').dataset.inlineScene),refs=structuredClone(scene.elementRefs);refs.splice(Number(button.dataset.refRemove),1);commit(()=>editScene(p,scene.id,{},refs),button);
   });
-  return {reset:()=>dropdown.close(),hasDraft(){
+  return {reset:()=>{dropdown.close();quickAdd.reset()},hasDraft(){
     const p=project();if(!p)return false;
     if(document.querySelector('.view:not([hidden]) [aria-invalid="true"]'))return true;
     return [...document.querySelectorAll('.view:not([hidden]) [data-scene-field],.view:not([hidden]) [data-element-field]')].some(input=>{
