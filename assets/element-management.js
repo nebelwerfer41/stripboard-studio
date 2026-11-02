@@ -1,3 +1,4 @@
+import {categoryUsesQuantity} from './quantities.js';
 import {validDate} from './production-data.js';
 const fields={set:'set',location:'location',scriptday:'scriptDay',unit:'unit',sequence:'sequence',dn:'dn',daynight:'dn',ie:'ie',intext:'ie',episode:'episode'};
 export const builtinField=name=>{const key=String(name??'').toLowerCase().replace(/[^a-z]/g,'');return Object.hasOwn(fields,key)?fields[key]:null};
@@ -5,7 +6,7 @@ export function isBuiltinCategory(category){return Boolean([category?.builtIn,ca
 const bool=(value,fallback=false)=>value==null?fallback:[true,1,'1'].includes(value);
 export function categoryDefaults(category){
   const a=category?.attributes||{},s=category?.source||{};
-  return {autoAssignIds:bool(a.AutoAssignIds??s.autoAssignIds),excludeFromBoard:bool(a.ExcludeFromStripboard??s.excludeFromBoard),allowHold:bool(a.AllowDOODHoldDays??s.allowHoldDays,true),useDailyQuantity:bool(a.UseInDailyQuantity??s.useInDailyQuantity,true),...category?.elementDefaults};
+  return {autoAssignIds:bool(a.AutoAssignIds??s.autoAssignIds),excludeFromBoard:bool(a.ExcludeFromStripboard??s.excludeFromBoard),allowHold:bool(a.AllowDOODHoldDays??s.allowHoldDays,true),useDailyQuantity:categoryUsesQuantity(category),...category?.elementDefaults};
 }
 export function elementOptions(element){
   const s=element?.source||{},a=element?.attributes||{};
@@ -24,7 +25,7 @@ export function elementUsage(project,boardName,element){
   const flags=project.redFlags.filter(f=>f.target?.kind==='element'&&(f.target.elementId===element.id||f.target.category===element.category&&f.target.element===element.name));
   return {occurrences,dates,first:dates[0]||null,last:dates.at(-1)||null,worked:dates.length,count:occurrences.length,flags};
 }
-export function propertyDefinitions(category){return Object.entries(category?.properties||{}).map(([key,value])=>({key,label:value?.name||key,type:value?.type==='multiline'||value?.type==='Multi-Line'?'multiline':'single',raw:value}))}
+export function propertyDefinitions(category){return Object.entries(category?.properties||{}).map(([key,value])=>({key,label:value?.name||key,type:value?.type==='multiline'||value?.type==='Multi-Line'||value?.type==='longtext'?'multiline':'single',raw:value}))}
 const builtinNames=[['set','Set'],['location','Location'],['dn','D/N'],['ie','I/E'],['scriptDay','Script Day'],['sequence','Sequence'],['unit','Unit'],['episode','Episode']];
 export function catalogCategories(project){
  const list=[...project.categorySettings];for(const [field,name] of builtinNames)if(!list.some(c=>builtinField(c.name)===field))list.push({id:`derived-category:${field}`,name,builtIn:true,attributes:{},properties:{},derived:true});return list;

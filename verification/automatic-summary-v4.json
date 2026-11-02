@@ -1,0 +1,22 @@
+{
+  "suiteVersion": 4,
+  "syntheticFiles": 42,
+  "msdFiles": 19,
+  "mmsxFiles": 20,
+  "studioFiles": 3,
+  "parserAndContentChecks": 8552,
+  "suiteReproducibility": "PASS: tutti i file e manifest uguali alla seconda generazione",
+  "candidateReproducibility": "PASS: due file e manifest uguali alla seconda generazione",
+  "nodeSuites": "PASS",
+  "browserPersistence": "PASS: conferma perdite, contenuto corrente, revisioni e quattro suite MSD HTML",
+  "localNativeReferences": {
+    "mmsx": "PASS: 146 colori scene, 12 regole, modifica completa, Studio, byte identici se invariato",
+    "msd": "PASS: 146 tempi uguali al riferimento MMSX, byte identici se invariato, modifica completa riletta"
+  },
+  "nativeApplicationTests": "NON ESEGUITI: MMS6 e MMS10 non disponibili in questo ambiente",
+  "openQuestions": [
+    "Report NO RED FLAGS: causa non ancora dimostrata, controlli mirati 11-*",
+    "Riapertura report Vertical, Calendar ed eventi in MMS10 dopo la correzione strutturale",
+    "Resa colori e Day/Night, salvataggio e riapertura in MMS6/MMS10"
+  ]
+}

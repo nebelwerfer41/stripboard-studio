@@ -86,7 +86,7 @@ export function calculateDood({project,board,calendar,elements=doodElements(proj
   }
   const flagEvents=(project.redFlags||[]).filter(f=>Object.hasOwn(DOOD_EVENT_TYPES,f.type)).map(f=>({...f,type:f.type,targets:f.target?[f.target]:[],derivedRedFlag:true}));
   const scoped=[...events,...flagEvents].filter(e=>inScope(e,board,calendar));
-  for(const e of scoped)if(!doodEventType(e))diagnostics.push(`Evento ${e.name||e.id}: tipo DOOD non verificato, escluso dai conteggi`);
+  for(const e of scoped)if(!doodEventType(e)&&e.type!=='none')diagnostics.push(`Evento ${e.name||e.id}: tipo DOOD non verificato, escluso dai conteggi`);
   for(const e of scoped)if(doodEventType(e)&&(!validDate(e.startDate)||!validDate(e.endDate)||e.endDate<e.startDate))diagnostics.push(`Evento ${e.name||e.id}: intervallo non valido, escluso`);
   const known=scoped.filter(e=>doodEventType(e)&&validDate(e.startDate)&&validDate(e.endDate)&&e.endDate>=e.startDate);
   const bounds=[...days.keys(),...known.flatMap(e=>[e.startDate,e.endDate])].sort();

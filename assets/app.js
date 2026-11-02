@@ -1,3 +1,5 @@
+import {quantityRows,quantitySettings} from './quantities.js';
+import {analyzeExport,formatExportReport,requireExport} from './export-adapters.js';
 import {parseMmsx,serializeMmsx} from './mmsx-project.js';
 const parseSchedule=(bytes,name)=>/\.studio\.json$/i.test(name)?parseStudio(bytes):/^(MMS2|MMSX)$/.test(new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4,bytes.byteLength))))?parseMmsx(bytes,name):parseMsd(bytes,name);
 import {parseMsd} from './msd-parser.js';
@@ -110,7 +112,8 @@ function showStatus(message){$('status').textContent=message;$('status').hidden=
 function isDirty(){return documentIsDirty(state)}
 function updateDocumentStatus(){
   const saving=state.serializationState==='saving';
-  if(state.project)$('saveButton').textContent=state.project.documentEditing||state.project.studio||state.project.studioContainer?'↓ Salva Studio':state.project.format==='mmsx'?'↓ Salva .mmsx':'↓ Salva .msd';
+  $('saveButton').textContent='↓ Salva progetto Studio';
+  $('exportButton').disabled=saving||!state.project;
   $('dirtyIndicator').textContent=saving?'Salvataggio…':isDirty()?'Modifiche non salvate':'Salvato';
   $('dirtyIndicator').classList.toggle('dirty',isDirty());
   $('saveButton').disabled=saving||!state.project;
@@ -127,7 +130,7 @@ function rebuildDocumentIndexes(){
 let preservedEditingView=null;
 function applyDocumentCommand(command,{preserveView=null}={}){
   const before=snapshotDocument(state.project),selectedPlanId=selectedBoard()?.id;
-  try{if(command()===false)return false;state.project.documentEditing=true;validateDocument(state.project);const current=state.project.boards.find(b=>b.id===selectedPlanId);if(current)state.board=current.name;rebuildDocumentIndexes();state.orderHistory.push({kind:'document',before});state.redoHistory=[];preservedEditingView=preserveView;edited();showStatus('');return true}
+  try{if(command()===false)return false;state.project.documentEditing=true;validateDocument(state.project,{requireUniqueMmsxScenes:true,repairFrom:before});const current=state.project.boards.find(b=>b.id===selectedPlanId);if(current)state.board=current.name;rebuildDocumentIndexes();state.orderHistory.push({kind:'document',before});state.redoHistory=[];preservedEditingView=preserveView;edited();showStatus('');return true}
   catch(error){restoreDocument(state.project,before);rebuildDocumentIndexes();throw error}
   finally{preservedEditingView=null}
 }
@@ -255,7 +258,7 @@ function setProject(data){
   const isMmsx=data.format==='mmsx';
   if(isMmsx||data.format==='studio')state.mode='board';
   for(const [id,key] of [['reportNav','reports'],['calendarNav','readCalendars'],['redFlagNav','readRedFlags'],['calendarNav','readCalendars']])$(id).disabled=!data.capabilities[key];
-  $('saveButton').textContent=isMmsx?'↓ Salva .mmsx':'↓ Salva .msd';
+  $('saveButton').textContent='↓ Salva progetto Studio';
   state.orderHistory=[];state.redoHistory=[];state.moveIntent=null;state.activeSceneId=null;state.calendarStartDrafts.clear();state.calendarGoDraft=null;state.calendarMonthDraft=null;state.layoutChoice='single';state.previewOpen=false;
   clearStripSelection();
   state.dood=freshDoodUI();state.project=data;state.sceneMap=sceneIndex();state.elementIds=new Map(data.elements.map(e=>[`${e.category}\u0000${e.name}`,e.boardId]));state.board=data.boards.some(b=>b.name===data.activeBoard)?data.activeBoard:data.boards[0]?.name;state.dataScene=null;state.dataCategory='';state.dataElement=null;
@@ -467,7 +470,7 @@ function fieldValue(shape,ctx){
   }
   if(shape.tag==='BDSCategoryElementsOccurrenceCountField'){
     const cats=shape.categories?.length?shape.categories:a.CategoryName?[a.CategoryName]:[];
-    return elementSumText({type:a.Type,text:a.Text,category:a.CategoryName,suppress:a.Suppress},contextRequirements(ctx,cats));
+    return elementSumText({type:a.Type,text:a.Text,category:a.CategoryName,suppress:a.Suppress},quantityRows(state.project,ctx.dayRecord?(ctx.group?.strips||[]).filter(x=>x.kind==='scene').map(x=>state.sceneMap.get(x.bdsId)):[ctx.scene],cats));
   }
   if(shape.tag==='BDSElementsIDListField'){
     const names=contextRequirements(ctx,[a.CategoryName]);
@@ -1322,12 +1325,11 @@ $('saveButton').addEventListener('click',async()=>{
   const saveProject={...project,...snapshotDocument(project)};
   updateDocumentStatus();showStatus('');
   try{
-    const isMmsx=project.format==='mmsx',studio=Boolean(project.documentEditing||project.studio||project.studioContainer),extension=studio?'.json':isMmsx?'.mmsx':'.msd';
-    const fileName=studio?project.fileName.replace(/(?:\.studio\.json|\.(?:msd|mmsx))$/i,'')+'.studio.json':isMmsx?project.fileName.replace(/\.mmsx$/i,'')+'-edited.mmsx':project.fileName.replace(/\.msd$/i,'')+'-edited.msd';
+    const extension='.json',fileName=project.fileName.replace(/(?:\.studio\.json|\.(?:msd|mmsx))$/i,'')+'.studio.json';
     // Open the picker during the user gesture, before asynchronous compression.
     let handle=null;
-    if(window.showSaveFilePicker)try{handle=await window.showSaveFilePicker({suggestedName:fileName,types:[{description:studio?'Stripboard Studio':'Movie Magic Scheduling',accept:{'application/octet-stream':[extension]}}]})}catch(error){if(!['SecurityError','NotSupportedError'].includes(error.name))throw error}
-    const bytes=studio?await serializeStudio(saveProject):isMmsx?await serializeMmsx(saveProject,fileName):serializeMsd(saveProject);
+    if(window.showSaveFilePicker)try{handle=await window.showSaveFilePicker({suggestedName:fileName,types:[{description:'Stripboard Studio',accept:{'application/octet-stream':[extension]}}]})}catch(error){if(!['SecurityError','NotSupportedError'].includes(error.name))throw error}
+    const bytes=await serializeStudio(saveProject);
     if(handle){
       const writer=await handle.createWritable();await writer.write(bytes);await writer.close();
     }else{
@@ -1338,6 +1340,29 @@ $('saveButton').addEventListener('click',async()=>{
     finishDocumentSave(state,token,true);
   }catch(error){finishDocumentSave(state,token,false);if(error.name!=='AbortError')showStatus(`Salvataggio non riuscito: ${error.message}`)}
   finally{updateDocumentStatus()}
+});
+// Export has its own review and never changes the Studio saved revision.
+let pendingExport=null;
+$('exportButton').addEventListener('click',()=>{
+ if(!state.project)return;
+ if(productionEditing.hasDraft()||integratedEditing.hasDraft()||documentEditor.hasDraft()||catalogEditor.hasDraft()||eventManager.hasDraft()){showStatus('Applica o correggi i campi ancora in modifica prima di esportare.');return}
+ pendingExport={...state.project,...snapshotDocument(state.project)};
+ $('exportDialog').showModal();reviewExport();
+});
+const exportQuantityOptions=()=>({quantityMode:$('exportQuantityMode').value,quantityStyle:$('exportFormat').value==='msd'?$('exportQuantityStyle').value||undefined:undefined});
+function reviewExport(){if(!pendingExport)return;$('exportQuantityStyle').disabled=$('exportFormat').value!=='msd';const report=analyzeExport(pendingExport,$('exportFormat').value,exportQuantityOptions());$('exportReport').textContent=formatExportReport(report);$('exportAcceptLoss').checked=false;$('exportLossLabel').hidden=!report.omitted.length&&!report.transformed.length;$('exportConfirm').disabled=report.blockers.length>0}
+for(const id of ['exportFormat','exportQuantityMode','exportQuantityStyle'])$(id).addEventListener('change',reviewExport);
+$('exportCancel').addEventListener('click',()=>$('exportDialog').close());
+$('exportDialog').addEventListener('close',()=>{pendingExport=null});
+$('exportConfirm').addEventListener('click',async()=>{
+ const project=pendingExport,target=$('exportFormat').value,acceptLoss=$('exportAcceptLoss').checked;if(!project)return;
+ try{
+  const quantityOptions=exportQuantityOptions();requireExport(project,target,{acceptLoss,...quantityOptions});$('exportConfirm').disabled=true;
+  const name=project.fileName.replace(/(?:\.studio\.json|\.(?:msd|mmsx))$/i,'')+'-export.'+target;
+  const bytes=target==='msd'?serializeMsd(project,{acceptLoss,...quantityOptions}):await serializeMmsx(project,name,{acceptLoss,...quantityOptions});
+  const url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));const link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  $('exportDialog').close();showStatus('Esportazione completata. Per conservare integralmente il lavoro usa Salva progetto Studio.');
+ }catch(error){showStatus(error.message);$('exportConfirm').disabled=false}
 });
 window.addEventListener('beforeunload',event=>{if(isDirty()||productionEditing.hasDraft()||documentEditor.hasDraft()||integratedEditing.hasDraft()||eventManager.hasDraft()){event.preventDefault();event.returnValue=''}});
 $('layoutSelect').addEventListener('change',e=>{

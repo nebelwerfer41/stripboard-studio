@@ -1,0 +1,515 @@
+{
+  "version": 4,
+  "dataPolicy": "Solo il caso sintetico fornito per diagnosi; nessun percorso locale o archivio privato incluso",
+  "originSha256": "199736aa2997d1d3579ff398a1f61e9aac8cc33307540d98a73387f618c2d23b",
+  "verification": "Verifiche interne separate dalla prova MMS10, da registrare",
+  "seed": 314159,
+  "files": [
+    {
+      "name": "02-resaved-rebuilt-actor-0.mmsx",
+      "sha256": "7eb3fc05d5691c5a5d52d5c5f098331a82e104620591f3a078e962021aa3884a",
+      "origin": "02-new-complex_edit.mmsx risalvato dall’utente in MMS10",
+      "operations": [
+        "Ricostruzione esplicita dal modello corrente, layout corretti, eventi con colore e ID distinti",
+        "Quantità zero originale invariata"
+      ],
+      "variant": "MMS2 dataFormat 5",
+      "expected": {
+        "scenes": 2,
+        "events": [
+          {
+            "name": "Prova costumi",
+            "type": "fitting",
+            "color": "#10457A",
+            "startDate": "2026-10-06",
+            "endDate": "2026-10-07",
+            "targets": [
+              {
+                "kind": "element",
+                "elementId": "00000000-0000-4000-8000-000000000332",
+                "category": "Cast",
+                "element": "Èlia"
+              }
+            ]
+          },
+          {
+            "name": "Prova Costumi",
+            "type": "none",
+            "color": "#10457A",
+            "startDate": "2026-10-07",
+            "endDate": "2026-10-07",
+            "targets": [
+              {
+                "kind": "element",
+                "elementId": "00000000-0000-4000-8000-000000000332",
+                "category": "Cast",
+                "element": "Èlia"
+              }
+            ]
+          },
+          {
+            "name": "Prova costumi",
+            "type": "fitting",
+            "color": "#10457A",
+            "startDate": "2026-10-06",
+            "endDate": "2026-10-07",
+            "targets": [
+              {
+                "kind": "element",
+                "elementId": "00000000-0000-4000-8000-000000000332",
+                "category": "Cast",
+                "element": "Èlia"
+              }
+            ]
+          }
+        ],
+        "redFlags": [
+          {
+            "id": "00000000-0000-4000-8000-000000000384",
+            "sourceId": "00000000-0000-4000-8000-000000000384",
+            "sourceOrder": 0,
+            "name": "Indisponibile",
+            "typeId": "10000000-0000-4000-8000-000000000029",
+            "type": "unavailable",
+            "typeName": null,
+            "note": "Vincolo sintetico",
+            "color": "#FF0000",
+            "startDate": "2026-10-06",
+            "endDate": "2026-10-08",
+            "date": "2026-10-06",
+            "rawDate": "20261006",
+            "target": {
+              "kind": "element",
+              "elementId": "00000000-0000-4000-8000-000000000332",
+              "category": "Cast",
+              "element": "Èlia"
+            },
+            "targetResolved": true,
+            "scope": {
+              "kind": "project"
+            },
+            "dateOrigin": "stored",
+            "source": {
+              "type": "10000000-0000-4000-8000-000000000029",
+              "note": "Vincolo sintetico",
+              "startDate": "20261006",
+              "endDate": "20261008",
+              "elementId": "00000000-0000-4000-8000-000000000332",
+              "id": "00000000-0000-4000-8000-000000000384",
+              "color": "#FF0000"
+            }
+          }
+        ],
+        "actorQuantity": 0,
+        "colors": "Bianco già registrato nel file ricevuto: mantenuto, nessun colore originale inventato"
+      },
+      "compatibility": {
+        "target": "mmsx",
+        "variant": "MMS2 dataFormat 5",
+        "mode": "rebuild",
+        "kept": [
+          {
+            "code": "scenes",
+            "count": 2,
+            "detail": "Scene e campi della scheda"
+          },
+          {
+            "code": "elements",
+            "count": 11,
+            "detail": "Elementi e associazioni risolte"
+          },
+          {
+            "code": "plans",
+            "count": 2,
+            "detail": "Piani, ordine di scene e banner"
+          },
+          {
+            "code": "calendars",
+            "count": 2,
+            "detail": "Calendari assegnati: regole supportate; eventuali copie e omissioni dettagliate sotto"
+          },
+          {
+            "code": "red-flags",
+            "count": 1,
+            "detail": "Red Flags: nome, nota, date e target"
+          },
+          {
+            "code": "events",
+            "count": 3,
+            "detail": "Eventi e target associati ai calendari esportati"
+          },
+          {
+            "code": "colors",
+            "count": 45,
+            "detail": "Combinazioni con etichette INT/EXT e Day/Night esportate come regole; colori per scena scritti separatamente"
+          },
+          {
+            "code": "category-colors",
+            "count": 19,
+            "detail": "Colori delle categorie mantenuti"
+          }
+        ],
+        "transformed": [
+          {
+            "code": "native-color-approximation",
+            "count": 144,
+            "detail": "Celle o scene con colori fuori dalla palette MMSX verificata approssimati al colore nativo più vicino; originali conservati in Studio"
+          },
+          {
+            "code": "event-color",
+            "count": 2,
+            "detail": "Eventi senza colore: applicato il colore nativo #10457A, come nel campione creato da MMS10"
+          },
+          {
+            "code": "property-identities",
+            "count": 4,
+            "detail": "Proprietà riferite tramite UUID alle definizioni della categoria; etichette conservate"
+          },
+          {
+            "code": "native-identities",
+            "count": 34,
+            "detail": "UUID nativi aggiunti ai record, chiavi e riferimenti riscritti insieme"
+          },
+          {
+            "code": "default-layouts",
+            "count": 1,
+            "detail": "Layout nativi sintetici e preferenze aggiunti per le viste Movie Magic"
+          },
+          {
+            "code": "system-redflag-types",
+            "count": 4,
+            "detail": "Tipi Red Flags di sistema Travel, Fitting, Unavailable e Rehearsal disponibili anche senza vincoli"
+          },
+          {
+            "code": "calendar-names",
+            "count": 2,
+            "detail": "Calendari copiati per segmento; nomi derivati da piano e segmento"
+          },
+          {
+            "code": "group-ids",
+            "count": 9,
+            "detail": "Identità locali di gruppi e strip rigenerate nel contenitore destinazione"
+          }
+        ],
+        "omitted": [
+          {
+            "code": "opaque-source",
+            "count": 1,
+            "detail": "Dati sorgente non interpretati: l’archivio resta nel progetto Studio, non nel file ricostruito"
+          },
+          {
+            "code": "layouts",
+            "count": 1,
+            "detail": "Template e geometrie di layout/report originali non ricostruiti"
+          },
+          {
+            "code": "unmapped-color-cells",
+            "count": 99,
+            "detail": "Celle senza coppia di etichette o Other non hanno una regola MMSX verificata; i colori effettivi delle scene sono esportati separatamente"
+          },
+          {
+            "code": "special-color-preferences",
+            "count": 3,
+            "detail": "Preferenze globali selezione/banner/fine giornata non ricostruite in MMSX; colori delle scene e regole palette esportati separatamente"
+          },
+          {
+            "code": "banner-style",
+            "count": 2,
+            "detail": "Stili individuali dei banner non ricostruiti; testo e ordine mantenuti, stile nativo predefinito"
+          },
+          {
+            "code": "unused-flag-types",
+            "count": 4,
+            "detail": "Definizioni Red Flags non utilizzate omesse"
+          },
+          {
+            "code": "category-options",
+            "count": 19,
+            "detail": "Opzioni categoria proprietarie: solo nome, ordine e definizioni proprietà ricostruiti"
+          },
+          {
+            "code": "calendar-options",
+            "count": 1,
+            "detail": "Opzioni e limiti attività calendario non ricostruiti"
+          },
+          {
+            "code": "flag-style",
+            "count": 1,
+            "detail": "Stile, codice DOOD e classificazione proprietaria Red Flags non ricostruiti; nome, nota, date e target mantenuti"
+          },
+          {
+            "code": "unverified-global-event-targets",
+            "count": 2,
+            "detail": "Portata progetto degli eventi non verificata nel formato MMSX: mantenuti i destinatari elementi; evento senza destinatari elementi omesso, originale conservato in Studio"
+          },
+          {
+            "code": "unused-calendars",
+            "count": 2,
+            "detail": "Calendari non assegnati a un segmento omessi"
+          },
+          {
+            "code": "banner-style",
+            "count": 2,
+            "detail": "Stile e tempi dei banner non ricostruiti; testo e ordine mantenuti"
+          }
+        ],
+        "blockers": []
+      },
+      "automatic": "PASS parser e confronti su quantità, eventi, colori, nessuna mutazione",
+      "manual": "DA ESEGUIRE in MMS10"
+    },
+    {
+      "name": "02-resaved-rebuilt-actor-1.mmsx",
+      "sha256": "54c691a5091fe3858fe207666f1f93a5f992ce25268f0410eefe589022abff93",
+      "origin": "02-new-complex_edit.mmsx risalvato dall’utente in MMS10",
+      "operations": [
+        "Ricostruzione esplicita dal modello corrente, layout corretti, eventi con colore e ID distinti",
+        "SOLO CONTROLLO DIAGNOSTICO: quantità Èlia nella prima scena modificata da 0 a 1"
+      ],
+      "variant": "MMS2 dataFormat 5",
+      "expected": {
+        "scenes": 2,
+        "events": [
+          {
+            "name": "Prova costumi",
+            "type": "fitting",
+            "color": "#10457A",
+            "startDate": "2026-10-06",
+            "endDate": "2026-10-07",
+            "targets": [
+              {
+                "kind": "element",
+                "elementId": "00000000-0000-4000-8000-000000000332",
+                "category": "Cast",
+                "element": "Èlia"
+              }
+            ]
+          },
+          {
+            "name": "Prova Costumi",
+            "type": "none",
+            "color": "#10457A",
+            "startDate": "2026-10-07",
+            "endDate": "2026-10-07",
+            "targets": [
+              {
+                "kind": "element",
+                "elementId": "00000000-0000-4000-8000-000000000332",
+                "category": "Cast",
+                "element": "Èlia"
+              }
+            ]
+          },
+          {
+            "name": "Prova costumi",
+            "type": "fitting",
+            "color": "#10457A",
+            "startDate": "2026-10-06",
+            "endDate": "2026-10-07",
+            "targets": [
+              {
+                "kind": "element",
+                "elementId": "00000000-0000-4000-8000-000000000332",
+                "category": "Cast",
+                "element": "Èlia"
+              }
+            ]
+          }
+        ],
+        "redFlags": [
+          {
+            "id": "00000000-0000-4000-8000-000000000384",
+            "sourceId": "00000000-0000-4000-8000-000000000384",
+            "sourceOrder": 0,
+            "name": "Indisponibile",
+            "typeId": "10000000-0000-4000-8000-000000000202",
+            "type": "unavailable",
+            "typeName": null,
+            "note": "Vincolo sintetico",
+            "color": "#FF0000",
+            "startDate": "2026-10-06",
+            "endDate": "2026-10-08",
+            "date": "2026-10-06",
+            "rawDate": "20261006",
+            "target": {
+              "kind": "element",
+              "elementId": "00000000-0000-4000-8000-000000000332",
+              "category": "Cast",
+              "element": "Èlia"
+            },
+            "targetResolved": true,
+            "scope": {
+              "kind": "project"
+            },
+            "dateOrigin": "stored",
+            "source": {
+              "type": "10000000-0000-4000-8000-000000000202",
+              "note": "Vincolo sintetico",
+              "startDate": "20261006",
+              "endDate": "20261008",
+              "elementId": "00000000-0000-4000-8000-000000000332",
+              "id": "00000000-0000-4000-8000-000000000384",
+              "color": "#FF0000"
+            }
+          }
+        ],
+        "actorQuantity": 1,
+        "colors": "Bianco già registrato nel file ricevuto: mantenuto, nessun colore originale inventato"
+      },
+      "compatibility": {
+        "target": "mmsx",
+        "variant": "MMS2 dataFormat 5",
+        "mode": "rebuild",
+        "kept": [
+          {
+            "code": "scenes",
+            "count": 2,
+            "detail": "Scene e campi della scheda"
+          },
+          {
+            "code": "elements",
+            "count": 11,
+            "detail": "Elementi e associazioni risolte"
+          },
+          {
+            "code": "plans",
+            "count": 2,
+            "detail": "Piani, ordine di scene e banner"
+          },
+          {
+            "code": "calendars",
+            "count": 2,
+            "detail": "Calendari assegnati: regole supportate; eventuali copie e omissioni dettagliate sotto"
+          },
+          {
+            "code": "red-flags",
+            "count": 1,
+            "detail": "Red Flags: nome, nota, date e target"
+          },
+          {
+            "code": "events",
+            "count": 3,
+            "detail": "Eventi e target associati ai calendari esportati"
+          },
+          {
+            "code": "colors",
+            "count": 45,
+            "detail": "Combinazioni con etichette INT/EXT e Day/Night esportate come regole; colori per scena scritti separatamente"
+          },
+          {
+            "code": "category-colors",
+            "count": 19,
+            "detail": "Colori delle categorie mantenuti"
+          }
+        ],
+        "transformed": [
+          {
+            "code": "native-color-approximation",
+            "count": 144,
+            "detail": "Celle o scene con colori fuori dalla palette MMSX verificata approssimati al colore nativo più vicino; originali conservati in Studio"
+          },
+          {
+            "code": "event-color",
+            "count": 2,
+            "detail": "Eventi senza colore: applicato il colore nativo #10457A, come nel campione creato da MMS10"
+          },
+          {
+            "code": "property-identities",
+            "count": 4,
+            "detail": "Proprietà riferite tramite UUID alle definizioni della categoria; etichette conservate"
+          },
+          {
+            "code": "native-identities",
+            "count": 34,
+            "detail": "UUID nativi aggiunti ai record, chiavi e riferimenti riscritti insieme"
+          },
+          {
+            "code": "default-layouts",
+            "count": 1,
+            "detail": "Layout nativi sintetici e preferenze aggiunti per le viste Movie Magic"
+          },
+          {
+            "code": "system-redflag-types",
+            "count": 4,
+            "detail": "Tipi Red Flags di sistema Travel, Fitting, Unavailable e Rehearsal disponibili anche senza vincoli"
+          },
+          {
+            "code": "calendar-names",
+            "count": 2,
+            "detail": "Calendari copiati per segmento; nomi derivati da piano e segmento"
+          },
+          {
+            "code": "group-ids",
+            "count": 9,
+            "detail": "Identità locali di gruppi e strip rigenerate nel contenitore destinazione"
+          }
+        ],
+        "omitted": [
+          {
+            "code": "opaque-source",
+            "count": 1,
+            "detail": "Dati sorgente non interpretati: l’archivio resta nel progetto Studio, non nel file ricostruito"
+          },
+          {
+            "code": "layouts",
+            "count": 1,
+            "detail": "Template e geometrie di layout/report originali non ricostruiti"
+          },
+          {
+            "code": "unmapped-color-cells",
+            "count": 99,
+            "detail": "Celle senza coppia di etichette o Other non hanno una regola MMSX verificata; i colori effettivi delle scene sono esportati separatamente"
+          },
+          {
+            "code": "special-color-preferences",
+            "count": 3,
+            "detail": "Preferenze globali selezione/banner/fine giornata non ricostruite in MMSX; colori delle scene e regole palette esportati separatamente"
+          },
+          {
+            "code": "banner-style",
+            "count": 2,
+            "detail": "Stili individuali dei banner non ricostruiti; testo e ordine mantenuti, stile nativo predefinito"
+          },
+          {
+            "code": "unused-flag-types",
+            "count": 4,
+            "detail": "Definizioni Red Flags non utilizzate omesse"
+          },
+          {
+            "code": "category-options",
+            "count": 19,
+            "detail": "Opzioni categoria proprietarie: solo nome, ordine e definizioni proprietà ricostruiti"
+          },
+          {
+            "code": "calendar-options",
+            "count": 1,
+            "detail": "Opzioni e limiti attività calendario non ricostruiti"
+          },
+          {
+            "code": "flag-style",
+            "count": 1,
+            "detail": "Stile, codice DOOD e classificazione proprietaria Red Flags non ricostruiti; nome, nota, date e target mantenuti"
+          },
+          {
+            "code": "unverified-global-event-targets",
+            "count": 2,
+            "detail": "Portata progetto degli eventi non verificata nel formato MMSX: mantenuti i destinatari elementi; evento senza destinatari elementi omesso, originale conservato in Studio"
+          },
+          {
+            "code": "unused-calendars",
+            "count": 2,
+            "detail": "Calendari non assegnati a un segmento omessi"
+          },
+          {
+            "code": "banner-style",
+            "count": 2,
+            "detail": "Stile e tempi dei banner non ricostruiti; testo e ordine mantenuti"
+          }
+        ],
+        "blockers": []
+      },
+      "automatic": "PASS parser e confronti su quantità, eventi, colori, nessuna mutazione",
+      "manual": "DA ESEGUIRE in MMS10"
+    }
+  ]
+}

@@ -1,4 +1,6 @@
-import {completeProjectModel} from './project-model.js';
+import {readMsdFlagType} from './native-export-projections.js';
+import {readMsdTime} from './scene-time.js';
+import {registerNativeModel,completeProjectModel} from './project-model.js';
 /* Movie Magic Scheduling 6 importer. Keeps the original EPSF bytes for conservative writes. */
 import {calendarDate,calendarDatesBetween,shootingDatesForCalendar,validDate} from './production-data.js';
 import {boardSignature} from './scheduling.js';
@@ -124,14 +126,14 @@ function parseColors(root){
     `${attr(x,'RowNumber')}:${attr(x,'ColumnNumber')}`,{fg:rgbColor(attr(x,'Fg')),bg:rgbColor(attr(x,'Bg'))}]));
   const preferences=Object.fromEntries(paths(root,['StripColorPreferences','StripColorPreference']).map(x=>[
     attr(x,'Name'),{fg:rgbColor(attr(x,'Fg')),bg:rgbColor(attr(x,'Bg'))}]));
-  return {columns,rows,cells,preferences};
+  return {columns,rows,cells,preferences,palette:paths(root,['ColorPalette','Color']).map(x=>rgbColor(attr(x,'RGB'))).filter(Boolean)};
 }
 function compactStrip(node){
   const kind=node.tagName==='BDSStrip'?'scene':node.tagName==='BannerStrip'?'banner':'unknown';
   const strip={kind,bdsId:kind==='scene'?attr(node,'BDSID'):null,text:kind==='banner'?attr(node,'Text'):null};
   if(kind==='banner'){
     const attributes=attrs(node);
-    strip.attributes=attributes;strip.estimateTimeA=attributes.EstimateTimeA??null;strip.style={fontColor:rgbColor(attributes.FontColor),fontSize:attributes.FontSize??null,
+    strip.attributes=attributes;try{strip.estimateTimeA=readMsdTime(attributes.EstimateTimeA,attributes.EstimateTimeB)}catch{strip.estimateTimeA=attributes.EstimateTimeA??null}strip.style={fontColor:rgbColor(attributes.FontColor),fontSize:attributes.FontSize??null,
       fontStyle:attributes.FontStyle??null,fontName:attributes.FontName??null,customized:attributes.IsCustomized==='1'};
   }
   return strip;
@@ -153,7 +155,7 @@ function parseRedFlags(root,elementIndex,issues){
     if(!targetResolved)issue(issues,'MISSING_REDFLAG_ELEMENT');
     return {id:`red-flag-${index+1}`,sourceId:attr(node,'ID'),identitySource:attr(node,'ID')?'msd-id':'entry-order',
       sourceOrder:index,name:attr(node,'Name'),note:attr(node,'Note'),date:isoDate(attr(node,'Date')),
-      rawDate:attr(node,'Date'),target,targetResolved,doodStatus:attr(node,'DOODStatus'),
+      rawDate:attr(node,'Date'),target,targetResolved,doodStatus:attr(node,'DOODStatus'),type:readMsdFlagType(attr(node,'Name'),attr(node,'DOODStatus')),
       attributes,source:rawNode(node)};
   });
   return {entries,names,settings:{manager:attrs(root),list:attrs(list)},source:rawNode(root)};
@@ -185,6 +187,8 @@ function buildProject(container){
   const scenes=paths(roots.BreakdownSheetMgr,['BreakdownSheets','BreakdownSheet']).map(node=>{
     const scene={bdsId:attr(node,'BDSID')};
     for(const [key,name] of Object.entries(fieldMap))scene[key]=attr(node,name);
+    scene.msdTimeSource={minutes:scene.estimateTimeA,hours:scene.estimateTimeB};
+    try{scene.estimateTimeA=readMsdTime(scene.estimateTimeA,scene.estimateTimeB);scene.estimateTimeB=null}catch{issue(issues,'INVALID_MSD_TIME')}
     const rawPages=attr(node,'NumScriptPages');scene.pagesEighths=/^\d+$/.test(rawPages||'')?Number(rawPages):null;
     if(scene.pagesEighths===null)issue(issues,'UNPARSED_PAGE_COUNT');
     const requirements=Object.create(null);for(const ref of paths(node,['ElementRefs','ElementRef'])){
@@ -265,7 +269,7 @@ function buildProject(container){
   completeProjectModel(project);
   sourceDocument.boardSignature=boardSignature(project);sourceDocument.calendarsSignature=calendarsSignature(project);
   sourceDocument.calendarSignatures=new Map(project.calendars.map(c=>[c.name,calendarsSignature({calendars:[c]})]));
-  return project;
+  return registerNativeModel(project);
 }
 export async function parseMsd(buffer,fileName='imported.msd'){
   if(!(buffer instanceof ArrayBuffer))throw TypeError('Expected an ArrayBuffer');

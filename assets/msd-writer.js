@@ -1,3 +1,5 @@
+import {exportQuantityProject} from './quantities.js';
+import {requireExport,commonMsdSections} from './export-adapters.js';
 /* Conservative EPSF/MSD writer: patch StripBoardMgr/CalendarMgr only when changed. */
 import {boardSignature} from './scheduling.js';
 import {calendarsSignature,FLASH_DATE_NS,CALENDAR_DAYS} from './calendar-commands.js';
@@ -156,8 +158,10 @@ function patchCalendars(project){
   const prefix=/^(<\?xml[^>]*\?>\s*)/.exec(xml)?.[0]||'';
   return encoder.encode(prefix+new XMLSerializer().serializeToString(doc.documentElement));
 }
-export function serializeMsd(project){
- if(project.documentEditing)throw Error('Le modifiche complete richiedono Salva progetto Studio (.studio.json). Esportazione nativa non disponibile per questo documento.');
+export function serializeMsd(project,options={}){
+  project=exportQuantityProject(project,options);
+ const report=requireExport(project,'msd',options);
+ if(report.mode==='rebuild')return encodeMsdSections(commonMsdSections(project)).buffer;
   const source=project?.sourceDocument;
   if(!source?.bytes||!source?.sections)throw Error('Documento MSD originale non disponibile');
   const boardChanged=boardSignature(project)!==source.boardSignature,calendarChanged=calendarsSignature(project)!==source.calendarsSignature;
@@ -179,4 +183,20 @@ export function serializeMsd(project){
   const header=oldBytes.slice(0,716);
   new DataView(header.buffer).setUint32(260,offset);
   return concat([header,...body,map]).buffer;
+}
+
+// EPSF 04/MMB10 container built entirely from synthetic/common-model sections.
+export function encodeMsdSections(sections){
+ const header=new Uint8Array(716),view=new DataView(header.buffer);
+ const put=(bytes,offset,value)=>bytes.set(encoder.encode(value),offset);
+ put(header,0,'/********* EPSF FILE ********/ ');put(header,64,'00.01.001');put(header,128,'EPS Schedule File');put(header,268,'MMB10');put(header,332,'04.00.000');put(header,460,'MMB10');put(header,524,'04.00.000');put(header,192,'04.00.000');
+ const names={CalendarMgr:'Calendars',CategoryMgr:'Categories',BreakdownSheetMgr:'BreakdownSheets',StripBoardLayoutMgr:'StripLayouts',ReportLayoutMgr:'ReportLayouts',RedFlagMgr:'RedFlags'};
+ const order=['DOODLayoutMgr','CalendarMgr','CategoryMgr','ElementMgr','BreakdownSheetMgr','StripBoardMgr','ProductionInfo','PrintViewOptions','ColorSettings','StripBoardLayoutMgr','ReportLayoutMgr','RedFlagMgr','Schedule'];
+ const entries=Object.entries(sections).sort(([a],[b])=>order.indexOf(a)-order.indexOf(b)),map=new Uint8Array(entries.length*332),mapView=new DataView(map.buffer),blocks=[];let offset=716;
+ for(const [i,[root,xml]] of entries.entries()){
+  const marker=new Uint8Array(68);put(marker,0,'/********* EPSF SECTION *********/ ');marker[67]=1;
+  const block=concat([marker,storedDeflate(encoder.encode('<?xml version="1.0" encoding="UTF-8"?>\n'+xml))]);blocks.push(block);
+  const start=i*332;put(map,start,'/********* EPSF SECTION MAP *********/ ');mapView.setUint32(start+68,offset);mapView.setUint32(start+72,block.length);put(map,start+76,names[root]||root);put(map,start+140,names[root]||root);put(map,start+204,'04.00.000');offset+=block.length;
+ }
+ view.setUint32(260,offset);view.setUint32(264,entries.length);return concat([header,...blocks,map]);
 }

@@ -1,3 +1,4 @@
+import {isCastCategory} from './quantities.js';
 import {createOverlay} from './overlay-service.js';
 import {escapeHtml as e} from './dood-print.js';
 import {editElement,editCategory,editScene,refreshDocument} from './document-model.js';
@@ -29,7 +30,7 @@ export function createCatalogEditor({getContext,onChange,onRefresh,onError}){
   let content;
   if(type==='category'){
    const defaults=categoryDefaults(r);definitions=propertyDefinitions(r);removed=[];
-   content=`<label class="catalog-name">Categoria<input name="name" value="${e(name)}" required></label><label>Colore<input name="color" type="color" value="${e(r.color||'#0c877c')}"></label>${tabButtons([['defaults','Predefiniti nuovi elementi'],['schema','Proprietà degli elementi']])}${section('defaults',`<div class="catalog-option-grid">${check('autoAssignIds','Assegna Board ID automaticamente',defaults.autoAssignIds)}${check('excludeFromBoard','Escludi dalla Stripboard',defaults.excludeFromBoard)}${check('allowHold','Consenti Hold Days',defaults.allowHold)}${check('useDailyQuantity','Usa nella quantità giornaliera',defaults.useDailyQuantity)}</div>`,false)}${section('schema',`${check('hideQuantity','Nascondi quantità nel Breakdown',Boolean(r.hideQuantity))}<button type="button" data-schema-add>＋ Proprietà</button><div data-schema-list></div>`)}`;
+   content=`<label class="catalog-name">Categoria<input name="name" value="${e(name)}" required></label><label>Colore<input name="color" type="color" value="${e(r.color||'#0c877c')}"></label>${tabButtons([['defaults','Predefiniti nuovi elementi'],['schema','Proprietà degli elementi']])}${section('defaults',`<div class="catalog-option-grid">${check('autoAssignIds','Assegna Board ID automaticamente',defaults.autoAssignIds)}${check('excludeFromBoard','Escludi dalla Stripboard',defaults.excludeFromBoard)}${check('allowHold','Consenti Hold Days',defaults.allowHold)}${check('useDailyQuantity','Usa nella quantità giornaliera',defaults.useDailyQuantity,isCastCategory(r))}</div>`,false)}${section('schema',`${check('hideQuantity','Nascondi quantità nel Breakdown',Boolean(r.hideQuantity))}<button type="button" data-schema-add>＋ Proprietà</button><div data-schema-list></div>`)}`;
   }else{
    const options=record?elementOptions(r):{lockId:false,...categoryDefaults(category)},rules=record?effectiveDoodRules(project,board,record):{allowHold:categoryDefaults(category).allowHold,allowDrop:false,minimumCalendarDays:7},usage=record?elementUsage(project,boardName,record):{occurrences:[],dates:[],flags:[],worked:0,first:null,last:null};
    const defs=propertyDefinitions(category),props=r.properties||{},known=new Set(defs.map(d=>d.key));
@@ -44,7 +45,7 @@ export function createCatalogEditor({getContext,onChange,onRefresh,onError}){
   onChange(()=>{
    if(kind==='category'){
     const names=new Set(),props=Object.create(null);for(const def of definitions){const label=def.label.trim();if(!label||names.has(label))throw Error('Nome proprietà obbligatorio e univoco');names.add(label);const key=def.key||label;props[key]={...(def.raw&&typeof def.raw==='object'?def.raw:{}),name:label,type:def.type}}
-    editCategory(project,record?.id||record?.name||null,{name:String(v.get('name')),color:String(v.get('color')),hideQuantity:form.elements.hideQuantity.checked,attributes:record?.attributes||{},properties:props,elementDefaults:Object.fromEntries(['autoAssignIds','excludeFromBoard','allowHold','useDailyQuantity'].map(k=>[k,form.elements[k].checked]))});
+    editCategory(project,record?.id||record?.name||null,{name:String(v.get('name')),color:String(v.get('color')),hideQuantity:form.elements.hideQuantity.checked,useDailyQuantity:form.elements.useDailyQuantity.checked,attributes:record?.attributes||{},properties:props,elementDefaults:Object.fromEntries(['autoAssignIds','excludeFromBoard','allowHold','useDailyQuantity'].map(k=>[k,form.elements[k].checked]))});
     for(const el of project.elements.filter(el=>el.category===String(v.get('name')).trim()))for(const key of removed)delete el.properties?.[key];
    }else {
     const authoring={...elementOptions(record),...Object.fromEntries(['lockId','excludeFromBoard','useDailyQuantity','allowHold','allowDrop'].map(k=>[k,form.elements[k].checked])),minimumCalendarDays:Number(v.get('minimumCalendarDays'))};

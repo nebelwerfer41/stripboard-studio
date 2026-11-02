@@ -1,3 +1,16 @@
+> Revisione corrente: [v6 — quantità selezionabili, totali e ID](quantities-and-export-v6.md). Le sezioni precedenti contengono risultati storici.
+
+> Revisione corrente: [v5 — quantità, piani MSD completi e Red Flags](native-regressions-v5.md). Questa pagina contiene anche risultati storici.
+
+> Aggiornamento corrente: [revisione v4, riscontri manuali e limiti](native-regressions-v4.md). Le sezioni precedenti sono storiche.
+
+> Suite v3: [riscontro manuale v2 e correzioni su tempi, Red Flags e report](native-ui-regressions.md).
+> La suite v2 apre parzialmente in MMS10 e solo i minimi MSD risultano aperti in MMS6.
+
+> Aggiornamento: la suite v1 non si apre in Movie Magic (riscontro utente).
+> Vedi [riesame dei campioni e correzioni](native-format-corrections.md).
+> I PASS dei parser riportati nelle sezioni storiche non provano compatibilità nativa.
+
 > **v1.8 — 8 ottobre 2026:** Calendar ora consente editing delle regole e ripianificazione esplicita con Undo/Redo e salvataggio. Le restrizioni di sola consultazione riportate sotto descrivono la fase precedente. [Estensioni dei writer, Anteprima Spoglio, prove reali/sintetiche e limiti](calendar-workspace.md).
 
 # Supporto MMSX

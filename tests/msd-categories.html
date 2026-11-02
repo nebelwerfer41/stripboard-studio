@@ -2,7 +2,9 @@
 <body><h1>MSD: nomi di categoria e conservazione dei riferimenti</h1><pre id="result">In corso…</pre>
 <script type="module">
 import {parseMsd} from '../assets/msd-parser.js';
-import {serializeMsd} from '../assets/msd-writer.js';
+import {serializeMsd as serializeNativeMsd} from '../assets/msd-writer.js';
+// This harness explicitly accepts the documented Studio date-extension uncertainty.
+const serializeMsd=project=>serializeNativeMsd(project,{acceptLoss:true});
 import {moveBoardItems,snapshotBoardOrder,restoreBoardOrder} from '../assets/scheduling.js';
 import {renamedCategoryFixture} from './fixtures/msd.mjs';
 const lines=[];

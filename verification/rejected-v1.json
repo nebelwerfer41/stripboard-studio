@@ -1,0 +1,117 @@
+{
+  "suiteVersion": 1,
+  "evidence": "Segnalazione utente: nessun export aperto in MMS6 o MMS10",
+  "exactMMSVersions": "non comunicate",
+  "results": [
+    {
+      "file": "01-new-minimal.msd",
+      "sha256": "1699b6f1aacbbab142d59ed29dfdd6add54f5f27cae240b39f5cc005763be623",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "01-new-minimal.mmsx",
+      "sha256": "181d7bad224fe24c0e8014e0f5943907245e9414e0ebe158619d2a6cf333f41e",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "01b-new-single-scene.msd",
+      "sha256": "3321861d3794cb05a737373369c27bb3c710e25172d26e61b57ab1f18e96335e",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "01b-new-single-scene.mmsx",
+      "sha256": "e27856296a0c08c1eff95dd8323824f17622a51d288b097c64fdebaf816093d0",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "02-new-complex.msd",
+      "sha256": "38868b322db7103ca59d714b15e546db7cb6aec88e86483823dc497330a4f02e",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "02-new-complex.mmsx",
+      "sha256": "95f4531e758d306717c5243af0d7956b185363c3383259d2949e0a1d7acf58fd",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "03-import-msd-edited.msd",
+      "sha256": "a477d5a36209917bdf642b1053cc8e03eda91dce039a4df5a35ffc11762695da",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "03-import-msd-edited.mmsx",
+      "sha256": "c44f10473d6446eddcb6ca624e86066016da1cc3badc89a1592f2597704ae17c",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "04-import-mmsx-edited.msd",
+      "sha256": "35afacefd5150a54ba5a89ccd9031818b6713bbcd5a37b58c8d633005c8b2a17",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "04-import-mmsx-edited.mmsx",
+      "sha256": "b06a1ba4948c03a57609aef020a89f18b2e06a56901681f4d25d1350d319c307",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "05-studio-new.msd",
+      "sha256": "38868b322db7103ca59d714b15e546db7cb6aec88e86483823dc497330a4f02e",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "05-studio-new.mmsx",
+      "sha256": "2a9db15047f4fe4d3bf816ff7bb737ce90f10a3a082c450e4187f6e25a9938f2",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "06-studio-msd.msd",
+      "sha256": "a477d5a36209917bdf642b1053cc8e03eda91dce039a4df5a35ffc11762695da",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "06-studio-msd.mmsx",
+      "sha256": "a7ce071c603b24b46fcfa0f8a27241e311582488c2bbd2756abc6cfba8617c04",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "07-studio-mmsx.msd",
+      "sha256": "35afacefd5150a54ba5a89ccd9031818b6713bbcd5a37b58c8d633005c8b2a17",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "07-studio-mmsx.mmsx",
+      "sha256": "20dcaed2909b9582c60a52282dc8e31d4d892de180695780cb77cfffef65b052",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "08-native-noop.msd",
+      "sha256": "38868b322db7103ca59d714b15e546db7cb6aec88e86483823dc497330a4f02e",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "08-native-noop.mmsx",
+      "sha256": "a0ad60a61054e78a469742199528a5aba2dc0c0d7b8e909857fb65ef185a76dc",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "09-migrate-v1.msd",
+      "sha256": "5780e9c0c79b3c90011e067ae611688b11cf6601d565fffc021b2579bc7b612b",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "09-migrate-v1.mmsx",
+      "sha256": "a0ad60a61054e78a469742199528a5aba2dc0c0d7b8e909857fb65ef185a76dc",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "09-migrate-v2.msd",
+      "sha256": "5780e9c0c79b3c90011e067ae611688b11cf6601d565fffc021b2579bc7b612b",
+      "manual": "FAIL apertura"
+    },
+    {
+      "file": "09-migrate-v2.mmsx",
+      "sha256": "a0ad60a61054e78a469742199528a5aba2dc0c0d7b8e909857fb65ef185a76dc",
+      "manual": "FAIL apertura"
+    }
+  ]
+}

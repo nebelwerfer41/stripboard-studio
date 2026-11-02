@@ -39,7 +39,7 @@ export function activeSceneContext(project,boardName,sceneId,stripId){
   return {scene,occurrence:occurrence||null};
 }
 export function breakdownCategories(project,scene,{hideEmpty=false}={}){
-  const chosen=new Map(),categories=catalogCategories(project).filter(c=>{const field=builtinField(c.name);if(!field)return true;const preferred=singleSceneValue(project,scene,field).element?.category;if(preferred&&c.name!==preferred)return false;if(chosen.has(field))return false;chosen.set(field,c.name);return true}).map((c,i)=>({...c,id:c.id??`category:${JSON.stringify([c.name,i])}`,items:[]}));
+  const chosen=new Map(),categories=catalogCategories(project).filter(c=>{const field=builtinField(c.name);if(!field)return true;const preferred=singleSceneValue(project,scene,field).element?.category;if(preferred&&c.name!==preferred)return false;if(chosen.has(field))return false;chosen.set(field,c.name);return true}).map((c,i)=>({...c,unknown:Boolean(c.derived&&!builtinField(c.name)),id:c.id??`category:${JSON.stringify([c.name,i])}`,items:[]}));
   const elements=new Map(project.elements.map(e=>[e.id,e]));
   for(const ref of scene?.elementRefs||[]){
     if(builtinField(elements.get(ref.elementId)?.category||ref.category))continue;

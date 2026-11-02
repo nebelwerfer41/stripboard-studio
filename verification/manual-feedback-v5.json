@@ -1,0 +1,207 @@
+{
+  "suiteVersion": 5,
+  "archiveSha256": "b2c71f1faf4b5a59ac6160332e1c76df22f417bf70486200227ddae4e94e335e",
+  "source": "Riscontro e rettifiche utente del 2 novembre 2026",
+  "applicationVersions": "Build esatte non comunicate",
+  "results": [
+    {
+      "case": "14",
+      "result": "Trasferimento eventi di sistema in MMS6 CORRETTO, rettifica esplicita del precedente riscontro negativo"
+    },
+    {
+      "case": "15",
+      "result": "Denominazioni Red Flags standard, comportamento richiesto"
+    },
+    {
+      "case": "16",
+      "result": "Entrambi gli attori visualizzati; variante quantità 1 ha Board ID 1, variante 3 senza ID: da correggere"
+    }
+  ],
+  "quantityCorrection": "MMS6: numero iniziale oppure Nome (quantità), non parentesi iniziali. Per 0/1 non decorare il nome. MMS10: quantità numeriche e categoria Use in daily qty, Cast senza controllo. Totale Studio massimo per identità, non somma tra scene.",
+  "files": [
+    {
+      "name": "01-new-minimal.msd",
+      "sha256": "9c6e06f8293cbd2366e22697df1233c9debfb4d80e176d51f49bb6414756c761"
+    },
+    {
+      "name": "01-new-minimal.mmsx",
+      "sha256": "f0ae70ecbabb8ecfcbcade665677322e6beaaa294ec128170709fec8f92c2e8a"
+    },
+    {
+      "name": "01b-new-single-scene.msd",
+      "sha256": "1426ecf20a1d74b0bfb6c02027238b52d20b013a9d41baf74c10c8bc0bd37839"
+    },
+    {
+      "name": "01b-new-single-scene.mmsx",
+      "sha256": "9040534691805662b9f03613bb73b7e40ce6229a7a46c8b3430e48fcb7531ed8"
+    },
+    {
+      "name": "02-new-complex.msd",
+      "sha256": "d5fe481e0e282727b05ae4aaf7dc3b70a063491da043a84515446ccd94988882"
+    },
+    {
+      "name": "02-new-complex.mmsx",
+      "sha256": "44d7d2e6689e0f5ba25f563d3ae47445b5dad1d95c4d75478b2289b746fdc1d4"
+    },
+    {
+      "name": "03-import-msd-edited.msd",
+      "sha256": "c3941592860f2492ea3ef9b8a10d1881b62b7fb291c43614b0ad7feb70092556"
+    },
+    {
+      "name": "03-import-msd-edited.mmsx",
+      "sha256": "2222d6db1df0561736b98f673b925a403f7c0c6b4d9ddf098a38c4323c8234eb"
+    },
+    {
+      "name": "04-import-mmsx-edited.msd",
+      "sha256": "1c6cedb5296b9f6478aadb17af6870703e1727da811a51c3019db4135c9b9696"
+    },
+    {
+      "name": "04-import-mmsx-edited.mmsx",
+      "sha256": "81fa6be975669d4c89dad928886a7cc775d6ec8ececd3c981bcb1f77c5d87ab4"
+    },
+    {
+      "name": "05-studio-new.studio.json",
+      "sha256": "7bc836bd509481462c9c302ab253e2ae50d43def92ba4ec9ea6bb450bc7d377b"
+    },
+    {
+      "name": "05-studio-new.msd",
+      "sha256": "d5fe481e0e282727b05ae4aaf7dc3b70a063491da043a84515446ccd94988882"
+    },
+    {
+      "name": "05-studio-new.mmsx",
+      "sha256": "b68436b16f8d04bfca638654c305f5dc27b0523e6fdbd5e9388377e248bd7b81"
+    },
+    {
+      "name": "06-studio-msd.studio.json",
+      "sha256": "ee4db54764eaf9a06f9415933389547358f2e6c29090a1171f2ce6e316ba8d67"
+    },
+    {
+      "name": "06-studio-msd.msd",
+      "sha256": "c3941592860f2492ea3ef9b8a10d1881b62b7fb291c43614b0ad7feb70092556"
+    },
+    {
+      "name": "06-studio-msd.mmsx",
+      "sha256": "1c2175e597781f5155db6715646817bb3ace955b3d6ace8e58a05cb291915cef"
+    },
+    {
+      "name": "07-studio-mmsx.studio.json",
+      "sha256": "42eb26e2e9bb9168bf51ac8a5a0257a5853d1173e0b51e6998dc1bec67c0ca8f"
+    },
+    {
+      "name": "07-studio-mmsx.msd",
+      "sha256": "1c6cedb5296b9f6478aadb17af6870703e1727da811a51c3019db4135c9b9696"
+    },
+    {
+      "name": "07-studio-mmsx.mmsx",
+      "sha256": "5e9cd443017523d3a2faf26dccd2f0fb5ab2d4f2d2b9ab88e2c47a9c154e4111"
+    },
+    {
+      "name": "08-native-noop.msd",
+      "sha256": "d5fe481e0e282727b05ae4aaf7dc3b70a063491da043a84515446ccd94988882"
+    },
+    {
+      "name": "08-native-noop.mmsx",
+      "sha256": "f55d96be3577ebadca63fe015b94d5fec53d2b60a063b93a2318c38679ac7a08"
+    },
+    {
+      "name": "09-migrate-v1.msd",
+      "sha256": "f6417336f70c4665686d77ce9a2c4dfb585390a9dc98e1eb48821fbc15172c62"
+    },
+    {
+      "name": "09-migrate-v1.mmsx",
+      "sha256": "f55d96be3577ebadca63fe015b94d5fec53d2b60a063b93a2318c38679ac7a08"
+    },
+    {
+      "name": "09-migrate-v2.msd",
+      "sha256": "f6417336f70c4665686d77ce9a2c4dfb585390a9dc98e1eb48821fbc15172c62"
+    },
+    {
+      "name": "09-migrate-v2.mmsx",
+      "sha256": "f55d96be3577ebadca63fe015b94d5fec53d2b60a063b93a2318c38679ac7a08"
+    },
+    {
+      "name": "10-diagnostic-time.msd",
+      "sha256": "3ed7d43324970cdaa71e15e9bd78ca5c73bd0b127ec9795dfd9fa1ae82807a7d"
+    },
+    {
+      "name": "10-diagnostic-unicode.msd",
+      "sha256": "efdfa9fae6be1afcb5fa081255970b8249fc37b0d9fe2cce68d85a56ed8c882e"
+    },
+    {
+      "name": "10-diagnostic-properties.msd",
+      "sha256": "a9d7dc29c532b8adba353a9088fa41f96f64e4d86aee61952a2937c7c7bfcb9e"
+    },
+    {
+      "name": "10-diagnostic-empty-day.msd",
+      "sha256": "336dea9aee4b957c79ab1ffb9ea251d317945eec4595a53c71d89d79ac2fb877"
+    },
+    {
+      "name": "10-diagnostic-redflag.msd",
+      "sha256": "b456de080e3c3c5c8f1a757d16f15747ca19980219315b1526a776cee6b372ec"
+    },
+    {
+      "name": "10-diagnostic-second-plan.msd",
+      "sha256": "19e73704b13b03c5d206fbfa782aab531e0fe7cdfca39bdfe8465f685291f21e"
+    },
+    {
+      "name": "10-diagnostic-int-ext-dn.msd",
+      "sha256": "82eae691e9b98fa0d20e4b0aacd0daff06831d1ee97c497a9fa07d9f4affef29"
+    },
+    {
+      "name": "11-redflag-zero-no-events.mmsx",
+      "sha256": "8f0b8ea22ff69706e9ee4aaf5f15f5da0142c40431bc649460c231f6c24db1a3"
+    },
+    {
+      "name": "11-redflag-absent-events.mmsx",
+      "sha256": "aacfcdcceeda89f53cfdd33cffa3f08a3605252b7431d35ca7383f9a5f0ec9c1"
+    },
+    {
+      "name": "11-redflag-absent-no-events.mmsx",
+      "sha256": "f353878a85ea649a2d1b155c4252aadfac5b394f0fc96434a32e7f2bc26d06b3"
+    },
+    {
+      "name": "11-redflag-one-no-events.mmsx",
+      "sha256": "4cc7cdcd6ac2c74a3e107dbd2c5f64d93f8494902c4c130a40384ef7351a9b5a"
+    },
+    {
+      "name": "11-redflag-actor-zero.mmsx",
+      "sha256": "968e46f59efb4b8bf1df2cf1a173907c002a694f3ea966e2dea6fec199a613b9"
+    },
+    {
+      "name": "11-redflag-single-day.mmsx",
+      "sha256": "bd12959f33be37f478db54886a9c1284008627546e36582656ab559f25de3e94"
+    },
+    {
+      "name": "11-redflag-scheduled-range.mmsx",
+      "sha256": "bf592f8055c9dc8b6b71562f6f3b9baf4d3553f9f0168cc1da58c27400c96aa9"
+    },
+    {
+      "name": "12-event-native-none.mmsx",
+      "sha256": "e1a3c2866e51bc33117f73c9ff7aff84b4e936c25c08d59305bcd25d045f05dd"
+    },
+    {
+      "name": "13-color-losses.msd",
+      "sha256": "d5fe481e0e282727b05ae4aaf7dc3b70a063491da043a84515446ccd94988882"
+    },
+    {
+      "name": "13-color-losses.mmsx",
+      "sha256": "2a3c893c4c50e5faf006e20e902d0aad88a55f00b8d962b19ff8b13e5259c21f"
+    },
+    {
+      "name": "14-system-events.msd",
+      "sha256": "79114c6d720a742148baf5ca9cfc3234576dd6ea18b8df03df9230ada4560890"
+    },
+    {
+      "name": "14-system-events.mmsx",
+      "sha256": "be1258cfc1904e20a16aa28db309eb3c664a16bb8271f1d55bab547b4586a26b"
+    },
+    {
+      "name": "15-msd-system-flag-definitions.msd",
+      "sha256": "a5119a7044bf3ecb36a536f8eed7d3ff9057cc1a63cb3ffa5a0270d2358dd351"
+    },
+    {
+      "name": "16-msd-quantity-variants.msd",
+      "sha256": "8334e614fbfe869c23310ffe40d3bd5b18084ecd6adb1b8cbf03b0e582e05b00"
+    }
+  ]
+}

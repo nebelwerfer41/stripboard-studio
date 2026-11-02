@@ -1,9 +1,5 @@
-export function elementTotal(names){
-  return names.reduce((total,name)=>{
-    const leading=/^\s*(\d+(?:[.,]\d+)?)/.exec(name||'');
-    return total+(leading?Number(leading[1].replace(',','.')):1);
-  },0);
-}
+import {parseQuantityName,positiveQuantity} from './quantities.js';
+export function elementTotal(values){return values.reduce((total,value)=>total+(typeof value==='object'?Number(value.quantity)||0:parseQuantityName(value).quantity),0)}
 
 export function elementSumText({type,text,category,suppress},names){
   const total=elementTotal(names);

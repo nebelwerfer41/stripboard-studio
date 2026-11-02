@@ -1,3 +1,4 @@
+import {boardIdKey} from './element-ids.js';
 import {editScene,editElement,refreshDocument,snapshotDocument} from './document-model.js';
 import {calendarDate,findCalendar,validDate} from './production-data.js';
 import {dayBreakKey,moveBoardItems} from './scheduling.js';
@@ -68,7 +69,7 @@ export function bulkElementIds(project,ids,{start=1,prefix=''}={}){
   const selected=ids.map(id=>project.elements.find(e=>e.id===id)).filter(e=>!e||!elementOptions(e).lockId);ids=selected.map(e=>e?.id);if(!selected.length||new Set(ids).size!==ids.length||selected.some(e=>!e))throw Error('Seleziona gli elementi');
   const proposed=selected.map((e,index)=>`${prefix}${start+index}`),chosen=new Set(ids);
   if(!Number.isSafeInteger(start+ids.length-1))throw Error('ID troppo grande');
-  for(const [i,e] of selected.entries())if(project.elements.some(other=>!chosen.has(other.id)&&other.category===e.category&&String(other.boardId??'')===proposed[i]))throw Error(`ID ${proposed[i]} già presente in ${e.category}`);
+  for(const [i,e] of selected.entries())if(project.elements.some(other=>!chosen.has(other.id)&&other.category===e.category&&boardIdKey(other.boardId)===boardIdKey(proposed[i])))throw Error(`ID ${proposed[i]} già presente in ${e.category}`);
   selected.forEach((e,index)=>{e.boardId=proposed[index]});refreshDocument(project);
 }
 export function moveElementsToCategory(project,ids,category){
@@ -76,6 +77,7 @@ export function moveElementsToCategory(project,ids,category){
   if(isBuiltinCategory(project.categorySettings.find(c=>c.name===category)))throw Error('Scegli una categoria personalizzata');
   const selected=ids.map(id=>project.elements.find(e=>e.id===id));if(!selected.length||selected.some(e=>!e))throw Error('Seleziona gli elementi');
   const names=new Set();for(const el of selected){if(names.has(el.name)||project.elements.some(e=>!ids.includes(e.id)&&e.category===category&&e.name===el.name))throw Error(`Esiste già un elemento ${el.name} in ${category}`);names.add(el.name)}
+  const idsInTarget=new Set(project.elements.filter(e=>!ids.includes(e.id)&&e.category===category).map(e=>boardIdKey(e.boardId)).filter(Boolean));for(const el of selected){const id=boardIdKey(el.boardId);if(id&&idsInTarget.has(id))throw Error(`ID ${el.boardId} già presente in ${category}`);if(id)idsInTarget.add(id)}
   for(const el of selected)editElement(project,el.id,{...el,category});
 }
 export function reorderCollection(project,kind,ids){

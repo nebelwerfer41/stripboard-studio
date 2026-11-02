@@ -35,7 +35,7 @@ for(const variant of ['5','3','hybrid'])test(`full Studio edit preserves origina
  const cal=createCalendar(p,{name:'Seconda unità'});createPlan(p,{name:'Piano alternativo',calendarId:cal.id,copyFrom:p.boards[0].id});
  const data=JSON.parse(new TextDecoder().decode(await serializeStudio(p)));assert.deepEqual(Uint8Array.from(atob(data.native),c=>c.charCodeAt(0)),bytes);
  const again=await parseStudio(new TextEncoder().encode(JSON.stringify(data)));assert.equal(again.scenes[0].pagesEighths,17);assert.equal(again.scenes[0].requirements.Cast[0],'Interprete');assert.equal(again.boards[0].unscheduledGroups,again.boards[1].unscheduledGroups);assert.equal(again.boards.at(-1).name,'Piano alternativo');
- assert.equal(again.events.length,p.events.length);assert.equal(again.events[0].id,p.events[0].id);await assert.rejects(()=>serializeMmsx(again,'source.mmsx'),/Studio/);
+ assert.equal(again.events.length,p.events.length);assert.equal(again.events[0].id,p.events[0].id);await assert.rejects(()=>serializeMmsx(again,'source.mmsx'),/non risolto/);
 });
 test('calendar and plan renames retain calendar ID, dates and fixed events',()=>{
  const p=createDocument('Film'),b=p.boards[0],c=p.calendars[0];addDay(p,b.id,{date:'2026-10-12',shootingDayNumber:1});p.events.push({id:'ev',startDate:'2026-10-13',endDate:'2026-10-13',calendarId:c.id,studioBoardName:b.name,targets:[]});
@@ -44,7 +44,7 @@ test('calendar and plan renames retain calendar ID, dates and fixed events',()=>
 test('invalid values fail without partial creation; malformed containers fail before loading',async()=>{
  const p=createDocument('Film');assert.throws(()=>editScene(p,null,{scene:'',pagesEighths:-1}),/intero/);assert.throws(()=>editScene(p,null,{scene:'1',pagesEighths:1.5}),/ottavi/);assert.equal(p.scenes.length,0);
  assert.throws(()=>editElement(p,null,{name:'Anna',category:'Missing',properties:{}}),/Categoria/);assert.throws(()=>addDay(p,p.boards[0].id,{date:'2026-02-30',shootingDayNumber:1}),/valido/);assert.throws(()=>editCategory(p,null,{name:'Cast'}),/presente/);
- const data=JSON.parse(new TextDecoder().decode(await serializeStudio(p)));data.document.boards[0].unscheduledGroups[0].strips=[{kind:'scene',sourceKey:'lost',bdsId:'missing'}];await assert.rejects(()=>parseStudio(new TextEncoder().encode(JSON.stringify(data))),/senza scena/);
+ const data=JSON.parse(new TextDecoder().decode(await serializeStudio(p)));data.document.value.boards[0].unscheduledGroups[0].strips=[{kind:'scene',sourceKey:'lost',bdsId:'missing'}];await assert.rejects(()=>parseStudio(new TextEncoder().encode(JSON.stringify(data))),/senza scena/);
  assert.equal(validateDocument(p),p);
 });
 

@@ -1,6 +1,8 @@
 <!doctype html><html lang="it"><meta charset="utf-8"><title>Calendar MSD round-trip</title><body><h1>Calendar MSD round-trip</h1><label>Campione reale opzionale <input id="file" type="file" accept=".msd"></label><pre id="result">In corso…</pre><script type="module">
 import {parseMsd} from '../assets/msd-parser.js';
-import {serializeMsd} from '../assets/msd-writer.js';
+import {serializeMsd as serializeNativeMsd} from '../assets/msd-writer.js';
+// This harness explicitly accepts the documented Studio date-extension uncertainty.
+const serializeMsd=project=>serializeNativeMsd(project,{acceptLoss:true});
 import {moveCalendarItems,editCalendar,previewReschedule,rescheduleCalendar,snapshotProduction,restoreProduction} from '../assets/calendar-commands.js';
 import {calendarDate,boardWithCalendar} from '../assets/production-data.js';
 import {calendarPlanEntries,calendarDayContent} from '../assets/calendar-selectors.js';

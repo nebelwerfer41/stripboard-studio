@@ -1,7 +1,9 @@
 <!doctype html><html lang="it"><meta charset="utf-8"><title>MSD round-trip</title>
 <body><h1>MSD round-trip</h1><pre id="result">In corso…</pre><a id="downloadResult" hidden>Scarica MSD modificato di prova</a><script type="module">
 import {parseMsd} from '../assets/msd-parser.js';
-import {serializeMsd} from '../assets/msd-writer.js';
+import {serializeMsd as serializeNativeMsd} from '../assets/msd-writer.js';
+// This harness explicitly accepts the documented Studio date-extension uncertainty.
+const serializeMsd=project=>serializeNativeMsd(project,{acceptLoss:true});
 import {moveStrip,moveStrips,moveDayBreak,moveBoardItems,dayBreakKey,createStripboard,snapshotBoardOrder,restoreBoardOrder} from '../assets/scheduling.js';
 const lines=[];let failures=0;
 const check=(label,yes)=>{lines.push(`${yes?'✓':'✗'} ${label}`);if(!yes)failures++};

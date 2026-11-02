@@ -1,0 +1,195 @@
+{
+  "suiteVersion": 2,
+  "evidence": "Riscontro manuale utente nel chat, screenshot Red Flags INVALID DATE",
+  "exactVersions": "MMS6/MMS10; build non comunicate",
+  "boneyard": "Nessuna data di programmazione delle strip; nel campione MMSX resta un campo calendar di segmento",
+  "records": [
+    {
+      "file": "01-new-minimal.msd",
+      "sha256": "bfa280fec481ae3a152b17d02778550a471f1e9dcb510bc14b5301f96d224e0c",
+      "observed": {
+        "apertura": "PASS"
+      }
+    },
+    {
+      "file": "01-new-minimal.mmsx",
+      "sha256": "ca1404d2b5746a4a5a03227c8244e028bc636666579ced035334dd9d4c83ed09",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "FAIL apertura pagina Red Flags",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "01b-new-single-scene.msd",
+      "sha256": "7de6dade2fc114acc517c126a70f6cae3dd2d62dcb9b0f6de3bb840df407833a",
+      "observed": {
+        "apertura": "PASS"
+      }
+    },
+    {
+      "file": "01b-new-single-scene.mmsx",
+      "sha256": "5fe29afa602876e1ddedf374b42b442a33344d3f117e7351ef4abfda5879290c",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "FAIL apertura pagina Red Flags",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "02-new-complex.msd",
+      "sha256": "a4f7caa25f07ebd2aa7f0968052a4b20f9f3f0df4ce69885bc05bbdab5b0dacb",
+      "observed": {
+        "apertura": "FAIL: the selected file cannot be opened by this application"
+      }
+    },
+    {
+      "file": "02-new-complex.mmsx",
+      "sha256": "33c2f42fe720fcaee045ada46393ddf7c6792ea9d00984dff125f9103c2bddf1",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PARZIALE: vincolo visibile, calendario Red Flags INVALID DATE",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "03-import-msd-edited.msd",
+      "sha256": "cd25c4aa13a0b88d1d20d8857eb1c9ed0ecd8678675168dd8d6db982a6514032",
+      "observed": {
+        "apertura": "FAIL: the selected file cannot be opened by this application"
+      }
+    },
+    {
+      "file": "03-import-msd-edited.mmsx",
+      "sha256": "1d842bfed3d91aaf649e3998a49205e77fb39977f4c73865f6f6220f001f4e8e",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PARZIALE: vincolo visibile, calendario Red Flags INVALID DATE",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "04-import-mmsx-edited.msd",
+      "sha256": "ece95c9b0ffeeeb5c72b15ee9bd796657b248b5e2f654ca9b01bd14d54eb884b",
+      "observed": {
+        "apertura": "FAIL: the selected file cannot be opened by this application"
+      }
+    },
+    {
+      "file": "04-import-mmsx-edited.mmsx",
+      "sha256": "a0519f510010dfc31d95cdaa9afae056a26cc14fe7cabeafb8c41fd7420ac7b8",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PASS pagina Red Flags",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "05-studio-new.msd",
+      "sha256": "a4f7caa25f07ebd2aa7f0968052a4b20f9f3f0df4ce69885bc05bbdab5b0dacb",
+      "observed": {
+        "apertura": "FAIL: the selected file cannot be opened by this application"
+      }
+    },
+    {
+      "file": "05-studio-new.mmsx",
+      "sha256": "6fda7f991173a5427010b005313c5e779ea5305eb684ed88dc82b490aa633320",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PARZIALE: vincolo visibile, calendario Red Flags INVALID DATE",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "06-studio-msd.msd",
+      "sha256": "cd25c4aa13a0b88d1d20d8857eb1c9ed0ecd8678675168dd8d6db982a6514032",
+      "observed": {
+        "apertura": "FAIL: the selected file cannot be opened by this application"
+      }
+    },
+    {
+      "file": "06-studio-msd.mmsx",
+      "sha256": "97b883bef79a762dcd0bd23dafebd2acce4e879f39bc99621b1464aae2050035",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PARZIALE: vincolo visibile, calendario Red Flags INVALID DATE",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "07-studio-mmsx.msd",
+      "sha256": "ece95c9b0ffeeeb5c72b15ee9bd796657b248b5e2f654ca9b01bd14d54eb884b",
+      "observed": {
+        "apertura": "FAIL: the selected file cannot be opened by this application"
+      }
+    },
+    {
+      "file": "07-studio-mmsx.mmsx",
+      "sha256": "75ae993a96d53eec5cbef18164272ef923c2a9030e3dbdb49e848e5633be5994",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PASS pagina Red Flags",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "08-native-noop.msd",
+      "sha256": "a4f7caa25f07ebd2aa7f0968052a4b20f9f3f0df4ce69885bc05bbdab5b0dacb",
+      "observed": {
+        "apertura": "FAIL: the selected file cannot be opened by this application"
+      }
+    },
+    {
+      "file": "08-native-noop.mmsx",
+      "sha256": "2c65b33b73f7ba8c553b62a8735d7ea558618f580e6adc9fdd423fb2d422affd",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PARZIALE: vincolo visibile, calendario Red Flags INVALID DATE",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "09-migrate-v1.msd",
+      "sha256": "9bf844e1b5b2b69efadb694d7e270b853b2da6b1775d78e9d6751836d81446a7",
+      "observed": {
+        "apertura": "NON DETERMINATO: ultima riga utente ambigua «07-08-08»"
+      }
+    },
+    {
+      "file": "09-migrate-v1.mmsx",
+      "sha256": "2c65b33b73f7ba8c553b62a8735d7ea558618f580e6adc9fdd423fb2d422affd",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PARZIALE: vincolo visibile, calendario Red Flags INVALID DATE",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    },
+    {
+      "file": "09-migrate-v2.msd",
+      "sha256": "9bf844e1b5b2b69efadb694d7e270b853b2da6b1775d78e9d6751836d81446a7",
+      "observed": {
+        "apertura": "NON DETERMINATO: ultima riga utente ambigua «07-08-08»"
+      }
+    },
+    {
+      "file": "09-migrate-v2.mmsx",
+      "sha256": "2c65b33b73f7ba8c553b62a8735d7ea558618f580e6adc9fdd423fb2d422affd",
+      "observed": {
+        "apertura": "PASS",
+        "redFlags": "PARZIALE: vincolo visibile, calendario Red Flags INVALID DATE",
+        "calendarReport": "CRASH",
+        "reportNames": "non standard"
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "suiteVersion": 6,
+  "modelVersion": 3,
+  "syntheticFiles": 49,
+  "msdFiles": 24,
+  "mmsxFiles": 22,
+  "studioFiles": 3,
+  "checks": 10789,
+  "reproducibility": "PASS: file e manifest identici alla seconda generazione",
+  "nodeSuites": "PASS: 32 file di test",
+  "browserWorkflow": "PASS: conferma perdite, modalità per scena/dal nome, suffisso/prefisso MSD, revisione non salvata dopo export, conversioni incrociate",
+  "nativeQtySample": "PASS: byte identici se invariato; quantità e Use in daily qty conservati dopo modifica e Studio; Cast senza controllo; massimo giornaliero comparse 57",
+  "manualV5Correction": "Caso 14: trasferimento eventi di sistema in MMS6 confermato corretto dall’utente",
+  "manualV6": "DA ESEGUIRE in MMS6/MMS10; nessun PASS dei parser equivale a prova nativa",
+  "dataPolicy": "Solo dati sintetici; i file allegati non sono distribuiti"
+}

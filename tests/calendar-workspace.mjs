@@ -107,7 +107,7 @@ test('history preserves exact opaque calendar numbers through undo and a subsequ
 
 test('unscheduled scene occurrence remains in Boneyard with no invented date after rule edits and rescheduling',async()=>{
  const root=fixture(),yard=root.contents.stripboard.board.segmentMap.yard;
- yard.stripMap.unscheduled={type:'breakdown',sheet:'s2',sortOrder:1};
+ delete root.contents.stripboard.board.segmentMap.a.stripMap.As2;yard.stripMap.unscheduled={type:'breakdown',sheet:'s2',sortOrder:1};
  const p=await parseMmsx(await encodeMmsx(root)),b=p.boards[0],entry=b.unscheduledGroups.find(g=>g.strips.some(s=>s.kind==='scene')),strip=entry.strips.find(s=>s.kind==='scene');
  editCalendar(p,{calendarId:b.calendarId,startDate:'2026-10-08'});rescheduleCalendar(p,b.calendarId);
  assert.equal(entry.date,null);const context=activeSceneContext(p,b.name,p.scenes.find(s=>s.bdsId==='s2').id,strip.sourceKey);assert.equal(context.occurrence.container,'unscheduledGroups');

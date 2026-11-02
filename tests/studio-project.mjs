@@ -8,8 +8,8 @@ for(const variant of ['5','3','hybrid'])test(`Studio roundtrip preserves native 
  const bytes=await encodeMmsx(fixture(variant)),project=await parseMmsx(bytes,'source.mmsx'),board=project.boards[0];
  setDoodRules(project,board.name,{category:'Cast',rules:{allowHold:true}});setDoodRules(project,board.name,{elementId:'actor',rules:{allowDrop:true}});
  project.events.push({id:'studio-event',studio:true,type:'travel',studioBoardName:board.name,calendarId:board.calendarId,startDate:'2026-10-01',endDate:'2026-10-02',scope:{boardId:'stale',segmentId:'stale'},targets:[{kind:'element',elementId:'actor'}]});
- const again=await parseStudio(await serializeStudio(project));assert.deepEqual(again.studio,project.studio);assert.deepEqual(await serializeMmsx(again,'source.mmsx'),bytes);
- const event=again.events.find(e=>e.studio);assert.equal(event.scope.boardId,again.boards[0].parentBoardId);assert.equal(event.scope.segmentId,again.boards[0].segmentId);assert.equal(again.counts.events,again.events.length);
+ const again=await parseStudio(await serializeStudio(project));assert.deepEqual(again.studio,project.studio);assert.deepEqual(await serializeMmsx(again,'source.mmsx',{acceptLoss:true}),bytes);
+ const event=again.events.find(e=>e.studio);assert.equal(event.scope.boardId,'stale');assert.equal(event.scope.segmentId,'stale');assert.equal(again.counts.events,again.events.length);
 });
 test('history restores Studio metadata/events without cloning native opaque event records',async()=>{
  const project=await parseMmsx(await encodeMmsx(fixture()),'source.mmsx'),original=project.events[0],before=snapshotStudio(project);
@@ -17,4 +17,4 @@ test('history restores Studio metadata/events without cloning native opaque even
  restoreStudio(project,before);assert.equal(project.studio,undefined);assert.equal(project.events[0],original);assert.equal(project.events.filter(e=>e.studio).length,0);
  restoreStudio(project,after);assert.equal(project.studio.dood[project.boards[0].name].categories.Cast.allowHold,false);assert.equal(project.events.filter(e=>e.studio).length,1);
 });
-test('unsupported Studio container versions fail before native parsing',async()=>{await assert.rejects(()=>parseStudio(new TextEncoder().encode(JSON.stringify({type:'stripboard-studio',version:3,native:'',events:[]}))),/non supportato/)});
+test('unsupported Studio container versions fail before native parsing',async()=>{await assert.rejects(()=>parseStudio(new TextEncoder().encode(JSON.stringify({type:'stripboard-studio',version:99,native:'',events:[]}))),/non supportato/)});

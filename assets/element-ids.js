@@ -1,0 +1,5 @@
+// Board IDs identify elements within a category; UUIDs identify graph records.
+export const boardIdKey=value=>{const text=String(value??'').trim();return /^\d+$/.test(text)?BigInt(text).toString():text.toLocaleLowerCase()};
+export function nextBoardId(elements,category){const used=new Set(elements.filter(e=>e.category===category).map(e=>boardIdKey(e.boardId)));let value=1;while(used.has(String(value)))value++;return String(value)}
+export function boardIdConflicts(elements){const seen=new Map(),result=[];for(const element of elements){const id=boardIdKey(element.boardId);if(!id)continue;const key=JSON.stringify([element.category,id]);if(seen.has(key))result.push({first:seen.get(key),duplicate:element});else seen.set(key,element)}return result}
+export function assignExportBoardIds(elements){const result=elements.map(e=>({...e})),assigned=[];for(const element of result)if(!String(element.boardId??'').trim()){element.boardId=nextBoardId(result,element.category);assigned.push(element)}return {elements:result,assigned}}

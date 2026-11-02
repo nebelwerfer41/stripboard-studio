@@ -31,7 +31,7 @@ function variant(root,format){
 }
 test('native dates, quantities, duplicate scene numbers and segment calendars stay independent',async()=>{
  const root=fixture(),p=await parse(root),b=p.boards[0],cal=selectedCalendar(p,b.name);
- assert.equal(p.modelVersion,1);assert.equal(p.calendars.length,3);assert.equal(new Set(p.calendars.map(c=>c.id)).size,3);
+ assert.equal(p.modelVersion,3);assert.equal(p.calendars.length,3);assert.equal(new Set(p.calendars.map(c=>c.id)).size,3);
  assert.equal(p.boards[0].parentBoardId,p.boards[1].parentBoardId);assert.notEqual(p.boards[0].id,p.boards[1].id);
  assert.equal(cal.scope.segmentId,'a');assert.equal(p.calendars.find(c=>c.scope.segmentId==='yard').daysOff.Mon,'1');
  assert.equal(p.scenes[0].elementRefs[0].quantity,40);assert.equal(p.scenes[0].elementRefs[0].name,'40 persone');assert.notEqual(p.scenes[0].id,p.scenes[1].id);

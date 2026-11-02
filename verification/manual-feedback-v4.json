@@ -1,0 +1,306 @@
+{
+  "suiteVersion": 4,
+  "archiveSha256": "d145691508a3aa43f58ff68f2e94cf6437a1e30fa3469e5abe75a9c3a8b16bad",
+  "applicationVersions": "Build esatte non comunicate",
+  "source": "Riscontro utente con screenshot di Daily Category Total e breakdown",
+  "generalResult": "Il resto mi pare che funzioni tutto: riscontro generale favorevole, non elenco di PASS né prova di salvataggio/riapertura",
+  "requests": [
+    "Quattro definizioni native sempre presenti",
+    "Eventi di sistema con elementi → Red Flags MSD con notifica",
+    "Quantità MSD leggibili nei nomi, sempre con notifica"
+  ],
+  "results": [
+    {
+      "file": "02-new-complex.mmsx",
+      "sha256": "3d4ce55232c9d8b8e00c05d0bafdf8ddbcc861bde6039cfa15ebdb9636614cfb",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "04-import-mmsx-edited.msd",
+      "sha256": "8af33a062dc8c6c0526e709aa96bbe10d2863af17e46032a822765ebc936df03",
+      "app": "MMS6",
+      "result": "Catalogo scene incompleto nelle stripboard ricavate da sub-board",
+      "missing": [
+        {
+          "board": "Piano principale / Piano principale",
+          "missing": [
+            "2"
+          ]
+        },
+        {
+          "board": "Piano principale / Secondo segmento",
+          "missing": [
+            "1A"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "04-import-mmsx-edited.mmsx",
+      "sha256": "6394b85bb34b46aa85469b2910be763b07509b843630fef540d48d7692cf21a7",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "05-studio-new.mmsx",
+      "sha256": "14b20c3a49e37408d4f901f0eb4c7be885ee682814ddfce29f5cb1eca48968d7",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "07-studio-mmsx.msd",
+      "sha256": "8af33a062dc8c6c0526e709aa96bbe10d2863af17e46032a822765ebc936df03",
+      "app": "MMS6",
+      "result": "Catalogo scene incompleto nelle stripboard ricavate da sub-board",
+      "missing": [
+        {
+          "board": "Piano principale / Piano principale",
+          "missing": [
+            "2"
+          ]
+        },
+        {
+          "board": "Piano principale / Secondo segmento",
+          "missing": [
+            "1A"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "07-studio-mmsx.mmsx",
+      "sha256": "8ecdd09329fd6c2967115231541b96d16f7e70cffc3d174ffba95a3d0b8fa4d2",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "08-native-noop.mmsx",
+      "sha256": "838f1ecbde9ee945578724b51adeb37c77a6ff93a5bbda5c08ee42b21286f00d",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "09-migrate-v1.msd",
+      "sha256": "13232d0e36219ba27247cef23d760d949169769f2da6ec909a76af752e7e3985",
+      "app": "MMS6",
+      "result": "Catalogo scene incompleto nelle stripboard ricavate da sub-board",
+      "missing": [
+        {
+          "board": "Piano principale / Piano principale",
+          "missing": [
+            "2"
+          ]
+        },
+        {
+          "board": "Piano principale / Secondo segmento",
+          "missing": [
+            "1A"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "09-migrate-v1.mmsx",
+      "sha256": "838f1ecbde9ee945578724b51adeb37c77a6ff93a5bbda5c08ee42b21286f00d",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "09-migrate-v2.msd",
+      "sha256": "13232d0e36219ba27247cef23d760d949169769f2da6ec909a76af752e7e3985",
+      "app": "MMS6",
+      "result": "Catalogo scene incompleto nelle stripboard ricavate da sub-board",
+      "missing": [
+        {
+          "board": "Piano principale / Piano principale",
+          "missing": [
+            "2"
+          ]
+        },
+        {
+          "board": "Piano principale / Secondo segmento",
+          "missing": [
+            "1A"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "09-migrate-v2.mmsx",
+      "sha256": "838f1ecbde9ee945578724b51adeb37c77a6ff93a5bbda5c08ee42b21286f00d",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "10-diagnostic-redflag.msd",
+      "sha256": "2d3c3d1b553003cbd39b8ab8ff580908c4717457b67b940f11fca8813cb258ce",
+      "app": "MMS6",
+      "result": "Si apre; mancano tipi/flag capaci di generare sigle DOOD, anche ricreandoli"
+    },
+    {
+      "file": "11-redflag-zero-no-events.mmsx",
+      "sha256": "626a426af7af2833e88237275637a59981ba1f3e94453e048f6f8626a180e338",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Èlia"
+        ],
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "11-redflag-absent-events.mmsx",
+      "sha256": "7c3b95a6c71e9245616aaae2e07661265977bd042e388e5992ce93ac6b76b25a",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "11-redflag-absent-no-events.mmsx",
+      "sha256": "0e6cc94f2c55356d2d27588b7479515449e5df7d59491f22df0502377b28a828",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "11-redflag-one-no-events.mmsx",
+      "sha256": "0dfe49cd7e3b056e7debfd2f0f3c3fd7036c649b0c927a41f3617621c8211335",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "11-redflag-actor-zero.mmsx",
+      "sha256": "e5e533a2588a177824a3dd3b02612f636e1d1ccff52244817483eab20909b639",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Èlia"
+        ],
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "11-redflag-single-day.mmsx",
+      "sha256": "e998eef9f404b2357cf88bc814c3034558fd0034d087ad197d64253b31887232",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "11-redflag-scheduled-range.mmsx",
+      "sha256": "082b9fd3f7684e05b5ee30e7251bd4dbd108ed4add12b06025c764e4b8e39055",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "12-event-native-none.mmsx",
+      "sha256": "3ee66128c8d4228751aec8d3a80c98ecc01fb5530315d1f51ddab57f054d5ed5",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    },
+    {
+      "file": "13-color-losses.mmsx",
+      "sha256": "126b63f9375c42644918da08ef5a718836c587873393200b7df6b4a1d615e588",
+      "app": "MMS10",
+      "result": "Associazione zero selezionata nel dropdown ma assente dal box; aggregazione quantità anomala; riassociazione imposta uno",
+      "zeroAssociations": [
+        [
+          "1A",
+          "Oggetto a quantità zero"
+        ]
+      ]
+    }
+  ],
+  "rehearsalFollowup": {
+    "file": "redflags.msd",
+    "observed": "Quattro definizioni riservate con SortOrder -1; tutte le entry generali con DOODStatus 0",
+    "manualUserConfirmation": "Assegnando Rehearsal a un elemento in MMS6 compare R",
+    "limit": "Non è ancora una prova del nuovo export automatico v5"
+  }
+}

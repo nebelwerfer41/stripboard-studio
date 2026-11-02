@@ -1,3 +1,6 @@
+> Modello v2: [semantica corretta dei tempi MSD e migrazione](native-ui-regressions.md).
+> EstimateTimeA/EstimateTimeB nativi MSD sono minuti/ore dello stesso tempo stimato.
+
 > **Interfaccia v1.18:** scegliere un calendario ora cambia l’associazione del piano e ripianifica le giornate. Proprietà/regole/date condividono un overlay; Boneyard resta separato dalle sub-board calendario. Le precedenti proiezioni di lettura sono API/audit storici, non il flusso corrente. Vedi [Calendar corrente](calendar-workspace.md) ed [editing completo](document-editing.md).
 
 > **Editing completo:** le successive funzioni di creazione/modifica e il contenitore Studio v2 sono descritti in [document-editing.md](document-editing.md). Le limitazioni delle fasi precedenti riportate sotto sono storiche.

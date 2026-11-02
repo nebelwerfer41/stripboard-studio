@@ -1,0 +1,56 @@
+{
+  "suiteVersion": 3,
+  "modelVersion": 2,
+  "node": {
+    "passed": [
+      "tests/board-segments.mjs",
+      "tests/calendar-drag.mjs",
+      "tests/calendar-workspace.mjs",
+      "tests/document-editing.mjs",
+      "tests/document-state.mjs",
+      "tests/dood-builtins.mjs",
+      "tests/dood-engine.mjs",
+      "tests/dood-performance.mjs",
+      "tests/dood-print.mjs",
+      "tests/element-format.mjs",
+      "tests/mmsx-conservation.mjs",
+      "tests/mmsx-production.mjs",
+      "tests/mmsx-v3.mjs",
+      "tests/mmsx.mjs",
+      "tests/production-data.mjs",
+      "tests/production-info.mjs",
+      "tests/report-layout.mjs",
+      "tests/scene-dropdowns.mjs",
+      "tests/strip-deselect.mjs",
+      "tests/strip-display.mjs",
+      "tests/strip-drag.mjs",
+      "tests/strip-interaction.mjs",
+      "tests/studio-project.mjs",
+      "tests/workspace-authoring.mjs",
+      "tests/workspace-refinements.mjs",
+      "tests/native-schema.mjs",
+      "tests/scene-time.mjs",
+      "tests/persistence.mjs"
+    ],
+    "failed": []
+  },
+  "pairedReferenceTimes": {
+    "scenes": 146,
+    "matching": 146
+  },
+  "referenceMsdNoop": "PASS byte-identical",
+  "browser": [
+    "persistence workflow PASS",
+    "4 MSD HTML suites PASS",
+    "document editing / Studio reopen PASS"
+  ],
+  "files": 32,
+  "checks": 1919,
+  "reproduction": "PASS identical manifests and SHA-256",
+  "boneyard": "calendar metadata kept separate; date/shootDay keys absent on generated Boneyard strips",
+  "manualV2": "See manual-feedback-v2.json; partial MMSX and minimal MSD PASS, complex MSD FAIL",
+  "manualV3": {
+    "MMS6": "DA ESEGUIRE",
+    "MMS10": "DA ESEGUIRE"
+  }
+}

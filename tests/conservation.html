@@ -2,7 +2,9 @@
 <body><h1>MSD: conservazione prima e dopo un riordino</h1><p>Il campione incluso viene verificato automaticamente. Per una variante diversa seleziona un MSD locale; il file non viene modificato o caricato su un server.</p><input id="sample" type="file" accept=".msd"><pre id="result">In corso…</pre>
 <script type="module">
 import {parseMsd} from '../assets/msd-parser.js';
-import {serializeMsd} from '../assets/msd-writer.js';
+import {serializeMsd as serializeNativeMsd} from '../assets/msd-writer.js';
+// This harness explicitly accepts the documented Studio date-extension uncertainty.
+const serializeMsd=project=>serializeNativeMsd(project,{acceptLoss:true});
 import {moveBoardItems,snapshotBoardOrder,restoreBoardOrder} from '../assets/scheduling.js';
 const same=(a,b)=>{a=new Uint8Array(a);b=new Uint8Array(b);return a.length===b.length&&a.every((value,index)=>value===b[index])};
 async function verify(buffer,name){

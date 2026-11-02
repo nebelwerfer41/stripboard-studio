@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {elementTotal,elementSumText,customListText,categoryElementsText} from '../assets/element-format.js';
 
-test('element totals use a leading quantity and count other names once',()=>{
-  assert.equal(elementTotal(['20 Townspeople','2 Guards','Captain','0 Stand-ins']),23);
+test('element totals use a leading quantity and count each single element including legacy zero once',()=>{
+  assert.equal(elementTotal(['20 Townspeople','2 Guards','Captain','0 Stand-ins']),24);
   assert.equal(elementTotal(['Guard 20',' 3 Dancers']),4);
 });
 

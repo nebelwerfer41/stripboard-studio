@@ -1,8 +1,33 @@
+> Revisione corrente: [quantità e persistenza v6](docs/quantities-and-export-v6.md), [suite manuale v6](verification/movie-magic-suite-v6.zip).
+
+> Aggiornamento persistenza/export: [revisione v5](docs/native-regressions-v5.md), [suite manuale v5](verification/movie-magic-suite-v5.zip).
+
+> Suite v3: corretti coppia minuti/ore MSD, Calendar Report, tipi Red Flags e nomi report.
+> Metadati Boneyard e date delle strip restano distinti. [Analisi ed esiti manuali](docs/native-ui-regressions.md).
+
+> La suite export v1 è stata rifiutata da MMS6/MMS10. La suite v2 corregge
+> differenze strutturali osservate nei campioni allegati; apertura ancora da
+> riverificare. [Analisi e correzioni](docs/native-format-corrections.md).
+
 [Catalog](https://nebelwerfer41.github.io/) · [Repository](https://github.com/nebelwerfer41/stripboard-studio)
 
 > **MMSX support:** local import and export of dataFormat 3 and 5 plans, alongside MSD support. Features, limitations, and tests are documented in [docs/mmsx-support.md](docs/mmsx-support.md).
 
 # Stripboard Studio v1.21
+
+
+La persistenza ora usa **Salva progetto Studio** (schema v3, migrazioni v1/v2),
+separato da **Esporta MSD/MMSX…**. L'export analizza il modello corrente, mostra
+quantità e dettagli di trasformazioni/omissioni, richiede conferma delle perdite
+e blocca riferimenti o date non rappresentabili. Non azzera lo stato delle
+modifiche non salvate. Progetti nuovi e importati usano gli stessi adattatori;
+i nativi invariati mantengono l'identità binaria. L'archivio originale opaco
+resta nel progetto Studio anche dopo editing completo.
+
+Vedi la [matrice di compatibilità e le incognite](docs/persistence-compatibility.md)
+e la [suite sintetica per MMS6/MMS10](verification/movie-magic/README.md), con
+manifest, checklist e registro delle prove manuali ancora da eseguire. Le sezioni
+storiche sottostanti descrivono le versioni precedenti.
 
 Breakdown uses searchable dropdowns for **Set, Location, INT/EXT, D/N, Script Day, Unit, Sequence and Episode**, including **Aggiungi** for missing values. Built-in values appear only in the scene fields, and choosing or clearing one keeps a single value per scene; resource categories retain multiple checkbox selections, quantities and daily-use options. Scene, synopsis, times, page fields and comments retain direct entry; Sheet remains read-only.
 
@@ -191,3 +216,5 @@ Global Quick Add searches existing elements or creates an element and category i
 Navigation is ordered Stripboard, Breakdown, Calendar, DooD, Red Flags, Elementi and Progetto. Production Info moves to Progetto with access to Reports; the scene quantities panel and duplicate DOOD export action are removed. Linked elements are selected through category and text filters, retain selections across categories and can be applied to existing scenes.
 
 Verified with all 23 Node test files and Chromium suites covering Quick Add, navigation/Boneyard, quantity visibility, linked elements, production editing, dropdowns, authoring, workspace refinements, Studio save/reopen, source conservation, mobile layouts and DOOD/PDF output.
+
+La [revisione v4](docs/native-regressions-v4.md) corregge griglia/palette colori MSD e MMSX, Day/Night, struttura verticale, eventi e duplicazioni tra sub-board. [Suite candidata v4](verification/movie-magic-suite-v4.zip); prove MMS6/MMS10 ancora da registrare separatamente.

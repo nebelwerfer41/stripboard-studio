@@ -1,0 +1,17 @@
+{
+  "suiteVersion": 5,
+  "syntheticFiles": 46,
+  "msdFiles": 22,
+  "mmsxFiles": 21,
+  "studioFiles": 3,
+  "parserAndContentChecks": 9857,
+  "reproducibility": "PASS: file e manifest identici nella seconda generazione",
+  "nodeSuites": "PASS: 31 file di test",
+  "browserPersistence": "PASS: notifica quantità nei nomi MSD e conversione eventi, conferma perdite, revisioni e quattro suite HTML MSD",
+  "msdInternalRegression": "PASS: tutti i piani completi, quantità leggibili e varianti collegate, flag FT/TR/R rilette, note multilinea, eventi Studio su MSD nativo, nessuna mutazione",
+  "nativeSourceSamples": "PASS: nativi completi identici byte per byte; coppia 146 tempi e riferimento MMSX con 146 colori e 12 regole",
+  "redflagsSample": "PASS: quattro definizioni SortOrder -1, Rehearsal generale DOODStatus 0, conservazione del sorgente e dopo modifica completa",
+  "manualUserConfirmation": "MMS6 produce R assegnando Rehearsal a un elemento nella UI nativa",
+  "nativeV5Opening": "NON ESEGUITA in questo ambiente; il nuovo export automatico Rehearsal deve essere provato in MMS6",
+  "dataPolicy": "Esclusivamente file sintetici; i riferimenti allegati non vengono distribuiti"
+}

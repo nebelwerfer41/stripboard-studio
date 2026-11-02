@@ -1,11 +1,13 @@
+import {positiveQuantity,isCastCategory} from './quantities.js';
+import {nextBoardId,boardIdKey} from './element-ids.js';
 /* Editable common document. Proprietary archives remain owned by their adapters. */
-import {completeProjectModel} from './project-model.js';
+import {completeProjectModel,scenePlacementConflicts} from './project-model.js';
 import {standardLayout} from './strip-display.js';
 import {ExactNumber} from './mmsx-codec.js';
 import {validDate} from './production-data.js';
 import {isBuiltinCategory,categoryDefaults,elementOptions,builtinField,catalogCategories} from './element-management.js';
 import {SINGLE_SCENE_FIELDS,refSceneField,normalizeSceneSingleValues,singleSceneValue,assertSceneSingleValues,sceneValueIndex} from './scene-values.js';
-export const DOCUMENT_KEYS=['title','production','scenes','elements','categorySettings','boards','calendars','events','redFlags','redFlagNames','redFlagSettings','activeBoard','defaultCalendar','studio','documentEditing','stripLayouts','reportLayouts','colors','capabilities'];
+export const DOCUMENT_KEYS=['id','title','production','scenes','elements','categorySettings','boards','calendars','events','redFlags','redFlagNames','redFlagSettings','activeBoard','defaultCalendar','studio','documentEditing','stripLayouts','reportLayouts','colors','capabilities','quantitySettings'];
 export const SCENE_FIELDS={scene:'Scena',synopsis:'Sinossi',ie:'INT / EXT',dn:'DAY / NIGHT',set:'Set',location:'Location',scriptDay:'Script day',episode:'Episodio',unit:'Unità',sequence:'Sequenza',scriptPageNumbers:'Pagine script',pagesEighths:'Pagine',estimateTimeA:'Tempo stimato',estimateTimeB:'Tempo schermo',comments:'Commenti'};
 const uid=kind=>`studio-${kind}:${crypto.randomUUID()}`;
 function clone(value,seen=new Map()){
@@ -17,7 +19,7 @@ function clone(value,seen=new Map()){
 const record=value=>value&&typeof value==='object'&&!Array.isArray(value);
 function requireRecord(value,label){if(!record(value))throw Error(`${label}: usa un oggetto di proprietà`)}
 export function snapshotDocument(p){return clone(Object.fromEntries(DOCUMENT_KEYS.map(k=>[k,p[k]])))}
-export function restoreDocument(p,s){for(const k of DOCUMENT_KEYS)p[k]=clone(s[k]);refreshDocument(p)}
+export function restoreDocument(p,s){const restored=clone(s);for(const k of DOCUMENT_KEYS)if(k!=='id'||restored[k]!==undefined)p[k]=restored[k];refreshDocument(p)}
 export function refreshDocument(p){
   completeProjectModel(p);
   const elements=new Map(p.elements.map(e=>[e.id,e]));
@@ -31,7 +33,7 @@ export function refreshDocument(p){
   return p;
 }
 export function createDocument(title='Nuovo progetto'){
-  const p={format:'studio',fileName:`${title.replace(/[\/\\:*?"<>|]/g,'-')}.studio.json`,title,production:{PictureTitle:title},scenes:[],elements:[],categorySettings:['Cast','Background Actors','Props','Costumes','Makeup','Set','Location','Special Effects','Vehicles','Animals','Sound','Notes'].map(name=>({id:uid('category'),name,attributes:{},properties:{}})),boards:[],calendars:[],events:[],redFlags:[],redFlagNames:[],stripLayouts:[standardLayout('compact')],reportLayouts:[],colors:{preferences:{Banner:{bg:'#663301',fg:'#FFFFFF'},DayStrip:{bg:'#333333',fg:'#FFFFFF'}}},counts:{},capabilities:{editCalendars:true,createBoards:true,calendarProjection:false},documentEditing:true};
+  const p={id:uid('project'),format:'studio',fileName:`${title.replace(/[\/\\:*?"<>|]/g,'-')}.studio.json`,title,production:{PictureTitle:title},scenes:[],elements:[],categorySettings:['Cast','Background Actors','Props','Costumes','Makeup','Set','Location','Special Effects','Vehicles','Animals','Sound','Notes'].map(name=>({id:uid('category'),name,attributes:{},properties:{}})),boards:[],calendars:[],events:[],redFlags:[],redFlagNames:[],stripLayouts:[standardLayout('compact')],reportLayouts:[],colors:{preferences:{Banner:{bg:'#663301',fg:'#FFFFFF'},DayStrip:{bg:'#333333',fg:'#FFFFFF'}}},counts:{},capabilities:{editCalendars:true,createBoards:true,calendarProjection:false},documentEditing:true};
   createCalendar(p,{name:'Calendario principale'});createPlan(p,{name:'Piano principale',calendarId:p.calendars[0].id});p.activeBoard=p.boards[0].name;p.defaultCalendar=p.calendars[0].name;return refreshDocument(p);
 }
 function required(value,label){if(typeof value!=='string'||!value.trim())throw Error(`${label} obbligatorio`);return value.trim()}
@@ -42,7 +44,7 @@ export function editScene(p,id,values,refs){
   const next={pagesEighths:null,...s,...values};next.scene=String(next.scene??'').trim();
   if(next.pagesEighths!==null&&(!Number.isSafeInteger(next.pagesEighths)||next.pagesEighths<0))throw Error('Gli ottavi devono essere un intero non negativo');
   for(const key of ['estimateTimeA','estimateTimeB'])if(next[key]&&typeof next[key]==='string'&&!/^\d+:[0-5]\d$/.test(next[key])&&!/^\d+$/.test(next[key]))throw Error('Tempo non valido: usa ore:minuti o il valore numerico sorgente');
-  if(refs){const seen=new Set();next.elementRefs=refs.map(r=>{const key=r.elementId??JSON.stringify([r.category,r.name]);if(seen.has(key))throw Error('Elemento duplicato');seen.add(key);if(!p.elements.some(e=>e.id===r.elementId)&&!s?.elementRefs.some(old=>old.elementId===r.elementId&&!old.resolved))throw Error('Elemento non trovato');if(r.quantity!==null&&(typeof r.quantity!=='number'||!Number.isFinite(r.quantity)||r.quantity<0)&&JSON.stringify(r.quantity)!==JSON.stringify(s?.elementRefs.find(old=>old.elementId===r.elementId)?.quantity))throw Error('Quantità non valida');const old=s?.elementRefs.find(old=>old.elementId===r.elementId&&(r.elementId!==null||old.category===r.category&&old.name===r.name));return {...r,quantityOrigin:old&&JSON.stringify(old.quantity)===JSON.stringify(r.quantity)?old.quantityOrigin:r.quantity===null?'absent':'stored'}})}
+  if(refs){const seen=new Set();next.elementRefs=refs.map(r=>{const key=r.elementId??JSON.stringify([r.category,r.name]);if(seen.has(key))throw Error('Elemento duplicato');seen.add(key);if(!p.elements.some(e=>e.id===r.elementId)&&!s?.elementRefs.some(old=>old.elementId===r.elementId&&!old.resolved))throw Error('Elemento non trovato');if(r.quantity!==null&&(typeof r.quantity!=='number'||!Number.isFinite(r.quantity)||r.quantity<0)&&JSON.stringify(r.quantity)!==JSON.stringify(s?.elementRefs.find(old=>old.elementId===r.elementId)?.quantity))throw Error('Quantità non valida');const old=s?.elementRefs.find(old=>old.elementId===r.elementId&&(r.elementId!==null||old.category===r.category&&old.name===r.name));return {...r,quantity:old&&JSON.stringify(old.quantity)===JSON.stringify(r.quantity)?old.quantity:isCastCategory(p.categorySettings.find(c=>c.name===r.category)||r.category)?1:positiveQuantity(r.quantity),...(r.quantity===0?{legacyQuantity:0}:{}),quantityOrigin:old&&JSON.stringify(old.quantity)===JSON.stringify(r.quantity)?old.quantityOrigin:r.quantity===null?'absent':'stored'}})}
   for(const field of SINGLE_SCENE_FIELDS)if(Object.hasOwn(values,field)&&values[field]!=null&&typeof values[field]==='object')throw Error(`Il parametro ${field} ammette un solo valore`);
   if(!s&&!Number.isSafeInteger(p.scenes.reduce((max,scene)=>{const n=Number(scene.sheetNumber);return Number.isSafeInteger(n)&&n>max?n:max},0)+1))throw Error('Numerazione sheet esaurita');
   const fieldRefs=new Map();if(refs)for(const ref of next.elementRefs){const field=refSceneField(p,ref);if(!field)continue;if(fieldRefs.has(field))throw Error(`Il parametro ${field} ammette un solo valore`);fieldRefs.set(field,ref)}
@@ -76,7 +78,8 @@ export function editElement(p,id,values){
   const defaults=categoryDefaults(p.categorySettings.find(c=>c.name===category));
   const sceneField=el&&builtinField(el.category),boundScenes=sceneField?p.scenes.filter(s=>singleSceneValue(p,s,sceneField).element?.id===id):[];
   const old=el?{name:el.name,category:el.category}:null,next={...(!el?{authoring:{excludeFromBoard:defaults.excludeFromBoard,allowHold:defaults.allowHold,useDailyQuantity:defaults.useDailyQuantity}}:{}),...el,...values,name,category,id:el?.id||uid('element')};
-  if(!el&&defaults.autoAssignIds&&!String(next.boardId??'').trim()){let n=1;const used=new Set(p.elements.filter(e=>e.category===category).map(e=>String(e.boardId)));while(used.has(String(n)))n++;next.boardId=String(n)}
+  if(!String(next.boardId??'').trim())next.boardId=nextBoardId(p.elements,category);
+  if(p.elements.some(e=>e!==el&&e.category===category&&boardIdKey(e.boardId)===boardIdKey(next.boardId)))throw Error('Board ID già presente nella categoria');
   if(el)Object.assign(el,next);else p.elements.push(next);
   if(old){for(const e of p.elements)if(Array.isArray(e.linkedElements))e.linkedElements=e.linkedElements.map(([cat,n])=>cat===old.category&&n===old.name?[category,name]:[cat,n]);for(const s of boundScenes){s[sceneField]=name;if(name!==old.name&&['ie','dn'].includes(sceneField))delete s.mmsxColors}for(const flag of p.redFlags)if(flag.target.elementId===id)Object.assign(flag.target,{category,element:name});for(const e of p.events)for(const t of e.targets||[])if(t.elementId===id)Object.assign(t,{category,element:name})}
   refreshDocument(p);return next;
@@ -129,7 +132,8 @@ export function editFlag(p,id,values){
   if(values.target.kind==='element'&&!p.elements.some(e=>e.id===values.target.elementId))throw Error('Elemento non trovato');
   const f={...old,...values,name,id:old?.id||uid('flag'),date:values.startDate,typeName:name,targetResolved:values.target.kind!=='unresolved',scope:{kind:'project'},dateOrigin:'edited'};if(old)Object.assign(old,f);else p.redFlags.push(f);refreshDocument(p);return f;
 }
-export function validateDocument(p,{allowLegacySingleValues=false}={}){
+export function validateDocument(p,{allowLegacySingleValues=false,requireUniqueMmsxScenes=false,repairFrom=null}={}){
+  if(p?.quantitySettings&&(!['explicit','name'].includes(p.quantitySettings.mode)||!['prefix','suffix'].includes(p.quantitySettings.msdStyle)))throw Error('Sistema quantità non valido');
   if(!p||typeof p.title!=='string'||!p.title.trim())throw Error('Titolo progetto non valido');
   for(const key of ['scenes','elements','categorySettings','boards','calendars','events','redFlags'])if(!Array.isArray(p[key]))throw Error(`Raccolta ${key} non valida`);
   if(!p.boards.length)throw Error('Il documento richiede almeno un piano');
@@ -140,6 +144,12 @@ export function validateDocument(p,{allowLegacySingleValues=false}={}){
   for(const f of p.redFlags)if(!record(f.target))throw Error('Target Red Flag non valido');
   for(const [key,field] of [['scenes','bdsId'],['elements','id'],['boards','id'],['calendars','id']]){const ids=new Set();for(const r of p[key]){if(typeof r[field]!=='string'||ids.has(r[field]))throw Error(`Identità ${key} non valida`);ids.add(r[field])}}
   if(!allowLegacySingleValues){const index=sceneValueIndex(p);for(const scene of p.scenes)assertSceneSingleValues(p,scene,index)}
+  if(requireUniqueMmsxScenes&&p.format==='mmsx'){
+    // Old invalid projects may be repaired incrementally, but commands cannot add conflicts.
+    const allowance=new Map(),key=issue=>JSON.stringify([issue.parentBoardId,issue.bdsId]);
+    for(const issue of repairFrom?scenePlacementConflicts(repairFrom):[])allowance.set(key(issue),(allowance.get(key(issue))||0)+1);
+    for(const issue of scenePlacementConflicts(p)){const remaining=(allowance.get(key(issue))||0)-1;allowance.set(key(issue),remaining);if(remaining<0)throw Error(`La scena ${p.scenes.find(s=>s.bdsId===issue.bdsId)?.scene||issue.bdsId} compare più volte nello stesso piano MMSX`)}
+  }
   const scenes=new Set(p.scenes.map(s=>s.bdsId));for(const b of p.boards){const keys=new Set();for(const g of [...b.scheduledGroups,...b.unscheduledGroups]){if(!Array.isArray(g.strips))throw Error('Gruppo strip non valido');for(const s of g.strips){if(keys.has(s.sourceKey)||!s.sourceKey)throw Error('Identità strip duplicata');keys.add(s.sourceKey);if(s.kind==='scene'&&!scenes.has(s.bdsId))throw Error('Strip senza scena')}}}
   return p;
 }

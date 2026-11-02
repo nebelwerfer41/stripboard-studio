@@ -1,0 +1,306 @@
+{
+  "suiteVersion": 3,
+  "sourceArchiveSha256": "71f2de0a3e0397844478e8ea97aded78c4b30da154f9fdce6fe14db5f89f33b6",
+  "evidence": "Riscontro manuale utente in conversazione, build esatte non comunicate",
+  "applicationVersions": {
+    "MMS6": "DA REGISTRARE",
+    "MMS10": "DA REGISTRARE"
+  },
+  "scope": "Solo gli esiti esplicitamente riportati; apertura o riapertura non inferite dall’assenza di altri errori",
+  "results": [
+    {
+      "file": "01-new-minimal.msd",
+      "sha256": "74ec97db90cfd053e594a4b943f0b95ea0ee4dc6ceabc0be16467ab131fe57e2",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "01-new-minimal.mmsx",
+      "sha256": "748397879e5e225652def4f765dea93d98e8c3a83c94ee2edbe79c081d97e417",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "Non specificato in questo riscontro",
+      "events": "Non specificato",
+      "scenePlacement": "Non segnalata per questo caso",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "01b-new-single-scene.msd",
+      "sha256": "847c1b8e395a3a31e3946d0ea2107eedc1eb1049c509ecbc6642200fadbba922",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "01b-new-single-scene.mmsx",
+      "sha256": "6b8e61e4270a94dc12e19c3a05651b15f78652fededdf05a9f2d082080b10465",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "Non specificato in questo riscontro",
+      "events": "Non specificato",
+      "scenePlacement": "Non segnalata per questo caso",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "02-new-complex.msd",
+      "sha256": "653ca14024ab351572df093762ca4c2b857bd764df1118fbda1ad21c37636903",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "02-new-complex.mmsx",
+      "sha256": "74cc6135ef065a929c8b5631ad198821483ac8ecab5cb81ce9b00f2654d41e09",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "NO RED FLAGS nel report; pagina di editing distinta",
+      "events": "Eventi fantasma/invisibili riportati nei casi 02/04/05/07/08/09",
+      "scenePlacement": "Non segnalata per questo caso",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "03-import-msd-edited.msd",
+      "sha256": "c18867f2b8506f162876ae4030b4591c362cae810a8e573a5933bc128cd1efd4",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "03-import-msd-edited.mmsx",
+      "sha256": "5796fcefa8095d6f801dcb3beb12187a279a3ac8f61c28878383a6c9d97794a1",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "OK riportato",
+      "events": "Nessun problema segnalato: eventi assenti",
+      "scenePlacement": "Non segnalata per questo caso",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "04-import-mmsx-edited.msd",
+      "sha256": "537635f5928e880516b63164e1d86787b831f54fcc287859dec0172b508b6fad",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "04-import-mmsx-edited.mmsx",
+      "sha256": "00e59d3c5b85f6c63ed66f235e0fe9f381fb8efe607b61189eda1cd854f765e0",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "NO RED FLAGS nel report; pagina di editing distinta",
+      "events": "Eventi fantasma/invisibili riportati nei casi 02/04/05/07/08/09",
+      "scenePlacement": "Duplicazione scena in sub-board dello stesso piano riportata",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "05-studio-new.msd",
+      "sha256": "653ca14024ab351572df093762ca4c2b857bd764df1118fbda1ad21c37636903",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "05-studio-new.mmsx",
+      "sha256": "870771776fc7310cd7661903c4fe698609b360e2c05fc1aac7a40232e4b05a11",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "NO RED FLAGS nel report; pagina di editing distinta",
+      "events": "Eventi fantasma/invisibili riportati nei casi 02/04/05/07/08/09",
+      "scenePlacement": "Non segnalata per questo caso",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "06-studio-msd.msd",
+      "sha256": "c18867f2b8506f162876ae4030b4591c362cae810a8e573a5933bc128cd1efd4",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "06-studio-msd.mmsx",
+      "sha256": "518fce10224b805b1d8de650a36f50c7578a8c007447e112458de37d208bf6bc",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "OK riportato",
+      "events": "Nessun problema segnalato: eventi assenti",
+      "scenePlacement": "Non segnalata per questo caso",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "07-studio-mmsx.msd",
+      "sha256": "537635f5928e880516b63164e1d86787b831f54fcc287859dec0172b508b6fad",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "07-studio-mmsx.mmsx",
+      "sha256": "1dc868dccd7e097c29efe5821adc63ac1397b62614b9259bb64e487768d1d205",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "NO RED FLAGS nel report; pagina di editing distinta",
+      "events": "Eventi fantasma/invisibili riportati nei casi 02/04/05/07/08/09",
+      "scenePlacement": "Duplicazione scena in sub-board dello stesso piano riportata",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "08-native-noop.msd",
+      "sha256": "653ca14024ab351572df093762ca4c2b857bd764df1118fbda1ad21c37636903",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "08-native-noop.mmsx",
+      "sha256": "4db6cd49c038b8a747a36c4729290b61a4e08d1e6b2f826ca726cea5d613799f",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "NO RED FLAGS nel report; pagina di editing distinta",
+      "events": "Eventi fantasma/invisibili riportati nei casi 02/04/05/07/08/09",
+      "scenePlacement": "Duplicazione scena in sub-board dello stesso piano riportata",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "09-migrate-v1.msd",
+      "sha256": "986178a2f538a8d1e66d850bd0ac571895babb11607d39a7add8b03a5e9abbf5",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "09-migrate-v1.mmsx",
+      "sha256": "4db6cd49c038b8a747a36c4729290b61a4e08d1e6b2f826ca726cea5d613799f",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "NO RED FLAGS nel report; pagina di editing distinta",
+      "events": "Eventi fantasma/invisibili riportati nei casi 02/04/05/07/08/09",
+      "scenePlacement": "Duplicazione scena in sub-board dello stesso piano riportata",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "09-migrate-v2.msd",
+      "sha256": "986178a2f538a8d1e66d850bd0ac571895babb11607d39a7add8b03a5e9abbf5",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "09-migrate-v2.mmsx",
+      "sha256": "4db6cd49c038b8a747a36c4729290b61a4e08d1e6b2f826ca726cea5d613799f",
+      "app": "MMS10",
+      "oneLineVertical": "Crash riportato in tutti gli esempi",
+      "colors": "Perdita colori strip segnalata anche su MMSX",
+      "redFlags": "NO RED FLAGS nel report; pagina di editing distinta",
+      "events": "Eventi fantasma/invisibili riportati nei casi 02/04/05/07/08/09",
+      "scenePlacement": "Duplicazione scena in sub-board dello stesso piano riportata",
+      "calendarReport": "Nessun nuovo esito: crash della suite precedente non riclassificato PASS",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "10-diagnostic-time.msd",
+      "sha256": "00ccd65e4061e6eafd051393f36325b47ec738fbb66d9a3ddf81cec1b7752b0e",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "10-diagnostic-unicode.msd",
+      "sha256": "44a022f741904e7df63053e149c4c09b9dd98e4d9c8d2412d43ff7d61249755e",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "10-diagnostic-properties.msd",
+      "sha256": "d176b60a77809b176d980735fc54a6211ef619f57928c0deea77e5c53cd7b940",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "10-diagnostic-empty-day.msd",
+      "sha256": "592954bb95cbe135ac3483e72a2464c16f1e2e4eecedb2ccba578cd52ebde687",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "10-diagnostic-redflag.msd",
+      "sha256": "31760e0775ac2554a7d24542d162b4872c5a1b6a0c04d22c15c7110fb06c9b70",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "10-diagnostic-second-plan.msd",
+      "sha256": "36a72b000126cfa73d6addefd881d1bc0e4fe66316b19054083eed31d1a80dbe",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    },
+    {
+      "file": "10-diagnostic-int-ext-dn.msd",
+      "sha256": "54382e5f699fc75c6b497ea3a92412cc918c453b633ad73c77d583b5a214998a",
+      "app": "MMS6",
+      "dayNight": "Sempre non assegnato, secondo riscontro complessivo",
+      "colors": "Strip bianche e palette grigia secondo riscontro complessivo",
+      "opening": "Nessun nuovo esito generale esplicito in questo riscontro",
+      "saveReopen": "NON REGISTRATO"
+    }
+  ]
+}
