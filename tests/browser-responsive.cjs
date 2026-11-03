@@ -100,8 +100,13 @@ const output=process.env.STUDIO_TEST_OUTPUT||'/tmp/stripboard-responsive-qa';
     await page.emulateMedia({media:'screen'});
     assert.equal(await page.locator('#dirtyIndicator').innerText(),'Salvato');
     const download=page.waitForEvent('download');await page.locator('#saveButton').click();
-    const saved=path.join(output,'responsive-noop.msd');await(await download).saveAs(saved);
-    assert.deepEqual(await fs.readFile(saved),await fs.readFile(path.join(__dirname,'../samples/Wonderful Life Demo.msd')));
+    const saved=path.join(output,'responsive-noop.studio.json'),file=await download;
+    assert.match(file.suggestedFilename(),/\.studio\.json$/);await file.saveAs(saved);
+    const native=await page.evaluate(async bytes=>{
+      const {parseStudio}=await import('./assets/studio-project.js'),{serializeMsd}=await import('./assets/msd-writer.js');
+      return [...new Uint8Array(serializeMsd(await parseStudio(new Uint8Array(bytes))))];
+    },[...await fs.readFile(saved)]);
+    assert.deepEqual(Buffer.from(native),await fs.readFile(path.join(__dirname,'../samples/Wonderful Life Demo.msd')));
 
     // Compact phone strips retain the original reorder and Undo workflow for both source orientations.
     await page.locator('#boardNav').click();

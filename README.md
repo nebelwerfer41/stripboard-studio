@@ -24,6 +24,13 @@ modifiche non salvate. Progetti nuovi e importati usano gli stessi adattatori;
 i nativi invariati mantengono l'identità binaria. L'archivio originale opaco
 resta nel progetto Studio anche dopo editing completo.
 
+Il dialogo **Esporta MSD/MMSX** usa gli stessi pannelli della UI: presenta
+impedimenti, trasformazioni, omissioni e dati mantenuti in sezioni leggibili,
+mostra gli errori nel dialogo e richiede nuovamente la conferma quando cambiano
+le opzioni. Lo stile dei nomi è visibile solo per MSD. Il Breakdown spiega la
+modalità quantità attiva e il massimo giornaliero per elemento. Il dialogo è
+utilizzabile anche su telefono e in orientamento orizzontale.
+
 Vedi la [matrice di compatibilità e le incognite](docs/persistence-compatibility.md)
 e la [suite sintetica per MMS6/MMS10](verification/movie-magic/README.md), con
 manifest, checklist e registro delle prove manuali ancora da eseguire. Le sezioni
@@ -142,6 +149,7 @@ Browser suites require Playwright, a local server and optionally `CHROME_PATH`. 
 CHROME_PATH=/usr/bin/chromium node tests/browser-refinements.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-performance.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-production-info.cjs
+CHROME_PATH=/usr/bin/chromium node tests/browser-export-review.cjs
 CHROME_PATH=/usr/bin/chromium node tests/browser-workspace-revision.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-qa node tests/browser-workspace.cjs
 CHROME_PATH=/usr/bin/chromium STUDIO_TEST_OUTPUT=/tmp/stripboard-dood-qa node tests/browser-dood.cjs

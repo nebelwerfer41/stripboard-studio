@@ -1,5 +1,6 @@
+import {exportReviewMarkup} from './export-review.js';
 import {quantityRows,quantitySettings} from './quantities.js';
-import {analyzeExport,formatExportReport,requireExport} from './export-adapters.js';
+import {analyzeExport,requireExport} from './export-adapters.js';
 import {parseMmsx,serializeMmsx} from './mmsx-project.js';
 const parseSchedule=(bytes,name)=>/\.studio\.json$/i.test(name)?parseStudio(bytes):/^(MMS2|MMSX)$/.test(new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4,bytes.byteLength))))?parseMmsx(bytes,name):parseMsd(bytes,name);
 import {parseMsd} from './msd-parser.js';
@@ -1347,12 +1348,25 @@ $('exportButton').addEventListener('click',()=>{
  if(!state.project)return;
  if(productionEditing.hasDraft()||integratedEditing.hasDraft()||documentEditor.hasDraft()||catalogEditor.hasDraft()||eventManager.hasDraft()){showStatus('Applica o correggi i campi ancora in modifica prima di esportare.');return}
  pendingExport={...state.project,...snapshotDocument(state.project)};
- $('exportDialog').showModal();reviewExport();
+ $('exportFormat').value=state.project.format==='msd'?'msd':'mmsx';
+ $('exportQuantityMode').value='project';$('exportQuantityStyle').value='';
+ reviewExport();$('exportDialog').showModal();
 });
 const exportQuantityOptions=()=>({quantityMode:$('exportQuantityMode').value,quantityStyle:$('exportFormat').value==='msd'?$('exportQuantityStyle').value||undefined:undefined});
-function reviewExport(){if(!pendingExport)return;$('exportQuantityStyle').disabled=$('exportFormat').value!=='msd';const report=analyzeExport(pendingExport,$('exportFormat').value,exportQuantityOptions());$('exportReport').textContent=formatExportReport(report);$('exportAcceptLoss').checked=false;$('exportLossLabel').hidden=!report.omitted.length&&!report.transformed.length;$('exportConfirm').disabled=report.blockers.length>0}
+function reviewExport(){
+ if(!pendingExport)return;
+ const msd=$('exportFormat').value==='msd';
+ $('exportQuantityStyle').disabled=!msd;$('exportQuantityStyleLabel').hidden=!msd;
+ const report=analyzeExport(pendingExport,$('exportFormat').value,exportQuantityOptions());
+ $('exportReport').innerHTML=exportReviewMarkup(report);$('exportReport').scrollTop=0;
+ const mode=$('exportQuantityMode').value==='project'?quantitySettings(pendingExport).mode:$('exportQuantityMode').value;
+ $('exportQuantityHelp').textContent=(mode==='name'?'Quantità lette dai nomi, ad esempio “Folla (3)” o “3 Folla”.':'Quantità lette dal valore di ogni elemento nella scena.')+' '+(msd?'Nel file MSD, le quantità da 2 in su sono riportate nei nomi.':'Nel file MMSX, le quantità sono numeriche per scena.');
+ $('exportAcceptLoss').checked=false;$('exportLossLabel').hidden=!report.omitted.length&&!report.transformed.length;
+ $('exportError').hidden=true;$('exportError').textContent='';
+ $('exportConfirm').disabled=report.blockers.length>0;
+}
 for(const id of ['exportFormat','exportQuantityMode','exportQuantityStyle'])$(id).addEventListener('change',reviewExport);
-$('exportCancel').addEventListener('click',()=>$('exportDialog').close());
+for(const id of ['exportCancel','exportClose'])$(id).addEventListener('click',()=>$('exportDialog').close());
 $('exportDialog').addEventListener('close',()=>{pendingExport=null});
 $('exportConfirm').addEventListener('click',async()=>{
  const project=pendingExport,target=$('exportFormat').value,acceptLoss=$('exportAcceptLoss').checked;if(!project)return;
@@ -1362,7 +1376,7 @@ $('exportConfirm').addEventListener('click',async()=>{
   const bytes=target==='msd'?serializeMsd(project,{acceptLoss,...quantityOptions}):await serializeMmsx(project,name,{acceptLoss,...quantityOptions});
   const url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));const link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
   $('exportDialog').close();showStatus('Esportazione completata. Per conservare integralmente il lavoro usa Salva progetto Studio.');
- }catch(error){showStatus(error.message);$('exportConfirm').disabled=false}
+ }catch(error){$('exportError').textContent=error.message;$('exportError').hidden=false;showStatus(error.message);$('exportConfirm').disabled=false}
 });
 window.addEventListener('beforeunload',event=>{if(isDirty()||productionEditing.hasDraft()||documentEditor.hasDraft()||integratedEditing.hasDraft()||eventManager.hasDraft()){event.preventDefault();event.returnValue=''}});
 $('layoutSelect').addEventListener('change',e=>{

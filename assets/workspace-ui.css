@@ -1,4 +1,32 @@
 /* One toolbar per workspace; data scrolls below it, never behind its commands. */
+.studio-overlay.export-overlay{width:min(760px,calc(100vw - 24px));max-height:90vh}
+.export-overlay[open]{display:flex;flex-direction:column;overflow:hidden}
+.export-overlay>.overlay-header,.export-overlay>.overlay-help,.export-options,.export-footer{flex:none}
+.export-overlay>.overlay-header{margin-bottom:0}
+.export-options label{margin:0}
+.export-review{min-height:60px;overflow:auto;overscroll-behavior:contain;border:1px solid #d4e0e5;border-radius:5px;padding:12px;overflow-wrap:anywhere}
+.export-review-status{margin:0;padding:9px 10px;background:#e3f1eb;border-radius:4px;font-weight:600;color:#21675f}
+.export-review-status[data-export-state=review]{background:#fff4df;color:#80561c}
+.export-review-status[data-export-state=blocked]{background:#fbeaea;color:#a32626}
+.export-review-group{padding:10px 0;border-top:1px solid #e1e9ec}
+.export-review-group h3{margin:0;font-size:13px}.export-review-group h3 small{font-weight:400;color:#617984}
+.export-review-group[data-export-group=blockers]:has(li) h3{color:#a32626}
+.export-review-group ul{list-style:none;padding:0;margin:8px 0 0}
+.export-review-group li{display:flex;gap:8px;align-items:baseline;margin:7px 0;font-size:12px;line-height:1.5}
+.export-item-count{flex:none;min-width:24px;padding:0 4px;border-radius:3px;background:#edf3f5;text-align:center;font-variant-numeric:tabular-nums}
+.export-loss{display:flex;align-items:flex-start;gap:8px;line-height:1.45}.export-loss input{flex:none;margin:2px 0;accent-color:#167f70}
+.studio-overlay .dialog-actions .export-primary{background:#167f70;color:#fff;border-color:#167f70}
+.studio-overlay .dialog-actions button:disabled{opacity:.45;cursor:default}
+.export-overlay :focus-visible{outline:2px solid #167f70;outline-offset:2px}
+.quantity-mode-control{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.quantity-mode-control select{max-width:100%;min-width:0;border:1px solid #c3d2d8;border-radius:4px;padding:6px;background:#fff;color:#28414f;font:inherit}
+.breakdown-quantity-help{font-size:11px;line-height:1.5;color:#617984;margin:0 0 10px}
+.top-actions #exportButton{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;padding:7px 10px;border:1px solid #ffffff30;border-radius:5px;background:#ffffff09;color:#e4f0f3;font:inherit;font-size:11px;cursor:pointer}
+.top-actions #exportButton:hover{background:#ffffff17}.top-actions #exportButton:disabled{opacity:.45;cursor:default}
+@media(max-width:620px){.studio-overlay.export-overlay{max-height:94vh;max-height:94dvh}.export-review{padding:8px}.export-footer .dialog-actions button{min-height:40px}.quantity-mode-control select{font-size:16px;min-height:36px}.top-actions #exportButton{white-space:normal;max-width:112px;padding:6px;font-size:11px}}
+@media(max-height:650px){.export-overlay[open]{display:block;overflow:auto}.export-review{max-height:35vh}}
+@media screen and (min-width:621px) and (max-width:950px){.topbar{padding-block:7px}}
+@media print{.breakdown-quantity-help{display:none!important}}
 .panel-header{display:grid;grid-template-columns:minmax(90px,1fr) auto auto auto;align-items:center;gap:6px 10px}
 .panel-tools{min-width:0}.view-editing-controls{grid-column:1/-1;margin:0;padding-top:6px;border-top:1px solid var(--line);font-size:12px}
 .view-editing-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
